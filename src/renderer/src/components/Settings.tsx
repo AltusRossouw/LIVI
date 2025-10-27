@@ -196,6 +196,20 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     window.carplay.usb.listenForEvents(usbHandler)
   }, [])
 
+  useEffect(() => {
+    let off: (() => void) | undefined
+    ;(async () => {
+      try {
+        const kiosk = await window.app.getKiosk()
+        setActiveSettings(prev => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+      } catch {}
+      off = window.app.onKioskSync(kiosk => {
+        setActiveSettings(prev => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+      })
+    })()
+    return () => { if (off) off() }
+  }, [])
+
   const renderField = (label: string, key: keyof ExtraConfig, min?: number, max?: number) => (
     <Grid size={{ xs: 3 }} key={String(key)}>
       <TextField

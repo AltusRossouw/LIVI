@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import { ExtraConfig } from '../main/Globals'
+import type { ExtraConfig } from '../main/Globals'
 import type { MultiTouchPoint } from '../main/carplay/messages/sendable'
 
 type ApiCallback<T = any> = (event: IpcRendererEvent, ...args: T[]) => void
@@ -55,7 +55,7 @@ const api = {
   },
 
   settings: {
-    get: () => ipcRenderer.invoke('getSettings'),
+    get: (): Promise<ExtraConfig> => ipcRenderer.invoke('getSettings'),
     save: (settings: ExtraConfig) => ipcRenderer.invoke('save-settings', settings),
     onUpdate: (callback: ApiCallback<ExtraConfig>) => ipcRenderer.on('settings', callback),
   },
@@ -90,15 +90,23 @@ const appApi = {
   getLatestRelease: () => ipcRenderer.invoke('app:getLatestRelease'),
   performUpdate: (imageUrl?: string) => ipcRenderer.invoke('app:performUpdate', imageUrl),
 
-  onUpdateEvent: (cb: (payload: any) => void) => {
+  onUpdateEvent: (cb: (payload: any) => void): (() => void) => {
     const ch = 'update:event'
     const handler = (_e: IpcRendererEvent, payload: any) => cb(payload)
     ipcRenderer.on(ch, handler)
     return () => ipcRenderer.removeListener(ch, handler)
   },
-  onUpdateProgress: (cb: (payload: any) => void) => {
+  onUpdateProgress: (cb: (payload: any) => void): (() => void) => {
     const ch = 'update:progress'
     const handler = (_e: IpcRendererEvent, payload: any) => cb(payload)
+    ipcRenderer.on(ch, handler)
+    return () => ipcRenderer.removeListener(ch, handler)
+  },
+
+  getKiosk: (): Promise<boolean> => ipcRenderer.invoke('settings:get-kiosk'),
+  onKioskSync: (cb: (kiosk: boolean) => void): (() => void) => {
+    const ch = 'settings:kiosk-sync'
+    const handler = (_e: IpcRendererEvent, kiosk: boolean) => cb(kiosk)
     ipcRenderer.on(ch, handler)
     return () => ipcRenderer.removeListener(ch, handler)
   },
@@ -108,7 +116,7 @@ contextBridge.exposeInMainWorld('app', appApi)
 
 declare global {
   interface Window {
-    carplay: typeof api
-    app: typeof appApi
+    carplay: any
+    app: any
   }
 }

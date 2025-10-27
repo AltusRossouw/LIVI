@@ -80,9 +80,9 @@ const mimeTypeFromExt = (ext: string): string =>
   )[ext.toLowerCase()] ?? 'application/octet-stream'
 
 const MIN_WIDTH = 400
+const isMac = process.platform === 'darwin'
 
-function applyAspectRatio(win: BrowserWindow, width: number, height: number): void {
-  if (!win) return
+function applyAspectRatioWindowed(win: BrowserWindow, width: number, height: number): void {
   const ratio = width && height ? width / height : 0
   const [winW, winH] = win.getSize()
   const [contentW, contentH] = win.getContentSize()
@@ -96,6 +96,10 @@ function applyAspectRatio(win: BrowserWindow, width: number, height: number): vo
     win.setMinimumSize(0, 0)
   }
 }
+function applyAspectRatioFullscreen(win: BrowserWindow, width: number, height: number): void {
+  const ratio = width && height ? width / height : 0
+  win.setAspectRatio(ratio, { width: 0, height: 0 })
+}
 
 // Globals
 let mainWindow: BrowserWindow | null
@@ -103,6 +107,7 @@ let socket: Socket
 let config: ExtraConfig
 let usbService: USBService
 let isQuitting = false
+let suppressNextFsSync = false
 
 const carplayService = new CarplayService()
 ;(global as any).carplayService = carplayService
@@ -182,7 +187,7 @@ function loadConfig(): ExtraConfig {
 }
 config = loadConfig()
 
-//  Updater helpers 
+// Updater helpers
 function pickAssetForPlatform(assets: any[]): { url?: string } {
   if (!Array.isArray(assets)) return {}
 
@@ -230,7 +235,7 @@ function sendUpdateProgress(payload: any) {
 async function downloadWithProgress(url: string, dest: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const req = https.get(url, (res) => {
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      if (res.statusCode && res.statusCode >= 300 && res.headers.location) {
         req.destroy()
         downloadWithProgress(res.headers.location, dest).then(resolve, reject)
         return
@@ -362,15 +367,68 @@ async function installOnMac(url: string): Promise<void> {
 }
 
 // Window
+function sendKioskSync(kiosk: boolean) {
+  mainWindow?.webContents.send('settings:kiosk-sync', kiosk)
+}
+function persistKioskAndBroadcast(kiosk: boolean) {
+  if (config.kiosk === kiosk) return
+  config = { ...config, kiosk }
+  try {
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          ...config,
+          width: +config.width,
+          height: +config.height,
+          fps: +config.fps,
+          dpi: +config.dpi,
+          format: +config.format,
+          iBoxVersion: +config.iBoxVersion,
+          phoneWorkMode: +config.phoneWorkMode,
+          packetMax: +config.packetMax,
+          mediaDelay: +config.mediaDelay,
+          wifiType: config.wifiType,
+          wifiChannel: config.wifiChannel,
+        },
+        null,
+        2
+      )
+    )
+  } catch (e) {
+    console.warn('[config] persist kiosk failed:', e)
+  }
+  if (socket) {
+    socket.config = config
+    socket.sendSettings()
+  }
+  sendKioskSync(kiosk)
+}
+
+function currentKiosk(): boolean {
+  const win = mainWindow
+  if (win && !win.isDestroyed()) {
+    return isMac ? win.isFullScreen() : win.isKiosk()
+  }
+  return !!config.kiosk
+}
+
+function applyWindowedContentSize(win: BrowserWindow, w: number, h: number) {
+  win.setContentSize(w, h, false)
+  applyAspectRatioWindowed(win, w, h)
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: config.width,
     height: config.height,
-    frame: !config.kiosk,
+    frame: isMac ? true : !config.kiosk,
     useContentSize: true,
-    kiosk: false,
+    kiosk: isMac ? false : !!config.kiosk,
     autoHideMenuBar: true,
     backgroundColor: '#000',
+    fullscreenable: true,
+    simpleFullscreen: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -385,7 +443,9 @@ function createWindow(): void {
   const ses = mainWindow.webContents.session
   ses.setPermissionCheckHandler((_w, p) => ['usb', 'hid', 'media', 'display-capture'].includes(p))
   ses.setPermissionRequestHandler((_w, p, cb) => cb(['usb', 'hid', 'media', 'display-capture'].includes(p)))
-  ses.setUSBProtectedClassesHandler(({ protectedClasses }) => protectedClasses.filter((c) => ['audio', 'video', 'vendor-specific'].includes(c)))
+  ses.setUSBProtectedClassesHandler(({ protectedClasses }) =>
+    protectedClasses.filter((c) => ['audio', 'video', 'vendor-specific'].includes(c))
+  )
 
   session.defaultSession.webRequest.onHeadersReceived({ urls: ['*://*/*', 'file://*/*'] }, (d, cb) =>
     cb({
@@ -400,17 +460,43 @@ function createWindow(): void {
 
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return
-    mainWindow.show()
-    if (config.kiosk) {
-      mainWindow.setKiosk(true)
-      applyAspectRatio(mainWindow, 0, 0)
+
+    if (isMac) {
+      const baseW = config.width || 800
+      const baseH = config.height || 480
+      applyWindowedContentSize(mainWindow, baseW, baseH)
+      mainWindow.show()
+      if (config.kiosk) setImmediate(() => mainWindow!.setFullScreen(true))
     } else {
-      mainWindow.setContentSize(config.width, config.height, false)
-      applyAspectRatio(mainWindow, config.width, config.height)
+      if (config.kiosk) {
+        mainWindow.setKiosk(true)
+        applyAspectRatioWindowed(mainWindow, 0, 0)
+      } else {
+        mainWindow.setContentSize(config.width, config.height, false)
+        applyAspectRatioWindowed(mainWindow, config.width, config.height)
+      }
+      mainWindow.show()
     }
+
+    sendKioskSync(currentKiosk())
+
     if (is.dev) mainWindow.webContents.openDevTools({ mode: 'detach' })
     carplayService.attachRenderer(mainWindow.webContents)
   })
+
+  if (isMac) {
+    mainWindow.on('enter-full-screen', () => {
+      if (suppressNextFsSync) return
+      applyAspectRatioFullscreen(mainWindow!, config.width || 800, config.height || 480)
+      persistKioskAndBroadcast(true)
+    })
+
+    mainWindow.on('leave-full-screen', () => {
+      if (suppressNextFsSync) { suppressNextFsSync = false; return }
+      applyAspectRatioWindowed(mainWindow!, config.width || 800, config.height || 480)
+      persistKioskAndBroadcast(false)
+    })
+  }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
@@ -421,9 +507,15 @@ function createWindow(): void {
   else mainWindow.loadURL('app://index.html')
 
   mainWindow.on('close', (e) => {
-    if (process.platform === 'darwin' && !isQuitting) {
+    if (isMac && !isQuitting) {
       e.preventDefault()
-      mainWindow?.hide()
+      if (mainWindow!.isFullScreen()) {
+        suppressNextFsSync = true
+        mainWindow!.once('leave-full-screen', () => mainWindow?.hide())
+        mainWindow!.setFullScreen(false)
+      } else {
+        mainWindow!.hide()
+      }
     }
   })
 
@@ -477,9 +569,19 @@ app.whenReady().then(() => {
   usbService = new USBService(carplayService)
   socket = new Socket(config, saveSettings)
 
-  ipcMain.handle('quit', () => (process.platform === 'darwin' ? mainWindow?.hide() : app.quit()))
+  ipcMain.handle('quit', () => (isMac
+    ? (mainWindow?.isFullScreen()
+        ? (() => { suppressNextFsSync = true; mainWindow!.once('leave-full-screen', () => mainWindow?.hide()); mainWindow!.setFullScreen(false) })()
+        : mainWindow?.hide())
+    : app.quit()))
 
-  // Update/Version IPC
+  ipcMain.handle('settings:get-kiosk', () => currentKiosk())
+  ipcMain.handle('getSettings', () => config)
+  ipcMain.handle('save-settings', (_evt, settings: ExtraConfig) => {
+    saveSettings(settings)
+    return true
+  })
+
   ipcMain.handle('app:getVersion', () => app.getVersion())
 
   ipcMain.handle('app:getLatestRelease', async () => {
@@ -574,17 +676,32 @@ function saveSettings(settings: ExtraConfig) {
     )
   )
 
+  config = { ...settings }
   socket.config = settings
   socket.sendSettings()
+  sendKioskSync(config.kiosk)
 
   if (!mainWindow) return
 
-  if (settings.kiosk) {
-    mainWindow.setKiosk(true)
-    applyAspectRatio(mainWindow, 0, 0)
+  if (isMac) {
+    const w = settings.width || 800
+    const h = settings.height || 480
+    if (settings.kiosk) {
+      applyWindowedContentSize(mainWindow, w, h)
+      applyAspectRatioFullscreen(mainWindow, w, h)
+      mainWindow.setFullScreen(true)
+    } else {
+      mainWindow.setFullScreen(false)
+      applyWindowedContentSize(mainWindow, w, h)
+    }
   } else {
-    mainWindow.setKiosk(false)
-    mainWindow.setContentSize(settings.width, settings.height, false)
-    applyAspectRatio(mainWindow, settings.width, settings.height)
+    if (settings.kiosk) {
+      mainWindow.setKiosk(true)
+      applyAspectRatioWindowed(mainWindow, 0, 0)
+    } else {
+      mainWindow.setKiosk(false)
+      mainWindow.setContentSize(settings.width, settings.height, false)
+      applyAspectRatioWindowed(mainWindow, settings.width, settings.height)
+    }
   }
 }

@@ -18,6 +18,7 @@ import {
   CircularProgress,
   Typography,
   MenuItem,
+  InputAdornment,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import type { SxProps, Theme } from '@mui/material/styles'
@@ -74,7 +75,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     audioVolume: settings.audioVolume ?? 1.0,
     navVolume: settings.navVolume ?? 1.0,
   })
-  const [micLabel, setMicLabel] = useState('no device available')
+  const [micLabel, setMicLabel] = useState('not available')
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
   const [openBindings, setOpenBindings] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
@@ -82,17 +83,36 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
   const [closeCountdown, setCloseCountdown] = useState(0)
   const [hasChanges, setHasChanges] = useState(false)
   const [openAdvanced, setOpenAdvanced] = useState(false)
+  const [micResetPending, setMicResetPending] = useState(false)
 
   const saveSettings = useCarplayStore(s => s.saveSettings)
   const isDongleConnected = useStatusStore(s => s.isDongleConnected)
   const setCameraFound = useStatusStore(s => s.setCameraFound)
   const theme = useTheme()
+  const isDarkMode = theme.palette.mode === 'dark'
+  const currentPrimary =
+    (isDarkMode ? activeSettings.primaryColorDark : activeSettings.primaryColorLight)
+    ?? theme.palette.primary.main
 
-  const debouncedSave = useMemo(() => debounce((newSettings: ExtraConfig) => saveSettings(newSettings), 300), [saveSettings])
+  const debouncedSave = useMemo(
+    () => debounce((newSettings: ExtraConfig) => saveSettings(newSettings), 300),
+    [saveSettings]
+  )
   useEffect(() => () => debouncedSave.cancel(), [debouncedSave])
 
+  const autoSave = async (patch: Partial<ExtraConfig>) => {
+    let kiosk = activeSettings.kiosk
+    try { kiosk = await window.app.getKiosk() } catch { }
+    const current = useCarplayStore.getState().settings
+    const nightMode = typeof current?.nightMode === 'boolean' ? current!.nightMode : activeSettings.nightMode
+
+    const updated: ExtraConfig = { ...activeSettings, ...patch, kiosk, nightMode }
+    setActiveSettings(updated)
+    saveSettings(updated)
+  }
+
   const requiresRestartParams: (keyof ExtraConfig)[] = [
-    'width', 'height', 'fps', 'dpi', 'format', 'mediaDelay', 'phoneWorkMode', 'wifiType', 'micType', 'audioTransferMode'
+    'width', 'height', 'fps', 'dpi', 'format', 'mediaDelay', 'wifiType', 'audioTransferMode'
   ]
 
   const getValidWifiChannel = (wifiType: ExtraConfig['wifiType'], ch?: number): number => {
@@ -103,6 +123,16 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
   }
 
   const settingsChange = (key: keyof ExtraConfig, value: any) => {
+    if (key === 'micType') {
+      const prev = activeSettings.micType
+      const next = value as 'box' | 'os'
+      const updated: ExtraConfig = { ...activeSettings, micType: next }
+      setActiveSettings(updated)
+      saveSettings(updated)
+      setMicResetPending(prev !== 'box' && next === 'box' && isDongleConnected)
+      return
+    }
+
     let updated: ExtraConfig = { ...activeSettings, [key]: value }
 
     if (key === 'wifiType') {
@@ -127,12 +157,16 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
   }
 
   const handleSave = async () => {
-    setIsResetting(true)
-    setCloseCountdown(3)
+    const needsReset = hasChanges || micResetPending
+
+    if (needsReset) {
+      setIsResetting(true)
+      setCloseCountdown(3)
+    }
 
     let resetStatus = ""
     try {
-      if (isDongleConnected) {
+      if (needsReset && isDongleConnected) {
         setResetMessage("Dongle Reset...")
         const ok = await window.carplay.usb.forceReset()
         resetStatus = ok ? "Success" : "Failed"
@@ -145,6 +179,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
 
     await saveSettings(activeSettings)
     setHasChanges(false)
+    setMicResetPending(false)
     setIsResetting(false)
     setResetMessage(resetStatus)
   }
@@ -164,16 +199,23 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     return () => clearInterval(timerId)
   }, [resetMessage])
 
+  const renderOsMicLabel = (raw: string) => {
+    if (raw === 'not available') return 'No system input'
+    const lower = raw.toLowerCase()
+    if (lower === 'system default' || lower === 'default') return 'OS mic (auto)'
+    return `OS • ${raw}`
+  }
+
   useEffect(() => {
     const updateMic = async () => {
       try {
         const label = await window.carplay.usb.getSysdefaultPrettyName()
-        const final = label && !['sysdefault', 'null'].includes(label) ? label : 'no device'
+        const final = label && !['sysdefault', 'null'].includes(label) ? label : 'not available'
         setMicLabel(final)
-        if (!activeSettings.microphone && final !== 'no device') {
-          const upd = { ...activeSettings, microphone: 'sysdefault' }
-          setActiveSettings(upd)
-          debouncedSave(upd)
+
+        // Only set once if user never chose a micType
+        if (!activeSettings.micType) {
+          await autoSave({ micType: (final === 'not available' ? 'box' : 'os') as 'box' | 'os' })
         }
       } catch {
         console.warn('[Settings] Mic label fetch failed')
@@ -184,13 +226,19 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       if (['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) updateMic()
     }
     window.carplay.usb.listenForEvents(micUsbHandler)
-  }, [])
+  }, [activeSettings.micType])
 
   useEffect(() => {
-    detectCameras(setCameraFound, saveSettings, activeSettings).then(setCameras)
+    const safeCameraPersist = async (cfgOrId: any) => {
+      const cameraId = typeof cfgOrId === 'string' ? cfgOrId : cfgOrId?.camera
+      await autoSave({ camera: cameraId ?? '' })
+    }
+
+    detectCameras(setCameraFound, safeCameraPersist, activeSettings).then(setCameras)
+
     const usbHandler = (_: any, data: { type: string }) => {
       if (['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
-        detectCameras(setCameraFound, saveSettings, activeSettings).then(setCameras)
+        detectCameras(setCameraFound, safeCameraPersist, activeSettings).then(setCameras)
       }
     }
     window.carplay.usb.listenForEvents(usbHandler)
@@ -202,7 +250,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       try {
         const kiosk = await window.app.getKiosk()
         setActiveSettings(prev => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
-      } catch {}
+      } catch { }
       off = window.app.onKioskSync(kiosk => {
         setActiveSettings(prev => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
       })
@@ -210,24 +258,12 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     return () => { if (off) off() }
   }, [])
 
-  const renderField = (label: string, key: keyof ExtraConfig, min?: number, max?: number) => (
-    <Grid size={{ xs: 3 }} key={String(key)}>
-      <TextField
-        label={label}
-        type="number"
-        fullWidth
-        inputProps={{ ...(min != null && { min }), ...(max != null && { max }) }}
-        value={activeSettings[key] as number | string}
-        onChange={e => settingsChange(key, Number(e.target.value))}
-        sx={{ mx: 2, maxWidth: 140 }}
-      />
-    </Grid>
-  )
-
   const handleClosePopup = () => {
     setResetMessage("")
     setCloseCountdown(0)
   }
+
+  const micUnavailable = micLabel === 'not available'
 
   return (
     <Box
@@ -237,7 +273,6 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       flexDirection="column"
       height="100vh"
     >
-      {/* Content */}
       <Box
         sx={{
           overflowY: 'hidden',
@@ -250,14 +285,11 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
           gap: 2,
         }}
       >
-        {/* Top row: left = Video, right = Audio */}
         <Grid container spacing={2} sx={{ px: 1 }}>
-          {/* VIDEO SETTINGS */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <SectionHeader sx={{ mb: 2.25 }}>VIDEO SETTINGS</SectionHeader>
 
             <Box sx={{ pl: 1.5 }}>
-              {/* Row 1: WIDTH × HEIGHT */}
               <Box
                 sx={{
                   display: 'grid',
@@ -286,7 +318,6 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
                 />
               </Box>
 
-              {/* Row 2: FPS | MEDIA DELAY */}
               <Box
                 sx={{
                   mt: 1.75,
@@ -318,7 +349,6 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
             </Box>
           </Grid>
 
-          {/* AUDIO SETTINGS */}
           <Grid size={{ xs: 12, sm: 6 }}>
             <SectionHeader>AUDIO SETTINGS</SectionHeader>
 
@@ -354,7 +384,6 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
           </Grid>
         </Grid>
 
-        {/* Bottom row: Options + three selects */}
         <Grid
           container
           spacing={2}
@@ -397,6 +426,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
             </Stack>
           </Grid>
 
+          {/* WIFI */}
           <Grid size={{ xs: 6, sm: 3 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
@@ -411,6 +441,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
             </TextField>
           </Grid>
 
+          {/* MICROPHONE */}
           <Grid size={{ xs: 6, sm: 3 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
@@ -418,15 +449,21 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
               fullWidth
               label="MICROPHONE"
               value={activeSettings.micType}
-              onChange={e => settingsChange('micType', e.target.value)}
+              onChange={e => settingsChange('micType', e.target.value as 'box' | 'os')}
             >
-              <MenuItem value="os">
-                <Typography noWrap component="span">OS: {micLabel}</Typography>
+              <MenuItem
+                value="os"
+                disabled={micUnavailable && activeSettings.micType !== 'os'}
+              >
+                <Typography noWrap component="span" title={micLabel}>
+                  {renderOsMicLabel(micLabel)}
+                </Typography>
               </MenuItem>
               <MenuItem value="box">BOX</MenuItem>
             </TextField>
           </Grid>
 
+          {/* CAMERA */}
           <Grid size={{ xs: 6, sm: 3 }} sx={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
@@ -446,7 +483,6 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
         </Grid>
       </Box>
 
-      {/* Centered action buttons */}
       <Box
         position="sticky"
         bottom={0}
@@ -464,9 +500,10 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
           </Button>
           <Button
             variant="contained"
-            color={hasChanges ? 'primary' : 'inherit'}
-            onClick={hasChanges ? handleSave : undefined}
-            disabled={!hasChanges || isResetting}
+            className="hover-ring"
+            color={(hasChanges || micResetPending) ? 'primary' : 'inherit'}
+            onClick={(hasChanges || micResetPending) ? handleSave : undefined}
+            disabled={!(hasChanges || micResetPending) || isResetting}
           >
             SAVE
           </Button>
@@ -504,24 +541,82 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
         </DialogContent>
       </Dialog>
 
+      {/* ADVANCED */}
       <Dialog
         open={openAdvanced}
         TransitionComponent={Transition}
         keepMounted
         onClose={() => setOpenAdvanced(false)}
-        PaperProps={{ sx: { minWidth: 520 } }}
+        maxWidth={false}
+        PaperProps={{
+          sx: {
+            width: 320,
+            maxWidth: 'calc(100vw - 48px)',
+            borderRadius: 2
+          }
+        }}
       >
         <DialogTitle>Advanced Settings</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            {renderField('DPI', 'dpi')}
-            {renderField('FORMAT', 'format')}
-            {renderField('IBOX VERSION', 'iBoxVersion')}
-            {renderField('PHONE WORK MODE', 'phoneWorkMode')}
-          </Grid>
-          <Typography variant="body2" sx={{ mt: 2 }} color="text.secondary">
-            Changes here may require a restart.
-          </Typography>
+        <DialogContent sx={{ pt: 2, pb: 2, px: 2.25, overflow: 'visible' }}>
+          <Box
+            sx={theme => ({
+              display: 'grid',
+              gridTemplateColumns: '120px 120px',
+              columnGap: theme.spacing(1.5),
+              rowGap: theme.spacing(1.5),
+              justifyContent: 'center',
+            })}
+          >
+            <TextField
+              size="small"
+              label={isDarkMode ? 'PRIMARY (DARK)' : 'PRIMARY (LIGHT)'}
+              value={currentPrimary}
+              onChange={e =>
+                settingsChange(isDarkMode ? 'primaryColorDark' : 'primaryColorLight', e.target.value)
+              }
+              InputProps={{
+                inputProps: { type: 'color' },
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() =>
+                        settingsChange(isDarkMode ? 'primaryColorDark' : 'primaryColorLight', undefined)
+                      }
+                      sx={{ ml: 1, py: 0.25, px: 1 }}
+                    >
+                      RESET
+                    </Button>
+                  </InputAdornment>
+                ),
+              }}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              sx={{ gridColumn: '1 / span 2' }}
+            />
+            <TextField
+              label="DPI"
+              type="number"
+              size="small"
+              margin="dense"
+              value={activeSettings.dpi}
+              onChange={e => settingsChange('dpi', Number(e.target.value))}
+              InputLabelProps={{ shrink: true }}
+              autoFocus
+              sx={{ width: 120 }}
+            />
+            <TextField
+              label="FORMAT"
+              type="number"
+              size="small"
+              margin="dense"
+              value={activeSettings.format}
+              onChange={e => settingsChange('format', Number(e.target.value))}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 120 }}
+            />
+          </Box>
         </DialogContent>
       </Dialog>
     </Box>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box } from '@mui/material'
 import { useCarplayStore } from '../store/store'
-import { themeColors } from '../themeColors'
+import { useTheme, alpha } from '@mui/material/styles'
 
 export interface FFTSpectrumProps {
   data: number[] | Float32Array
@@ -18,8 +18,16 @@ const SPECTRUM_WIDTH_RATIO = 0.92
 const TARGET_FPS = 30
 
 export default function FFTSpectrum({ data }: FFTSpectrumProps) {
-  const barColor = themeColors.barColor
-  const peakColor = themeColors.peakColor
+  const theme = useTheme()
+  const isDark = theme.palette.mode === 'dark'
+
+  const barColor = theme.palette.primary.main
+
+  // Grid/labels derived from theme text colors
+  const gridFill = alpha(theme.palette.text.primary, isDark ? 0.12 : 0.06)
+  const gridLine = alpha(theme.palette.text.primary, 0.35)
+  const majorLine = alpha(theme.palette.text.primary, 0.45)
+  const labelColor = alpha(theme.palette.text.secondary, 0.9)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bgCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -32,11 +40,6 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
   // Worker and buffers
   const workerRef = useRef<Worker | null>(null)
   const binsRef = useRef<Float32Array>(new Float32Array(POINTS))
-  const peaksRef = useRef<number[]>([])
-
-  useEffect(() => {
-    peaksRef.current = Array(POINTS).fill(0)
-  }, [])
 
   useEffect(() => {
     const worker = new Worker(
@@ -81,6 +84,7 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
     return () => obs.disconnect()
   }, [])
 
+  // Static grid and labels (redrawn on theme, size, or sample rate changes)
   useEffect(() => {
     const bg = bgCanvasRef.current
     if (!bg || dimensions.width === 0) return
@@ -93,24 +97,29 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
     bg.height = ch
 
     ctx.clearRect(0, 0, cw, ch)
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'
+
+    // Background band
+    ctx.fillStyle = gridFill
     ctx.fillRect(xOff, 0, specW, usableH)
 
-    ctx.strokeStyle = '#555'
+    // Horizontal guide lines
     ctx.lineWidth = 0.5
-      ;[0.25, 0.5, 0.75].forEach(f => {
-        const y = usableH * f
-        ctx.beginPath()
-        ctx.moveTo(xOff, y)
-        ctx.lineTo(xOff + specW, y)
-        ctx.stroke()
-      })
+    ;[0.25, 0.5, 0.75].forEach(f => {
+      const y = usableH * f
+      ctx.strokeStyle = gridLine
+      ctx.beginPath()
+      ctx.moveTo(xOff, y)
+      ctx.lineTo(xOff + specW, y)
+      ctx.stroke()
+    })
 
+    // Vertical lines + labels
     const freqs = [MIN_FREQ, 100, 500, 1000, 5000, 10000, MAX_FREQ]
-    ctx.fillStyle = '#aaa'
     ctx.font = `${LABEL_FONT_SIZE}px sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
+    ctx.fillStyle = labelColor
+
     const logMin = Math.log10(MIN_FREQ)
     const logMax = Math.log10(MAX_FREQ)
     const logDen = logMax - logMin
@@ -118,7 +127,7 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
     freqs.forEach(freq => {
       const pos = (Math.log10(freq) - logMin) / logDen
       const x = xOff + pos * specW
-      ctx.strokeStyle = '#666'
+      ctx.strokeStyle = majorLine
       ctx.beginPath()
       ctx.moveTo(x, 0)
       ctx.lineTo(x, usableH)
@@ -126,10 +135,11 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
       const label = freq >= 1000 ? `${freq / 1000}k` : `${freq}`
       ctx.fillText(label, x, usableH + 2)
     })
-  }, [dimensions, sampleRate])
+  }, [dimensions, sampleRate, gridFill, gridLine, majorLine, labelColor])
 
+  // Dynamic bars only
   useEffect(() => {
-    let rafId: number
+    let rafId = 0
     let last = 0
     const draw = () => {
       rafId = requestAnimationFrame(draw)
@@ -151,22 +161,17 @@ export default function FFTSpectrum({ data }: FFTSpectrumProps) {
       const xOff = (cw - specW) / 2
       const barW = specW / POINTS
       const bins = binsRef.current
-      const peaks = peaksRef.current
-      const decay = usableH * 0.02
 
       for (let i = 0; i < POINTS; i++) {
         const h = bins[i] * usableH
         const x = xOff + i * barW
-        peaks[i] = h > peaks[i] ? h : Math.max(peaks[i] - decay, 0)
         ctx.fillStyle = barColor
         ctx.fillRect(x, usableH - h, barW * 0.8, h)
-        ctx.fillStyle = peakColor
-        ctx.fillRect(x, usableH - peaks[i] - 2, barW * 0.8, 2)
       }
     }
     draw()
     return () => cancelAnimationFrame(rafId)
-  }, [dimensions])
+  }, [dimensions, barColor])
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>

@@ -211,6 +211,18 @@ export class CarplayService {
     ipcMain.on('carplay-key-command', (_, command) => {
       this.driver.send(new SendCommand(command))
     })
+
+    ipcMain.handle('carplay-media-read', async () => {
+      try {
+        const file = path.join(app.getPath('userData'), 'mediaData.json')
+        return readMediaFile(file)
+      } catch {
+        return {
+          timestamp: '',
+          payload: { type: MediaType.Data, media: {}, base64Image: undefined }
+        } as PersistedMediaFile
+      }
+    })
   }
 
   public attachRenderer(webContents: WebContents) {

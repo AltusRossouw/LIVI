@@ -69,6 +69,7 @@ const api = {
     sendMultiTouch: (points: MultiTouchPoint[]) => ipcRenderer.send('carplay-multi-touch', points),
     sendKeyCommand: (key: string) => ipcRenderer.send('carplay-key-command', key),
     onEvent: (callback: ApiCallback<any>) => ipcRenderer.on('carplay-event', callback),
+    readMedia: () => ipcRenderer.invoke('carplay-media-read'),
 
     onVideoChunk: (handler: ChunkHandler) => {
       videoChunkHandler = handler
@@ -113,10 +114,3 @@ const appApi = {
 }
 
 contextBridge.exposeInMainWorld('app', appApi)
-
-declare global {
-  interface Window {
-    carplay: any
-    app: any
-  }
-}

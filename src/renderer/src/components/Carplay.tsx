@@ -203,6 +203,12 @@ const Carplay: React.FC<CarplayProps> = ({
     }
   }, [])
 
+  const gotoHostUI = useCallback(() => {
+    if (location.pathname !== '/media') {
+      navigate('/media', { replace: true })
+    }
+  }, [location.pathname, navigate])
+
   // Carplay Worker messages
   useEffect(() => {
     if (!carplayWorker) return
@@ -239,7 +245,7 @@ const Carplay: React.FC<CarplayProps> = ({
           break
         case 'command': {
           const val = (message as any).value
-          if (val === CommandMapping.requestHostUI) navigate('/settings')
+          if (val === CommandMapping.requestHostUI) gotoHostUI()
           break
         }
         case 'dongleInfo':
@@ -266,7 +272,7 @@ const Carplay: React.FC<CarplayProps> = ({
     clearRetryTimeout,
     getAudioPlayer,
     processAudio,
-    navigate,
+    gotoHostUI,
     setDeviceInfo,
     setNegotiatedResolution,
     setAudioInfo,
@@ -356,7 +362,7 @@ const Carplay: React.FC<CarplayProps> = ({
           useCarplayStore.getState().resetInfo()
           break
         case 'command':
-          if (data.message?.value === CommandMapping.requestHostUI) navigate('/settings')
+          if (data.message?.value === CommandMapping.requestHostUI) gotoHostUI()
           break
       }
     }
@@ -364,7 +370,7 @@ const Carplay: React.FC<CarplayProps> = ({
     return () => {
       window.electron?.ipcRenderer.removeListener('carplay-event', handler)
     }
-  }, [navigate])
+  }, [gotoHostUI, setReceivingVideo])
 
   // Resize Observer
   useEffect(() => {

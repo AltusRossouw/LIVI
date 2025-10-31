@@ -11,7 +11,7 @@
   <img alt="Build Dev" src="https://img.shields.io/github/actions/workflow/status/f-io/pi-carplay/build.yml?branch=dev&label=build%20dev&style=flat">
 </p>
 
-# pi-carplay
+# <img src="assets/icons/linux/pi-carplay.png" alt="pi-carplay" width="25px" /> pi-carplay
 
 pi-carplay brings Apple CarPlay and Android Auto to the Raspberry Pi, with support for Linux (ARM/x86) and macOS (ARM) as well. It is a standalone Electron app, optimized for embedded setups and ultra-low-resolution OEM displays.  
 
@@ -116,11 +116,6 @@ brew install sox
 2. After the dongle knows your phone, connect the dongle to pi-carplay — it will attach without running provisioning again.
 
 ---
-
-## Links
-
-* **Repository & Issue Tracker:** [f-io/pi-carplay](https://github.com/f-io/pi-carplay)
-* **Inspired by:** [react-carplay](https://github.com/rhysmorgan134/react-carplay)
 
 ## Disclaimer
 

@@ -35,20 +35,19 @@ The `setup-pi.sh` script performs the following tasks:
 *Do not run this script on other Linux distributions.*
 
 ## Images
-<p align="center">
-  <img src="documentation/images/carplay.png"
-       alt="CarPlay"
-       width="45%" />
-</p>
 
 <p align="center">
-  <img src="documentation/images/settings.png"
-       alt="Settings"
-       width="45%" />
-  &emsp;&emsp;
-  <img src="documentation/images/info.png"
-       alt="Info"
-       width="45%" />
+  <img src="documentation/images/carplay.png" alt="CarPlay" width="58%" />
+</p>
+<p align="center">
+  <img src="documentation/images/carplay_no_phone.png" alt="No Phone" width="48%" align="top" />
+  &emsp;
+  <img src="documentation/images/info.png" alt="Info" width="48%" align="top" />
+</p>
+<p align="center">
+  <img src="documentation/images/media.png" alt="Media" width="48%" align="top" />
+  &emsp;
+  <img src="documentation/images/settings.png" alt="Settings" width="48%" align="top" />
 </p>
 
 ## Build Environment
@@ -107,6 +106,17 @@ brew install sox
 
 ---
 
+## Android Auto
+
+> **Provisioning not supported.** This app does **not** perform the Android Auto first-time provisioning/pairing flow.  
+> Your phone must already be paired/enrolled **on the dongle**.
+
+**How to provision AA on the dongle:**
+1. Use the dongle with a regular head unit **or** the vendor’s mobile app to add your phone once.
+2. After the dongle knows your phone, connect the dongle to pi-carplay — it will attach without running provisioning again.
+
+---
+
 ## Links
 
 * **Repository & Issue Tracker:** [f-io/pi-carplay](https://github.com/f-io/pi-carplay)
@@ -114,8 +124,7 @@ brew install sox
 
 ## Disclaimer
 
-_Apple and CarPlay are trademarks of Apple Inc. This project is not affiliated with or endorsed by Apple in any way. All trademarks are the property of their respective owners._
-
+_Apple and CarPlay are trademarks of Apple Inc. Android and Android Auto are trademarks of Google LLC. This project is not affiliated with or endorsed by Apple or Google. All product names, logos, and brands are the property of their respective owners._
 
 ## License
 

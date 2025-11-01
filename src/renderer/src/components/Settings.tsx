@@ -1,5 +1,5 @@
 import { ExtraConfig } from '../../../main/Globals'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, startTransition } from 'react'
 import {
   Box,
   FormControlLabel,
@@ -36,6 +36,8 @@ const MEDIA_DELAY_MIN = 300
 const MEDIA_DELAY_MAX = 2000
 const HEIGHT_MIN = 200
 const MIN_WIDTH = 400
+
+const UI_DEBOUNCED_KEYS = new Set<keyof ExtraConfig>(['primaryColorDark', 'primaryColorLight'])
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & { children: React.ReactElement },
@@ -110,7 +112,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     theme.palette.primary.main
 
   const debouncedSave = useMemo(
-    () => debounce((newSettings: ExtraConfig) => saveSettings(newSettings), 300),
+    () => debounce((newSettings: ExtraConfig) => saveSettings(newSettings), 500),
     [saveSettings]
   )
   useEffect(() => () => debouncedSave.cancel(), [debouncedSave])
@@ -125,7 +127,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       typeof current?.nightMode === 'boolean' ? current!.nightMode : activeSettings.nightMode
 
     const updated: ExtraConfig = { ...activeSettings, ...patch, kiosk, nightMode }
-    setActiveSettings(updated)
+    startTransition(() => setActiveSettings(updated))
     saveSettings(updated)
   }
 
@@ -171,7 +173,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       const prev = activeSettings.micType
       const next = value as 'box' | 'os'
       const updated: ExtraConfig = { ...activeSettings, micType: next }
-      setActiveSettings(updated)
+      startTransition(() => setActiveSettings(updated))
       saveSettings(updated)
       setMicResetPending(prev !== 'box' && next === 'box' && isDongleConnected)
       return
@@ -190,11 +192,11 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       }
     }
 
-    setActiveSettings(updated)
+    startTransition(() => setActiveSettings(updated))
 
-    if (['audioVolume', 'navVolume'].includes(key)) {
+    if (key === 'audioVolume' || key === 'navVolume' || UI_DEBOUNCED_KEYS.has(key)) {
       debouncedSave(updated)
-    } else if (['kiosk', 'nightMode'].includes(key)) {
+    } else if (key === 'kiosk' || key === 'nightMode') {
       saveSettings(updated)
     } else if (requiresRestartParams.includes(key)) {
       const pending = requiresRestartParams.some((p) => updated[p] !== settings[p])
@@ -296,10 +298,14 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       ; (async () => {
         try {
           const kiosk = await window.app.getKiosk()
-          setActiveSettings((prev) => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+          startTransition(() =>
+            setActiveSettings((prev) => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+          )
         } catch { }
         off = window.app.onKioskSync((kiosk) => {
-          setActiveSettings((prev) => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+          startTransition(() =>
+            setActiveSettings((prev) => (prev.kiosk === kiosk ? prev : { ...prev, kiosk }))
+          )
         })
       })()
     return () => {

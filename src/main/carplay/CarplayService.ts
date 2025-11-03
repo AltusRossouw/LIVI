@@ -27,9 +27,11 @@ let dongleConnected = false
 
 const APP_START_TS = Date.now()
 
+type MediaBag = Record<string, unknown>
+
 interface PersistedMediaPayload {
   type: MediaType
-  media?: Record<string, any>
+  media?: MediaBag
   base64Image?: string
 }
 
@@ -189,9 +191,8 @@ export class CarplayService {
     })
 
     type MultiTouchPoint = { id: number; x: number; y: number; action: number }
-    const to01 = (v: any) => {
-      const n = +v
-      if (!Number.isFinite(n)) return 0
+    const to01 = (v: number): number => {
+      const n = Number.isFinite(v) ? v : 0
       return n < 0 ? 0 : n > 1 ? 1 : n
     }
     const ONE_BASED_IDS = false
@@ -345,7 +346,7 @@ export class CarplayService {
     channel: string,
     data?: ArrayBuffer,
     chunkSize = 512 * 1024,
-    extra: Record<string, any> = {}
+    extra?: Record<string, unknown>
   ) {
     if (!this.webContents || !data) return
     let offset = 0
@@ -355,14 +356,23 @@ export class CarplayService {
     while (offset < total) {
       const end = Math.min(offset + chunkSize, total)
       const chunk = data.slice(offset, end)
-      this.webContents.send(channel, {
+
+      const envelope: {
+        id: string
+        offset: number
+        total: number
+        isLast: boolean
+        chunk: Buffer
+      } & Record<string, unknown> = {
         id,
         offset,
         total,
         isLast: end >= total,
         chunk: Buffer.from(chunk),
-        ...extra
-      })
+        ...(extra ?? {})
+      }
+
+      this.webContents.send(channel, envelope)
       offset = end
     }
   }

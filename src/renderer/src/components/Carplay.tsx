@@ -9,7 +9,7 @@ import { useCarplayStore, useStatusStore } from '../store/store'
 import { InitEvent, Renderer } from './worker/render/RenderEvents'
 import useCarplayAudio from './useCarplayAudio'
 import { useCarplayMultiTouch } from './useCarplayTouch'
-import type { CarPlayWorker, KeyCommand } from './worker/types'
+import type { CarPlayWorker, UsbEvent, KeyCommand, WorkerToUI, AudioData } from './worker/types'
 
 // Icons
 import UsbOffOutlinedIcon from '@mui/icons-material/UsbOffOutlined'
@@ -317,7 +317,7 @@ const Carplay: React.FC<CarplayProps> = ({
 
   useEffect(() => {
     if (!renderWorkerRef.current) return
-    const handler = (ev: MessageEvent<any>) => {
+    const handler = (ev: MessageEvent<{ type: 'render-ready' }>) => {
       if (ev.data?.type === 'render-ready') {
         console.log('[CARPLAY] Render worker ready message recived')
         setRenderReady(true)
@@ -329,11 +329,12 @@ const Carplay: React.FC<CarplayProps> = ({
 
   // Forward video chunks to worker port
   useEffect(() => {
-    const handleVideo = (packet: any) => {
-      if (!renderReady) return
-      const { chunk } = packet
-      const transfer = chunk.buffer
-      videoChannel.port1.postMessage(transfer, [transfer])
+    const handleVideo = (payload: unknown) => {
+      if (!renderReady || !payload || typeof payload !== 'object') return
+      const m = payload as { chunk?: { buffer?: ArrayBuffer } }
+      const buf = m.chunk?.buffer
+      if (!buf) return
+      videoChannel.port1.postMessage(buf, [buf])
     }
     window.carplay.ipc.onVideoChunk(handleVideo)
     return () => {}
@@ -341,17 +342,13 @@ const Carplay: React.FC<CarplayProps> = ({
 
   // Forward audio chunks to audio channel
   useEffect(() => {
-    const handleAudio = (chunk: any) => {
-      if (chunk && chunk.chunk && chunk.chunk.buffer) {
-        audioChannel.port2.postMessage(
-          {
-            type: 'audio',
-            buffer: chunk.chunk.buffer,
-            ...chunk
-          },
-          [chunk.chunk.buffer]
-        )
-      }
+    const handleAudio = (payload: unknown) => {
+      if (!payload || typeof payload !== 'object') return
+      const m = payload as { chunk?: { buffer?: ArrayBuffer } } & Record<string, unknown>
+      const buf = m.chunk?.buffer
+      if (!buf) return
+      const { chunk: _chunk, ...rest } = m
+      audioChannel.port2.postMessage({ type: 'audio', buffer: buf, ...rest }, [buf])
     }
     window.carplay.ipc.onAudioChunk(handleAudio)
     return () => {}
@@ -388,12 +385,13 @@ const Carplay: React.FC<CarplayProps> = ({
   // CarPlay worker messages
   useEffect(() => {
     if (!carplayWorker) return
-    const handler = (ev: MessageEvent<any>) => {
-      const { type, payload, message } = ev.data
-      switch (type) {
+    const handler = (ev: MessageEvent<WorkerToUI>) => {
+      const msg = ev.data
+      switch (msg.type) {
         case 'plugged':
           setDongleConnected(true)
           break
+
         case 'unplugged':
           hasStartedRef.current = false
           setDongleConnected(false)
@@ -401,38 +399,60 @@ const Carplay: React.FC<CarplayProps> = ({
           setReceivingVideo(false)
           resetInfo()
           break
-        case 'requestBuffer':
+
+        case 'requestBuffer': {
           clearRetryTimeout()
-          getAudioPlayer(message)
+          const m = (msg as Extract<WorkerToUI, { type: 'requestBuffer' }>).message
+          getAudioPlayer(m)
           break
-        case 'audio':
+        }
+
+        case 'audio': {
           clearRetryTimeout()
-          processAudio({
-            ...message,
+          const m = (msg as Extract<WorkerToUI, { type: 'audio' }>).message
+          const audioPayload: AudioData & { command?: number } = {
+            ...m,
             command: audioCommandRef.current
-          })
+          }
+          processAudio(audioPayload)
           audioCommandRef.current = undefined
           break
+        }
+
         case 'audioInfo':
-          setAudioInfo(payload)
+          setAudioInfo((msg as Extract<WorkerToUI, { type: 'audioInfo' }>).payload)
           break
+
         case 'pcmData':
-          setPcmData(new Float32Array(payload as ArrayBuffer))
+          setPcmData(new Float32Array((msg as Extract<WorkerToUI, { type: 'pcmData' }>).payload))
           break
+
         case 'command': {
-          const val = (message as any).value
+          const val = (msg as Extract<WorkerToUI, { type: 'command' }>).message?.value
           if (val === CommandMapping.requestHostUI) gotoHostUI()
           break
         }
-        case 'dongleInfo':
-          setDeviceInfo(payload)
+
+        case 'dongleInfo': {
+          const p = (msg as Extract<WorkerToUI, { type: 'dongleInfo' }>).payload
+          setDeviceInfo({
+            serial: p.serial ?? '',
+            manufacturer: p.manufacturer ?? '',
+            product: p.product ?? '',
+            fwVersion: p.fwVersion ?? ''
+          })
           break
-        case 'resolution':
-          setNegotiatedResolution(payload.width, payload.height)
+        }
+
+        case 'resolution': {
+          const r = (msg as Extract<WorkerToUI, { type: 'resolution' }>).payload
+          setNegotiatedResolution(r.width, r.height)
           setStreaming(true)
           setReceivingVideo(true)
           hasStartedRef.current = true
           break
+        }
+
         case 'failure':
           hasStartedRef.current = false
           if (!retryTimeoutRef.current) {
@@ -441,6 +461,7 @@ const Carplay: React.FC<CarplayProps> = ({
           break
       }
     }
+
     carplayWorker.addEventListener('message', handler)
     return () => carplayWorker.removeEventListener('message', handler)
   }, [
@@ -482,43 +503,68 @@ const Carplay: React.FC<CarplayProps> = ({
         canvasRef.current.style.height = '0'
       }
     }
-    const usbHandler = (_: any, data: { type: string }) => {
+    const usbHandler = (_evt: unknown, ...args: unknown[]) => {
+      const data = args[0] as UsbEvent | undefined
+      if (!data) return
       if (data.type === 'plugged') onUsbConnect()
       else if (data.type === 'unplugged') onUsbDisconnect()
     }
+
     window.carplay.usb.listenForEvents(usbHandler)
     ;(async () => {
       const last = await window.carplay.usb.getLastEvent()
-      if (last) usbHandler(null, last)
+      if (last) usbHandler(undefined, last as unknown)
     })()
 
     return () => {
-      window.electron?.ipcRenderer.removeListener('usb-event', usbHandler)
+      window.carplay.usb.unlistenForEvents?.(usbHandler)
     }
   }, [setReceivingVideo, setDongleConnected, setStreaming, clearRetryTimeout, navigate, resetInfo])
 
   // Settings/events from main
   useEffect(() => {
-    const handler = (_: any, data: any) => {
-      switch (data.type) {
-        case 'resolution':
-          useCarplayStore.setState({
-            negotiatedWidth: data.payload.width,
-            negotiatedHeight: data.payload.height
-          })
-          useStatusStore.setState({ isStreaming: true })
-          setReceivingVideo(true)
+    const handler = (_evt: unknown, data: unknown) => {
+      const d = (data ?? {}) as Record<string, unknown>
+      const t = typeof d.type === 'string' ? d.type : undefined
+
+      switch (t) {
+        case 'resolution': {
+          const payload = d.payload as { width?: number; height?: number } | undefined
+          if (payload && typeof payload.width === 'number' && typeof payload.height === 'number') {
+            useCarplayStore.setState({
+              negotiatedWidth: payload.width,
+              negotiatedHeight: payload.height
+            })
+            useStatusStore.setState({ isStreaming: true })
+            setReceivingVideo(true)
+          }
           break
-        case 'audioInfo':
-          useCarplayStore.setState({
-            audioCodec: data.payload.codec,
-            audioSampleRate: data.payload.sampleRate,
-            audioChannels: data.payload.channels,
-            audioBitDepth: data.payload.bitDepth
-          })
+        }
+        case 'audioInfo': {
+          const p = d.payload as
+            | {
+                codec?: string
+                sampleRate?: number
+                channels?: number
+                bitDepth?: number
+              }
+            | undefined
+          if (p) {
+            useCarplayStore.setState({
+              audioCodec: p.codec,
+              audioSampleRate: p.sampleRate,
+              audioChannels: p.channels,
+              audioBitDepth: p.bitDepth
+            })
+          }
           break
+        }
         case 'media': {
-          const playStatus = data.payload?.payload?.media?.MediaPlayStatus
+          const playStatus = (
+            d as {
+              payload?: { payload?: { media?: { MediaPlayStatus?: number } } }
+            }
+          ).payload?.payload?.media?.MediaPlayStatus
           const prevStatus = mediaPlayStatusRef.current
           if (typeof playStatus === 'number' && playStatus !== prevStatus) {
             mediaPlayStatusRef.current = playStatus
@@ -530,20 +576,31 @@ const Carplay: React.FC<CarplayProps> = ({
           useStatusStore.setState({ isDongleConnected: true })
           break
         case 'unplugged':
-          useStatusStore.setState({
-            isDongleConnected: false,
-            isStreaming: false
-          })
+          useStatusStore.setState({ isDongleConnected: false, isStreaming: false })
           useCarplayStore.getState().resetInfo()
           break
-        case 'command':
-          if (data.message?.value === CommandMapping.requestHostUI) gotoHostUI()
+        case 'command': {
+          const value = (d as { message?: { value?: number } }).message?.value
+          if (value === CommandMapping.requestHostUI) gotoHostUI()
           break
+        }
       }
     }
+
+    // subscribe
     window.carplay.ipc.onEvent(handler)
+
+    // best-effort cleanup for legacy emitter shape
     return () => {
-      window.electron?.ipcRenderer.removeListener('carplay-event', handler)
+      const remove = (
+        window as unknown as {
+          electron?: {
+            ipcRenderer?: { removeListener?: (ch: string, l: (...a: unknown[]) => void) => void }
+          }
+        }
+      ).electron?.ipcRenderer?.removeListener
+      if (typeof remove === 'function')
+        remove('carplay-event', handler as (...args: unknown[]) => void)
     }
   }, [gotoHostUI, setReceivingVideo])
 

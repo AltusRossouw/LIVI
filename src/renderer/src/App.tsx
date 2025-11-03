@@ -71,15 +71,16 @@ function App() {
 
     updateCameras(setCameraFound, saveSettings, settings)
 
-    const usbHandler = (_: any, data: { type: string }) => {
-      if (['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
+    const usbHandler = (_evt: unknown, ...args: unknown[]) => {
+      const data = (args[0] ?? {}) as { type?: string }
+      if (data.type && ['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
         updateCameras(setCameraFound, saveSettings, settings)
       }
     }
 
     window.carplay.usb.listenForEvents(usbHandler)
-    return () => window.carplay.usb.unlistenForEvents?.(usbHandler)
-  }, [settings])
+    return () => window.carplay.usb.unlistenForEvents(usbHandler)
+  }, [settings, saveSettings, setCameraFound])
 
   return (
     <Router>

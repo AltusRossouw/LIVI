@@ -164,6 +164,24 @@ export function buildRuntimeTheme(mode: 'light' | 'dark', primary?: string) {
   const isLight = mode === 'light'
   const hoverBg = isLight ? themeColors.highlightAlphaLight : themeColors.highlightAlphaDark
 
+  const tabsSO = (base.components?.MuiTabs?.styleOverrides ?? {}) as Record<string, CSSObject>
+  const outlinedSO = (base.components?.MuiOutlinedInput?.styleOverrides ?? {}) as Record<
+    string,
+    CSSObject
+  >
+  const inputLabelSO = (base.components?.MuiInputLabel?.styleOverrides ?? {}) as Record<
+    string,
+    CSSObject
+  >
+  const buttonSO = (base.components?.MuiButton?.styleOverrides ?? {}) as Record<string, CSSObject>
+
+  const tabsIndicator = (tabsSO.indicator ?? {}) as CSSObject
+  const outlinedRoot = (outlinedSO.root ?? {}) as CSSObject
+  const outlinedNotched = (outlinedSO.notchedOutline ?? {}) as CSSObject
+  const inputLabelRoot = (inputLabelSO.root ?? {}) as CSSObject
+  const btnContainedPrimary = (buttonSO.containedPrimary ?? {}) as CSSObject
+  const btnRoot = (buttonSO.root ?? {}) as CSSObject
+
   return createTheme({
     ...base,
     palette: {
@@ -172,46 +190,50 @@ export function buildRuntimeTheme(mode: 'light' | 'dark', primary?: string) {
     },
     components: {
       ...base.components,
+
       MuiTabs: {
         styleOverrides: {
-          ...(base.components?.MuiTabs as any)?.styleOverrides,
+          ...tabsSO,
           indicator: {
-            ...((base.components?.MuiTabs as any)?.styleOverrides?.indicator || {}),
+            ...tabsIndicator,
             backgroundColor: primary,
             height: 4
           }
         }
       },
+
       MuiOutlinedInput: {
         styleOverrides: {
-          ...(base.components?.MuiOutlinedInput as any)?.styleOverrides,
+          ...outlinedSO,
           root: {
-            ...((base.components?.MuiOutlinedInput as any)?.styleOverrides?.root || {}),
+            ...outlinedRoot,
             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: primary },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primary }
           },
-          notchedOutline: (base.components?.MuiOutlinedInput as any)?.styleOverrides?.notchedOutline
+          notchedOutline: outlinedNotched
         }
       },
+
       MuiInputLabel: {
         styleOverrides: {
-          ...(base.components?.MuiInputLabel as any)?.styleOverrides,
+          ...inputLabelSO,
           root: {
-            ...((base.components?.MuiInputLabel as any)?.styleOverrides?.root || {}),
+            ...inputLabelRoot,
             '&.Mui-focused': { color: primary }
           }
         }
       },
+
       MuiButton: {
         styleOverrides: {
-          ...(base.components?.MuiButton as any)?.styleOverrides,
+          ...buttonSO,
           containedPrimary: {
-            ...((base.components?.MuiButton as any)?.styleOverrides?.containedPrimary || {}),
+            ...btnContainedPrimary,
             backgroundColor: primary,
             '&:hover': { backgroundColor: hoverBg }
           },
           root: {
-            ...((base.components?.MuiButton as any)?.styleOverrides?.root || {}),
+            ...btnRoot,
             '&.hover-ring.MuiButton-containedPrimary:hover': {
               backgroundColor: primary,
               boxShadow: `0 0 0 2px ${alpha(primary, 0.55)} inset`

@@ -117,7 +117,8 @@ export default function Info() {
   )
 
   type RowOpts = { mono?: boolean; maxCh?: number; color?: string; tooltip?: string }
-  const Row = (label: string, value: any, opts: RowOpts = {}) => {
+  type RowValue = React.ReactNode | string | number | null | undefined
+  const Row = (label: string, value: RowValue, opts: RowOpts = {}) => {
     const color =
       opts.color ??
       (value != null && value !== '—' ? theme.palette.primary.main : theme.palette.text.primary)
@@ -206,7 +207,7 @@ export default function Info() {
 
   const recheckLatest = async () => {
     try {
-      const r = await (window as any)?.app?.getLatestRelease?.()
+      const r = await window.app?.getLatestRelease?.()
       if (r?.version) setLatestVersion(r.version)
       else setLatestVersion('—')
       setLatestUrl(r?.url)
@@ -217,8 +218,7 @@ export default function Info() {
   }
 
   useEffect(() => {
-    const w = window as any
-    w?.app?.getVersion?.().then((v: string) => v && setInstalledVersion(v))
+    window.app?.getVersion?.().then((v) => v && setInstalledVersion(v))
     recheckLatest()
   }, [])
 
@@ -240,20 +240,21 @@ export default function Info() {
   }, [isDongleConnected])
 
   useEffect(() => {
-    const w = window as any
-    const off1 = w?.app?.onUpdateEvent?.((e: any) => {
-      if (e?.phase === 'error') setError(String(e?.message || 'Update failed'))
-      setPhase(e?.phase || '')
+    const off1 = window.app?.onUpdateEvent?.((e: UpdateEvent) => {
+      if (e.phase === 'error') setError(e.message ?? 'Update failed')
+      setPhase(e.phase)
     })
-    const off2 = w?.app?.onUpdateProgress?.((p: any) => {
-      setPhase(p?.phase || 'download')
-      if (typeof p?.percent === 'number') setPercent(Math.max(0, Math.min(1, p.percent)))
-      if (typeof p?.received === 'number') setReceived(p.received)
-      if (typeof p?.total === 'number') setTotal(p.total)
+
+    const off2 = window.app?.onUpdateProgress?.((p: UpdateProgress) => {
+      setPhase('download')
+      setPercent(typeof p.percent === 'number' ? Math.max(0, Math.min(1, p.percent)) : null)
+      setReceived(p.received ?? 0)
+      setTotal(p.total ?? 0)
     })
+
     return () => {
-      off1 && off1()
-      off2 && off2()
+      off1?.()
+      off2?.()
     }
   }, [])
 
@@ -264,7 +265,7 @@ export default function Info() {
     setTotal(0)
     setPhase('start')
     setUpDialogOpen(true)
-    ;(window as any)?.app?.performUpdate?.(latestUrl)
+    window.app?.performUpdate?.(latestUrl)
   }
 
   const onPrimaryAction = () => {
@@ -453,7 +454,7 @@ export default function Info() {
       </Box>
 
       {/* Update progress dialog */}
-      <Dialog open={upDialogOpen} onClose={() => false as any}>
+      <Dialog open={upDialogOpen} onClose={() => {}} disableEscapeKeyDown>
         <DialogTitle>Software Update</DialogTitle>
         <DialogContent sx={{ width: 360 }}>
           <Typography sx={{ mb: 1 }}>{phaseText}</Typography>

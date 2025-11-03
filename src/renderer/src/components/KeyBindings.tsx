@@ -5,7 +5,7 @@ import { Box, Button, Modal, Paper, styled, Typography } from '@mui/material'
 
 interface KeyBindingsProps {
   settings: ExtraConfig
-  updateKey: (key: keyof ExtraConfig, value: any) => void
+  updateKey: (key: 'bindings', value: ExtraConfig['bindings']) => void
 }
 
 const Item = styled(Paper)(({ theme }) => ({
@@ -17,7 +17,7 @@ const Item = styled(Paper)(({ theme }) => ({
 }))
 
 const style = {
-  position: 'absolute' as 'absolute',
+  position: 'absolute' as const,
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',

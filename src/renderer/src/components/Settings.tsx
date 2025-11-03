@@ -39,6 +39,8 @@ const MIN_WIDTH = 400
 
 const UI_DEBOUNCED_KEYS = new Set<keyof ExtraConfig>(['primaryColorDark', 'primaryColorLight'])
 
+type UsbEvent = { type?: string } & Record<string, unknown>
+
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & { children: React.ReactElement },
   ref: React.Ref<unknown>
@@ -149,38 +151,19 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     return typeof ch === 'number' && ch > 0 && ch < 36 ? ch : 6
   }
 
-  const sanitizeSetting = (key: keyof ExtraConfig, raw: any): any => {
-    if (key === 'mediaDelay') {
-      const n = Number(raw)
-      if (!Number.isFinite(n)) return activeSettings.mediaDelay
-      return Math.min(MEDIA_DELAY_MAX, Math.max(MEDIA_DELAY_MIN, Math.round(n)))
-    }
-    if (key === 'height') {
-      const n = Number(raw)
-      if (!Number.isFinite(n)) return activeSettings.height
-      return Math.max(HEIGHT_MIN, Math.round(n))
-    }
-    if (key === 'width') {
-      const n = Number(raw)
-      if (!Number.isFinite(n)) return activeSettings.width
-      return Math.max(MIN_WIDTH, Math.round(n))
-    }
-    return raw
-  }
-
-  const settingsChange = (key: keyof ExtraConfig, value: any) => {
+  const settingsChange = <K extends SettingKey>(key: K, value: ExtraConfig[K]) => {
     if (key === 'micType') {
       const prev = activeSettings.micType
-      const next = value as 'box' | 'os'
-      const updated: ExtraConfig = { ...activeSettings, micType: next }
+      const next: ExtraConfig['micType'] = value === 'box' || value === 'os' ? value : prev
+      const updated = withSetting(activeSettings, 'micType', next)
       startTransition(() => setActiveSettings(updated))
       saveSettings(updated)
       setMicResetPending(prev !== 'box' && next === 'box' && isDongleConnected)
       return
     }
 
-    const guardedValue = sanitizeSetting(key, value)
-    let updated: ExtraConfig = { ...activeSettings, [key]: guardedValue }
+    const guardedValue = sanitizeSetting(key, value, activeSettings)
+    let updated = withSetting(activeSettings, key, guardedValue)
 
     if (key === 'wifiType') {
       updated = {
@@ -199,7 +182,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     } else if (key === 'kiosk' || key === 'nightMode') {
       saveSettings(updated)
     } else if (requiresRestartParams.includes(key)) {
-      const pending = requiresRestartParams.some((p) => updated[p] !== settings[p])
+      const pending = requiresRestartParams.some((p) => updated[p] !== settings![p])
       setHasChanges(pending)
     } else {
       saveSettings(updated)
@@ -218,8 +201,8 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     try {
       if (needsReset && isDongleConnected) {
         setResetMessage('Dongle Reset...')
-        const ok = await window.carplay.usb.forceReset()
-        resetStatus = ok ? 'Success' : 'Failed'
+        await window.carplay.usb.forceReset()
+        resetStatus = 'Success'
       } else {
         resetStatus = 'Settings saved (no dongle connected)'
       }
@@ -233,6 +216,90 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
     setIsResetting(false)
     setResetMessage(resetStatus)
   }
+
+  type SettingKey = keyof ExtraConfig
+
+  function sanitizeSetting<K extends SettingKey>(
+    key: K,
+    raw: unknown,
+    current: ExtraConfig
+  ): ExtraConfig[K] {
+    switch (key) {
+      case 'mediaDelay': {
+        const n = Number(raw)
+        const v = Number.isFinite(n)
+          ? Math.round(Math.min(MEDIA_DELAY_MAX, Math.max(MEDIA_DELAY_MIN, n)))
+          : current.mediaDelay
+        return v as ExtraConfig[K]
+      }
+      case 'height': {
+        const n = Number(raw)
+        const v = Number.isFinite(n) ? Math.round(Math.max(HEIGHT_MIN, n)) : current.height
+        return v as ExtraConfig[K]
+      }
+      case 'width': {
+        const n = Number(raw)
+        const v = Number.isFinite(n) ? Math.round(Math.max(MIN_WIDTH, n)) : current.width
+        return v as ExtraConfig[K]
+      }
+
+      case 'fps':
+      case 'dpi':
+      case 'format':
+      case 'iBoxVersion':
+      case 'phoneWorkMode':
+      case 'packetMax':
+      case 'wifiChannel': {
+        const n = Number(raw)
+        // no `any`: use current[key] for the fallback, and cast the number to ExtraConfig[K]
+        return Number.isFinite(n) ? (n as unknown as ExtraConfig[K]) : current[key]
+      }
+
+      case 'audioVolume':
+      case 'navVolume': {
+        const n = Number(raw)
+        const v = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : (current[key] as number)
+        return v as unknown as ExtraConfig[K]
+      }
+
+      case 'kiosk':
+      case 'nightMode':
+      case 'audioTransferMode':
+        return Boolean(raw) as ExtraConfig[K]
+
+      case 'wifiType': {
+        const v = raw === '2.4ghz' ? '2.4ghz' : raw === '5ghz' ? '5ghz' : current.wifiType
+        return v as ExtraConfig[K]
+      }
+      case 'micType': {
+        const v = raw === 'box' ? 'box' : raw === 'os' ? 'os' : current.micType
+        return v as ExtraConfig[K]
+      }
+
+      case 'primaryColorDark':
+      case 'primaryColorLight':
+      case 'camera':
+      case 'microphone':
+      case 'boxName':
+        return (raw === undefined ? undefined : String(raw)) as ExtraConfig[K]
+
+      case 'bindings':
+        return raw as ExtraConfig[K]
+
+      default:
+        return raw as ExtraConfig[K]
+    }
+  }
+
+  function withSetting<K extends SettingKey>(
+    base: ExtraConfig,
+    key: K,
+    val: ExtraConfig[K]
+  ): ExtraConfig {
+    return { ...base, [key]: val }
+  }
+
+  const toWifiType = (s: string): ExtraConfig['wifiType'] => (s === '5ghz' ? '5ghz' : '2.4ghz')
 
   useEffect(() => {
     if (!resetMessage) return
@@ -271,26 +338,33 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
       }
     }
     updateMic()
-    const micUsbHandler = (_: any, data: { type: string }) => {
-      if (['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) updateMic()
+
+    const micUsbHandler = (_evt: unknown, ...args: unknown[]) => {
+      const data = (args[0] ?? {}) as UsbEvent
+      if (data.type && ['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
+        updateMic()
+      }
     }
     window.carplay.usb.listenForEvents(micUsbHandler)
+    return () => window.carplay.usb.unlistenForEvents(micUsbHandler)
   }, [activeSettings.micType])
 
   useEffect(() => {
-    const safeCameraPersist = async (cfgOrId: any) => {
+    const safeCameraPersist = async (cfgOrId: string | { camera?: string } | null | undefined) => {
       const cameraId = typeof cfgOrId === 'string' ? cfgOrId : cfgOrId?.camera
       await autoSave({ camera: cameraId ?? '' })
     }
 
     detectCameras(setCameraFound, safeCameraPersist, activeSettings).then(setCameras)
 
-    const usbHandler = (_: any, data: { type: string }) => {
-      if (['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
+    const usbHandler = (_evt: unknown, ...args: unknown[]) => {
+      const data = (args[0] ?? {}) as UsbEvent
+      if (data.type && ['attach', 'plugged', 'detach', 'unplugged'].includes(data.type)) {
         detectCameras(setCameraFound, safeCameraPersist, activeSettings).then(setCameras)
       }
     }
     window.carplay.usb.listenForEvents(usbHandler)
+    return () => window.carplay.usb.unlistenForEvents(usbHandler)
   }, [])
 
   useEffect(() => {
@@ -320,9 +394,16 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
 
   const micUnavailable = micLabel === 'not available'
 
-  const cameraIds = useMemo<readonly string[]>(
-    () => (cameras.length ? cameras.map((c) => c.deviceId ?? '') : ['']),
+  const cameraOptions = useMemo<readonly { deviceId: string; label: string }[]>(
+    () =>
+      cameras.length
+        ? cameras.map((c) => ({ deviceId: c.deviceId ?? '', label: c.label || 'Camera' }))
+        : [{ deviceId: '', label: 'No camera' }],
     [cameras]
+  )
+  const cameraIds = useMemo<readonly string[]>(
+    () => cameraOptions.map((c) => c.deviceId),
+    [cameraOptions]
   )
   const cameraValue = coerceSelectValue(activeSettings.camera ?? '', cameraIds)
 
@@ -509,7 +590,7 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
               fullWidth
               label="WIFI"
               value={wifiValue}
-              onChange={(e) => settingsChange('wifiType', e.target.value)}
+              onChange={(e) => settingsChange('wifiType', toWifiType(e.target.value))}
             >
               <MenuItem value="2.4ghz">2.4 GHz</MenuItem>
               <MenuItem value="5ghz">5 GHz</MenuItem>
@@ -545,13 +626,11 @@ const Settings: React.FC<SettingsProps> = ({ settings }) => {
               value={cameraValue}
               onChange={(e) => settingsChange('camera', e.target.value)}
             >
-              {(cameras.length ? cameras : [{ deviceId: '', label: 'No camera' }]).map(
-                (cam: any) => (
-                  <MenuItem key={cam.deviceId ?? 'none'} value={cam.deviceId ?? ''}>
-                    {cam.label || 'Camera'}
-                  </MenuItem>
-                )
-              )}
+              {cameraOptions.map((cam) => (
+                <MenuItem key={cam.deviceId || 'none'} value={cam.deviceId}>
+                  {cam.label}
+                </MenuItem>
+              ))}
             </TextField>
           </Grid>
         </Grid>

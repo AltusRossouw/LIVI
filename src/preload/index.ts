@@ -2,12 +2,16 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type { ExtraConfig } from '../main/Globals'
 import type { MultiTouchPoint } from '../main/carplay/messages/sendable'
 
-type ApiCallback<T = any> = (event: IpcRendererEvent, ...args: T[]) => void
+type ApiCallback<TArgs extends unknown[] = unknown[]> = (
+  event: IpcRendererEvent,
+  ...args: TArgs
+) => void
 
-let usbEventQueue: [IpcRendererEvent, ...any[]][] = []
-let usbEventHandlers: ApiCallback<any>[] = []
+// Queue + handlers for usb-event
+let usbEventQueue: Array<[IpcRendererEvent, ...unknown[]]> = []
+let usbEventHandlers: Array<ApiCallback> = []
 
-ipcRenderer.on('usb-event', (event, ...args) => {
+ipcRenderer.on('usb-event', (event, ...args: unknown[]) => {
   if (usbEventHandlers.length) {
     usbEventHandlers.forEach((h) => h(event, ...args))
   } else {
@@ -15,68 +19,74 @@ ipcRenderer.on('usb-event', (event, ...args) => {
   }
 })
 
-type ChunkHandler = (payload: any) => void
-let videoChunkQueue: any[] = []
+type ChunkHandler = (payload: unknown) => void
+let videoChunkQueue: unknown[] = []
 let videoChunkHandler: ChunkHandler | null = null
-let audioChunkQueue: any[] = []
+let audioChunkQueue: unknown[] = []
 let audioChunkHandler: ChunkHandler | null = null
 
-ipcRenderer.on('carplay-video-chunk', (_event, payload) => {
+ipcRenderer.on('carplay-video-chunk', (_event, payload: unknown) => {
   if (videoChunkHandler) videoChunkHandler(payload)
   else videoChunkQueue.push(payload)
 })
-ipcRenderer.on('carplay-audio-chunk', (_event, payload) => {
+ipcRenderer.on('carplay-audio-chunk', (_event, payload: unknown) => {
   if (audioChunkHandler) audioChunkHandler(payload)
   else audioChunkQueue.push(payload)
 })
 
 const api = {
-  quit: () => ipcRenderer.invoke('quit'),
+  quit: (): Promise<void> => ipcRenderer.invoke('quit'),
 
-  onUSBResetStatus: (callback: ApiCallback<any>) => {
+  onUSBResetStatus: (callback: ApiCallback): void => {
     ipcRenderer.on('usb-reset-start', callback)
     ipcRenderer.on('usb-reset-done', callback)
   },
 
   usb: {
-    forceReset: () => ipcRenderer.invoke('usb-force-reset'),
-    detectDongle: () => ipcRenderer.invoke('usb-detect-dongle'),
-    getDeviceInfo: () => ipcRenderer.invoke('carplay:usbDevice'),
-    getLastEvent: () => ipcRenderer.invoke('usb-last-event'),
-    getSysdefaultPrettyName: () => ipcRenderer.invoke('get-sysdefault-mic-label'),
-    listenForEvents: (callback: ApiCallback<any>) => {
+    forceReset: (): Promise<void> => ipcRenderer.invoke('usb-force-reset'),
+    detectDongle: (): Promise<unknown> => ipcRenderer.invoke('usb-detect-dongle'),
+    getDeviceInfo: (): Promise<unknown> => ipcRenderer.invoke('carplay:usbDevice'),
+    getLastEvent: (): Promise<unknown> => ipcRenderer.invoke('usb-last-event'),
+    getSysdefaultPrettyName: (): Promise<string> => ipcRenderer.invoke('get-sysdefault-mic-label'),
+    listenForEvents: (callback: ApiCallback): void => {
       usbEventHandlers.push(callback)
       usbEventQueue.forEach(([evt, ...args]) => callback(evt, ...args))
       usbEventQueue = []
     },
-    unlistenForEvents: (callback: ApiCallback<any>) => {
+    unlistenForEvents: (callback: ApiCallback): void => {
       usbEventHandlers = usbEventHandlers.filter((cb) => cb !== callback)
     }
   },
 
   settings: {
     get: (): Promise<ExtraConfig> => ipcRenderer.invoke('getSettings'),
-    save: (settings: ExtraConfig) => ipcRenderer.invoke('save-settings', settings),
-    onUpdate: (callback: ApiCallback<ExtraConfig>) => ipcRenderer.on('settings', callback)
+    save: (settings: ExtraConfig): Promise<void> => ipcRenderer.invoke('save-settings', settings),
+    onUpdate: (callback: ApiCallback<[ExtraConfig]>): void => {
+      ipcRenderer.on('settings', callback)
+    }
   },
 
   ipc: {
-    start: () => ipcRenderer.invoke('carplay-start'),
-    stop: () => ipcRenderer.invoke('carplay-stop'),
-    sendFrame: () => ipcRenderer.invoke('carplay-sendframe'),
-    sendTouch: (x: number, y: number, action: number) =>
+    start: (): Promise<void> => ipcRenderer.invoke('carplay-start'),
+    stop: (): Promise<void> => ipcRenderer.invoke('carplay-stop'),
+    sendFrame: (): Promise<void> => ipcRenderer.invoke('carplay-sendframe'),
+    sendTouch: (x: number, y: number, action: number): void =>
       ipcRenderer.send('carplay-touch', { x, y, action }),
-    sendMultiTouch: (points: MultiTouchPoint[]) => ipcRenderer.send('carplay-multi-touch', points),
-    sendKeyCommand: (key: string) => ipcRenderer.send('carplay-key-command', key),
-    onEvent: (callback: ApiCallback<any>) => ipcRenderer.on('carplay-event', callback),
-    readMedia: () => ipcRenderer.invoke('carplay-media-read'),
+    sendMultiTouch: (points: MultiTouchPoint[]): void =>
+      ipcRenderer.send('carplay-multi-touch', points),
+    sendKeyCommand: (key: string): void => ipcRenderer.send('carplay-key-command', key),
+    onEvent: (callback: ApiCallback): void => {
+      ipcRenderer.on('carplay-event', callback)
+    },
 
-    onVideoChunk: (handler: ChunkHandler) => {
+    readMedia: (): Promise<unknown> => ipcRenderer.invoke('carplay-media-read'),
+
+    onVideoChunk: (handler: ChunkHandler): void => {
       videoChunkHandler = handler
       videoChunkQueue.forEach((chunk) => handler(chunk))
       videoChunkQueue = []
     },
-    onAudioChunk: (handler: ChunkHandler) => {
+    onAudioChunk: (handler: ChunkHandler): void => {
       audioChunkHandler = handler
       audioChunkQueue.forEach((chunk) => handler(chunk))
       audioChunkQueue = []
@@ -86,20 +96,25 @@ const api = {
 
 contextBridge.exposeInMainWorld('carplay', api)
 
-const appApi = {
-  getVersion: () => ipcRenderer.invoke('app:getVersion'),
-  getLatestRelease: () => ipcRenderer.invoke('app:getLatestRelease'),
-  performUpdate: (imageUrl?: string) => ipcRenderer.invoke('app:performUpdate', imageUrl),
+type UpdateEvent = { phase: string; message?: string }
+type UpdateProgress = { phase?: string; percent?: number; received?: number; total?: number }
 
-  onUpdateEvent: (cb: (payload: any) => void): (() => void) => {
+const appApi = {
+  getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  getLatestRelease: (): Promise<{ version?: string; url?: string }> =>
+    ipcRenderer.invoke('app:getLatestRelease'),
+  performUpdate: (imageUrl?: string): Promise<void> =>
+    ipcRenderer.invoke('app:performUpdate', imageUrl),
+
+  onUpdateEvent: (cb: (payload: UpdateEvent) => void): (() => void) => {
     const ch = 'update:event'
-    const handler = (_e: IpcRendererEvent, payload: any) => cb(payload)
+    const handler = (_e: IpcRendererEvent, payload: UpdateEvent) => cb(payload)
     ipcRenderer.on(ch, handler)
     return () => ipcRenderer.removeListener(ch, handler)
   },
-  onUpdateProgress: (cb: (payload: any) => void): (() => void) => {
+  onUpdateProgress: (cb: (payload: UpdateProgress) => void): (() => void) => {
     const ch = 'update:progress'
-    const handler = (_e: IpcRendererEvent, payload: any) => cb(payload)
+    const handler = (_e: IpcRendererEvent, payload: UpdateProgress) => cb(payload)
     ipcRenderer.on(ch, handler)
     return () => ipcRenderer.removeListener(ch, handler)
   },

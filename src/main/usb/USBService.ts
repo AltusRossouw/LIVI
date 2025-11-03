@@ -261,9 +261,11 @@ export class USBService {
 
     try {
       await new Promise<void>((resolve, reject) => {
-        dongle.reset((err) => {
+        dongle.reset((err?: unknown) => {
           if (err) {
-            const msg = String((err as any)?.message ?? err)
+            const msg =
+              err instanceof Error ? err.message : typeof err === 'string' ? err : String(err)
+
             if (
               msg.includes('LIBUSB_ERROR_NOT_FOUND') ||
               msg.includes('LIBUSB_ERROR_NO_DEVICE') ||

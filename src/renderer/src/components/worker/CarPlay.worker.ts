@@ -1,8 +1,20 @@
-/* eslint-disable no-restricted-globals */
 import { decodeTypeMap } from '../../../../main/carplay/messages'
 import { AudioPlayerKey } from './types'
 import { RingBuffer } from 'ringbuf.js'
 import { createAudioPlayerKey } from './utils'
+import type { Command } from './types'
+
+type PortAudioLike = {
+  type?: 'audio'
+  buffer?: ArrayBuffer
+  data?: Int16Array
+  chunk?: ArrayBuffer
+}
+
+type AudioDataMsg = PortAudioLike & {
+  decodeType?: number
+  audioType?: number
+}
 
 type Key = AudioPlayerKey
 
@@ -16,16 +28,19 @@ type Info = { codec: string | number; sampleRate: number; channels: number; bitD
 const lastInfo: Record<Key, Info> = {}
 let currentKey: Key | undefined
 
-function toInt16(audioData: any): Int16Array | undefined {
-  if (audioData?.data instanceof Int16Array) {
-    const src = audioData.data as Int16Array
-    const aligned =
-      src.byteOffset % 2 === 0 && src.buffer.byteLength >= src.byteOffset + src.byteLength
-    return aligned ? src : new Int16Array(src)
+function toInt16(msg: unknown): Int16Array | undefined {
+  if (typeof msg === 'object' && msg !== null) {
+    const a = msg as PortAudioLike
+    if (a.data instanceof Int16Array) {
+      const src = a.data
+      const aligned =
+        src.byteOffset % 2 === 0 && src.buffer.byteLength >= src.byteOffset + src.byteLength
+      return aligned ? src : new Int16Array(src)
+    }
+    if (a.buffer instanceof ArrayBuffer) return new Int16Array(a.buffer)
+    if (a.chunk instanceof ArrayBuffer) return new Int16Array(a.chunk)
   }
-  if (audioData?.buffer instanceof ArrayBuffer) return new Int16Array(audioData.buffer)
-  if (audioData?.chunk instanceof ArrayBuffer) return new Int16Array(audioData.chunk)
-  console.error('[CARPLAY.WORKER] PCM - cannot interpret PCM data:', audioData)
+  console.error('[CARPLAY.WORKER] PCM - cannot interpret PCM data:', msg)
   return undefined
 }
 
@@ -48,11 +63,17 @@ function pushOrPend(key: Key, chunk: Int16Array) {
   }
 }
 
-function processAudioData(audioData: any) {
-  const { decodeType, audioType } = audioData
-  const key = createAudioPlayerKey(decodeType, audioType)
-  const meta = decodeTypeMap[decodeType]
+function processAudioData(audioData: AudioDataMsg) {
+  const decodeType = audioData.decodeType
+  const audioType = audioData.audioType
 
+  // Fallbacks bleiben wie gehabt, nur sauber typisiert
+  const key = createAudioPlayerKey(
+    typeof decodeType === 'number' ? decodeType : (undefined as unknown as number),
+    typeof audioType === 'number' ? audioType : (undefined as unknown as number)
+  )
+
+  const meta = typeof decodeType === 'number' ? decodeTypeMap[decodeType] : undefined
   const channels = Math.max(1, meta?.channel ?? 2)
   const sampleRate = Math.max(8000, meta?.frequency ?? 48000)
   const codec = meta?.format ?? meta?.mimeType ?? String(decodeType)
@@ -61,9 +82,10 @@ function processAudioData(audioData: any) {
   const pcm = toInt16(audioData)
   if (!pcm) return
 
-  requestSabIfNeeded(decodeType, audioType, key)
+  if (typeof decodeType === 'number' && typeof audioType === 'number') {
+    requestSabIfNeeded(decodeType, audioType, key)
+  }
 
-  // send audioInfo on key change or if format values differ
   const info: Info = { codec, sampleRate, channels, bitDepth }
   const keyChanged = key !== currentKey
   const changed =
@@ -79,7 +101,7 @@ function processAudioData(audioData: any) {
     ;(self as unknown as Worker).postMessage({ type: 'audioInfo', payload: info })
   }
 
-  // FFT downmix for UI/visuals
+  // FFT downmix bleibt unverändert
   {
     const frames = Math.floor(pcm.length / channels)
     const f32 = new Float32Array(frames)
@@ -98,9 +120,9 @@ function processAudioData(audioData: any) {
 
 function setupPorts(port: MessagePort) {
   try {
-    port.onmessage = (ev) => {
+    port.onmessage = (ev: MessageEvent<AudioDataMsg>) => {
       try {
-        const data = ev.data as any
+        const data = ev.data
         if (data?.type === 'audio' && (data.buffer || data.data || data.chunk)) {
           processAudioData(data)
         }
@@ -115,21 +137,19 @@ function setupPorts(port: MessagePort) {
   }
 }
 
-;(self as unknown as Worker).onmessage = (ev: MessageEvent) => {
-  const data = ev.data as any
+;(self as unknown as Worker).onmessage = (ev: MessageEvent<Command>) => {
+  const data = ev.data
   switch (data?.type) {
     case 'initialise': {
-      audioPort = data?.payload?.audioPort
+      const p = (data as Extract<Command, { type: 'initialise' }>).payload
+      audioPort = p?.audioPort
       if (audioPort) setupPorts(audioPort)
       else console.error('[CARPLAY.WORKER] missing audioPort in initialise payload')
       break
     }
     case 'audioPlayer': {
-      const { sab, decodeType, audioType } = data.payload as {
-        sab: SharedArrayBuffer
-        decodeType: number
-        audioType: number
-      }
+      const p = (data as Extract<Command, { type: 'audioPlayer' }>).payload
+      const { sab, decodeType, audioType } = p
       const key = createAudioPlayerKey(decodeType, audioType)
       audioBuffers[key] = new RingBuffer(sab, Int16Array)
       sabRequested[key] = false

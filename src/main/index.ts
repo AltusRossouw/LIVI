@@ -110,7 +110,27 @@ let isQuitting = false
 let suppressNextFsSync = false
 
 const carplayService = new CarplayService()
-;(global as any).carplayService = carplayService
+declare global {
+  var carplayService: CarplayService | undefined
+}
+globalThis.carplayService = carplayService
+
+type UpdateEventPayload =
+  | { phase: 'start' }
+  | { phase: 'download'; received: number; total: number; percent: number }
+  | { phase: 'mounting' | 'copying' | 'unmounting' | 'installing' | 'relaunching' }
+  | { phase: 'error'; message: string }
+
+// GitHub API
+interface GhAsset {
+  name?: string
+  browser_download_url?: string
+}
+interface GhRelease {
+  tag_name?: string
+  name?: string
+  assets?: GhAsset[]
+}
 
 app.on('before-quit', async (e) => {
   if (isQuitting) return
@@ -189,11 +209,11 @@ function loadConfig(): ExtraConfig {
 config = loadConfig()
 
 // Updater helpers
-function pickAssetForPlatform(assets: any[]): { url?: string } {
+function pickAssetForPlatform(assets: GhAsset[]): { url?: string } {
   if (!Array.isArray(assets)) return {}
 
-  const nameOf = (a: any) => (a?.name || a?.browser_download_url || '') as string
-  const urlOf = (a: any) => a?.browser_download_url as string | undefined
+  const nameOf = (a: GhAsset) => a?.name || a?.browser_download_url || ''
+  const urlOf = (a?: GhAsset) => a?.browser_download_url
 
   if (process.platform === 'darwin') {
     const dmgs = assets.filter((a) => /\.dmg$/i.test(nameOf(a)))
@@ -227,10 +247,10 @@ function pickAssetForPlatform(assets: any[]): { url?: string } {
   return {}
 }
 
-function sendUpdateEvent(payload: any) {
+function sendUpdateEvent(payload: UpdateEventPayload) {
   mainWindow?.webContents.send('update:event', payload)
 }
-function sendUpdateProgress(payload: any) {
+function sendUpdateProgress(payload: Extract<UpdateEventPayload, { phase: 'download' }>) {
   mainWindow?.webContents.send('update:progress', payload)
 }
 
@@ -361,11 +381,11 @@ async function installOnLinux(url: string): Promise<void> {
   sendUpdateEvent({ phase: 'relaunching' })
 
   // Relaunch via spawn
-  const cleanEnv = { ...process.env }
-  delete (cleanEnv as any).APPIMAGE
-  delete (cleanEnv as any).APPDIR
-  delete (cleanEnv as any).ARGV0
-  delete (cleanEnv as any).OWD
+  const cleanEnv: Record<string, string | undefined> = { ...process.env }
+  delete cleanEnv.APPIMAGE
+  delete cleanEnv.APPDIR
+  delete cleanEnv.ARGV0
+  delete cleanEnv.OWD
 
   const child = spawn(current, [], { detached: true, stdio: 'ignore', env: cleanEnv })
   child.unref()
@@ -623,7 +643,7 @@ app.whenReady().then(() => {
       const feed = process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
       const res = await fetch(feed, { headers: { 'User-Agent': 'pi-carplay-updater' } })
       if (!res.ok) throw new Error(`feed ${res.status}`)
-      const json: any = await res.json()
+      const json = (await res.json()) as unknown as GhRelease
       const raw = (json.tag_name || json.name || '').toString()
       const version = raw.replace(/^v/i, '')
       const { url } = pickAssetForPlatform(json.assets || [])
@@ -646,7 +666,7 @@ app.whenReady().then(() => {
             const feed =
               process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
             const res = await fetch(feed, { headers: { 'User-Agent': 'pi-carplay-updater' } })
-            const json: any = await res.json()
+            const json = (await res.json()) as unknown as GhRelease
             return pickAssetForPlatform(json.assets || []).url
           })())
         if (!url || !/\.dmg($|\?)/i.test(url)) throw new Error('No DMG asset found')
@@ -660,7 +680,7 @@ app.whenReady().then(() => {
             const feed =
               process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
             const res = await fetch(feed, { headers: { 'User-Agent': 'pi-carplay-updater' } })
-            const json: any = await res.json()
+            const json = (await res.json()) as unknown as GhRelease
             return pickAssetForPlatform(json.assets || []).url
           })())
         if (!url || !/\.AppImage($|\?)/i.test(url)) throw new Error('No AppImage asset found')
@@ -670,9 +690,10 @@ app.whenReady().then(() => {
 
       console.warn('[update] unsupported platform:', process.platform)
       sendUpdateEvent({ phase: 'error', message: 'Unsupported platform' })
-    } catch (e: any) {
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       console.warn('[update] failed:', e)
-      sendUpdateEvent({ phase: 'error', message: String(e?.message || e) })
+      sendUpdateEvent({ phase: 'error', message: msg })
     }
   })
 

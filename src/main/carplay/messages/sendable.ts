@@ -247,25 +247,33 @@ export class SendOpen extends SendableMessageWithPayload {
   }
 }
 
+type BoxSettingsBody = {
+  mediaDelay: number
+  syncTime: number
+  androidAutoSizeW: number
+  androidAutoSizeH: number
+  WiFiChannel: number
+  wifiChannel: number
+}
+
 export class SendBoxSettings extends SendableMessageWithPayload {
   type = MessageType.BoxSettings
   private syncTime: number | null
   private config: DongleConfig
 
   getPayload(): Buffer {
-    const cfg = this.config as any
-    const channel: number =
-      typeof cfg.wifiChannel === 'number' && Number.isFinite(cfg.wifiChannel)
-        ? cfg.wifiChannel
-        : cfg.wifiType === '5ghz'
-          ? 36
-          : 1
+    const cfg = this.config
+    const channel: number = Number.isFinite(cfg.wifiChannel)
+      ? cfg.wifiChannel
+      : cfg.wifiType === '5ghz'
+        ? 36
+        : 1
 
-    const body: any = {
-      mediaDelay: this.config.mediaDelay,
+    const body: BoxSettingsBody = {
+      mediaDelay: cfg.mediaDelay,
       syncTime: this.syncTime ?? getCurrentTimeInMs(),
-      androidAutoSizeW: this.config.width,
-      androidAutoSizeH: this.config.height,
+      androidAutoSizeW: cfg.width,
+      androidAutoSizeH: cfg.height,
       WiFiChannel: channel,
       wifiChannel: channel
     }

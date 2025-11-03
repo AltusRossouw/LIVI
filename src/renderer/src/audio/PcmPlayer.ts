@@ -106,10 +106,10 @@ export class PcmPlayer {
       throw new Error('Illegal state - context or gainNode not set')
     }
 
+    type ImportMetaWithVite = ImportMeta & { env?: { DEV?: boolean } }
+
     const isDev =
-      typeof import.meta !== 'undefined' &&
-      typeof (import.meta as any).env !== 'undefined' &&
-      !!(import.meta as any).env.DEV
+      typeof import.meta !== 'undefined' && Boolean((import.meta as ImportMetaWithVite).env?.DEV)
 
     const workletURL = isDev
       ? '/audio.worklet.js'

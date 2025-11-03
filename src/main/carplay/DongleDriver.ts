@@ -243,8 +243,8 @@ export class DongleDriver extends EventEmitter {
 
         try {
           await this._device.close()
-        } catch (e: any) {
-          const msg = String(e?.message || e)
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
           if (/pending request/i.test(msg)) {
             console.warn('device.close(): pending request -> ignoring for shutdown')
           } else {

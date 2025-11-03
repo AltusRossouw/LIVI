@@ -116,11 +116,10 @@ export class WebGPURenderer implements FrameRenderer {
         '[WebGPURenderer] importExternalTexture failed, falling back to copyExternalImageToTexture:',
         e
       )
-      // @ts-ignore
-      ;(this.#device.queue as any).copyExternalImageToTexture(
+      this.#device.queue.copyExternalImageToTexture(
         { source: frame },
         { texture: this.#ctx.getCurrentTexture() },
-        [frame.displayWidth, frame.displayHeight]
+        { width: frame.displayWidth, height: frame.displayHeight }
       )
       frame.close()
       return

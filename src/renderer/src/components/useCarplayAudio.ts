@@ -18,12 +18,10 @@ const useCarplayAudio = (worker: CarPlayWorker) => {
   const navVolume = useCarplayStore((s) => s.navVolume ?? s.settings?.navVolume ?? 0.5)
   const audioJitterMs = useCarplayStore((s) => s.audioJitterMs ?? 15)
 
-  const getCommandName = (cmd?: number) => {
-    if (typeof cmd === 'number') {
-      // Numeric enum reverse mapping
-      return (AudioCommand as any)[cmd] as string | undefined
-    }
-    return undefined
+  const getCommandName = (cmd?: number): string | undefined => {
+    if (typeof cmd !== 'number') return undefined
+    const map = AudioCommand as unknown as Record<number, string>
+    return map[cmd]
   }
 
   const applyVolumes = useCallback(() => {
@@ -53,7 +51,6 @@ const useCarplayAudio = (worker: CarPlayWorker) => {
           playersRef.current.delete(key)
         }
 
-        // eslint-disable-next-line no-console
         console.log(
           '[Audio] Create PcmPlayer FS:',
           format.frequency,
@@ -93,7 +90,7 @@ const useCarplayAudio = (worker: CarPlayWorker) => {
   const processAudio = useCallback(
     (audio: AudioData) => {
       const player = getAudioPlayer(audio)
-      // eslint-disable-next-line no-console
+
       console.log(
         '[Audio]',
         'decodeType:',

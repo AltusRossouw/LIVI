@@ -1,5 +1,9 @@
 /// <reference types="@webgpu/types" />
 
+import type { ElectronAPI } from '@electron-toolkit/preload'
+import type { ExtraConfig } from '../../main/Globals'
+import type { MultiTouchPoint } from '../../main/carplay/messages/sendable'
+
 declare module 'ringbuf.js' {
   export class RingBuffer {
     constructor(sab: SharedArrayBuffer, type: { BYTES_PER_ELEMENT: number })
@@ -21,10 +25,48 @@ interface USBDevice {
   readonly vendorId: number
   readonly productId: number
 }
-
 interface USBDeviceRequestOptions {
   filters?: Array<Partial<USBDevice>>
 }
+
+declare global {
+  type UpdateEvent =
+    | { phase: 'start' | 'mounting' | 'copying' | 'unmounting' | 'installing' | 'relaunching' }
+    | { phase: 'error'; message?: string }
+
+  type UpdateProgress = {
+    phase: 'download'
+    percent?: number
+    received?: number
+    total?: number
+  }
+}
+
+type UsbDeviceInfo = {
+  device: boolean
+  serialNumber?: string
+  manufacturerName?: string
+  productName?: string
+  fwVersion?: string
+}
+
+type MediaPayload = {
+  timestamp: string
+  payload: {
+    type: number
+    media?: {
+      MediaSongName?: string
+      MediaAlbumName?: string
+      MediaArtistName?: string
+      MediaAPPName?: string
+      MediaSongDuration?: number
+      MediaSongPlayTime?: number
+      MediaPlayStatus?: number
+      MediaLyrics?: string
+    }
+    base64Image?: string
+  }
+} | null
 
 declare global {
   interface Navigator {
@@ -37,66 +79,52 @@ declare global {
   }
 
   interface Window {
+    electron: ElectronAPI
+
     carplay: {
-      quit: () => Promise<any>
-      onUSBResetStatus: (callback: (...args: any[]) => void) => void
+      quit(): Promise<void>
+      onUSBResetStatus(callback: (event: unknown, ...args: unknown[]) => void): void
 
       usb: {
-        forceReset: () => Promise<any>
-        detectDongle: () => Promise<any>
-        getDeviceInfo: () => Promise<any>
-        getLastEvent: () => Promise<any>
-        getSysdefaultPrettyName: () => Promise<string>
-        listenForEvents: (callback: (...args: any[]) => void) => void
-        unlistenForEvents: (callback: (...args: any[]) => void) => void
+        forceReset(): Promise<void>
+        detectDongle(): Promise<unknown>
+        getDeviceInfo(): Promise<UsbDeviceInfo>
+        getLastEvent(): Promise<unknown>
+        getSysdefaultPrettyName(): Promise<string>
+        listenForEvents(callback: (event: unknown, ...args: unknown[]) => void): void
+        unlistenForEvents(callback: (event: unknown, ...args: unknown[]) => void): void
       }
 
       settings: {
-        get: () => Promise<any>
-        save: (settings: any) => Promise<any>
-        onUpdate: (callback: (...args: any[]) => void) => void
+        get(): Promise<ExtraConfig>
+        save(settings: ExtraConfig): Promise<void>
+        onUpdate(callback: (event: unknown, settings: ExtraConfig) => void): void
       }
 
       ipc: {
-        start: () => Promise<any>
-        stop: () => Promise<any>
-        sendFrame: () => Promise<any>
-        sendTouch: (x: number, y: number, action: number) => void
-        sendMultiTouch: (points: any[]) => void
-        sendKeyCommand: (key: string) => void
-        onEvent: (callback: (...args: any[]) => void) => void
+        start(): Promise<void>
+        stop(): Promise<void>
+        sendFrame(): Promise<void>
+        sendTouch(x: number, y: number, action: number): void
+        sendMultiTouch(points: MultiTouchPoint[]): void
+        sendKeyCommand(key: string): void
+        onEvent(callback: (event: unknown, ...args: unknown[]) => void): void
 
-        readMedia: () => Promise<{
-          timestamp: string
-          payload: {
-            type: number
-            media?: {
-              MediaSongName?: string
-              MediaAlbumName?: string
-              MediaArtistName?: string
-              MediaAPPName?: string
-              MediaSongDuration?: number
-              MediaSongPlayTime?: number
-              MediaPlayStatus?: number
-              MediaLyrics?: string
-            }
-            base64Image?: string
-          }
-        } | null>
+        readMedia(): Promise<MediaPayload>
 
-        onVideoChunk: (handler: (payload: any) => void) => void
-        onAudioChunk: (handler: (payload: any) => void) => void
+        onVideoChunk(handler: (payload: unknown) => void): void
+        onAudioChunk(handler: (payload: unknown) => void): void
       }
     }
 
     app: {
-      getVersion: () => Promise<string>
-      getLatestRelease: () => Promise<any>
-      performUpdate: (imageUrl?: string) => Promise<any>
-      onUpdateEvent: (cb: (payload: any) => void) => () => void
-      onUpdateProgress: (cb: (payload: any) => void) => () => void
-      getKiosk: () => Promise<boolean>
-      onKioskSync: (cb: (kiosk: boolean) => void) => () => void
+      getVersion(): Promise<string>
+      getLatestRelease(): Promise<{ version?: string; url?: string }>
+      performUpdate(imageUrl?: string): Promise<void>
+      onUpdateEvent(cb: (payload: UpdateEvent) => void): () => void
+      onUpdateProgress(cb: (payload: UpdateProgress) => void): () => void
+      getKiosk(): Promise<boolean>
+      onKioskSync(cb: (kiosk: boolean) => void): () => void
     }
   }
 }

@@ -22,6 +22,9 @@ type MediaPayload = {
   base64Image?: string
 }
 
+// USB/carplay event shape
+type UsbEvent = { type?: string } & Record<string, unknown>
+
 // Utils
 function msToClock(ms?: number): string {
   if (!ms || ms < 0) return '0:00'
@@ -45,9 +48,11 @@ function mergePayload(prev: MediaPayload | undefined, inc: MediaPayload): MediaP
     base64Image: inc.base64Image !== undefined ? inc.base64Image : prev?.base64Image
   }
 }
-function payloadFromLiveEvent(ev: any): MediaPayload | null {
-  if (!ev || ev.type !== 'media' || !ev.payload || !ev.payload.payload) return null
-  return ev.payload.payload as MediaPayload
+type MediaEventPayload = { type: 'media'; payload: { payload: MediaPayload } }
+function payloadFromLiveEvent(ev: unknown): MediaPayload | null {
+  const e = ev as Partial<MediaEventPayload>
+  if (e?.type !== 'media' || !e.payload?.payload) return null
+  return e.payload.payload
 }
 
 // Hooks
@@ -159,7 +164,8 @@ function useMediaState(allowInitialHydrate: boolean) {
   const hydratedOnceRef = useRef(false)
 
   useEffect(() => {
-    const handler = (_evt: any, ev: any) => {
+    const handler = (_evt: unknown, ...args: unknown[]) => {
+      const ev = (args[0] ?? {}) as UsbEvent
       if (ev?.type === 'unplugged') {
         hydratedOnceRef.current = false
         setSnap(null)
@@ -184,15 +190,36 @@ function useMediaState(allowInitialHydrate: boolean) {
       })
     }
 
-    ;(window.carplay.ipc as any).onEvent?.(handler)
+    // Typed view of the pieces we use on window (no `any`)
+    type Bridge = {
+      carplay?: {
+        ipc?: { onEvent?: (cb: (e: unknown, ...a: unknown[]) => void) => void | (() => void) }
+      }
+      electron?: {
+        ipcRenderer?: {
+          removeListener?: (channel: string, listener: (...a: unknown[]) => void) => void
+        }
+      }
+    }
+    const w = window as unknown as Bridge
+
+    let unsubscribe: (() => void) | undefined
+    if (typeof w.carplay?.ipc?.onEvent === 'function') {
+      const maybe = w.carplay.ipc.onEvent(handler)
+      if (typeof maybe === 'function') unsubscribe = maybe
+    }
+
     return () => {
-      if ((window.carplay.ipc as any).offEvent) {
+      if (typeof unsubscribe === 'function') {
         try {
-          ;(window.carplay.ipc as any).offEvent(handler)
+          unsubscribe()
         } catch {}
-      } else {
+        return
+      }
+      const remove = w.electron?.ipcRenderer?.removeListener
+      if (typeof remove === 'function') {
         try {
-          ;(window.electron as any)?.ipcRenderer?.removeListener?.('carplay-event', handler)
+          remove('carplay-event', handler as (...a: unknown[]) => void)
         } catch {}
       }
     }
@@ -268,7 +295,7 @@ export default function Media() {
   const pagePad = Math.round(clamp(minSide * 0.02, 12, 22))
   const colGap = Math.round(clamp(w * 0.025, 16, 28))
   const sectionGap = Math.round(clamp(h * 0.03, 10, 24))
-  let ctrlSize = Math.round(clamp(h * 0.095, 50, 82))
+  const ctrlSize = Math.round(clamp(h * 0.095, 50, 82))
   const ctrlGap = Math.round(clamp(w * 0.03, 16, 32))
   const progressH = Math.round(clamp(h * 0.012, 8, 12))
 
@@ -374,14 +401,15 @@ export default function Media() {
 
   // Clear overrides on unplug
   useEffect(() => {
-    const usbHandler = (_: any, data: { type: string }) => {
+    const usbHandler = (_evt: unknown, ...args: unknown[]) => {
+      const data = (args[0] ?? {}) as UsbEvent
       if (data?.type === 'unplugged') {
         clearOverride()
         resetPress()
       }
     }
     window.carplay.usb.listenForEvents(usbHandler)
-    return () => window.carplay.usb.unlistenForEvents?.(usbHandler)
+    return () => window.carplay.usb.unlistenForEvents(usbHandler)
   }, [clearOverride, resetPress])
 
   // Progress from elapsed/total

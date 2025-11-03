@@ -22,7 +22,7 @@ export interface CarplayStore {
   settings: ExtraConfig | null
   saveSettings: (settings: ExtraConfig) => void
   getSettings: () => void
-  stream: (stream: any) => void
+  stream: (payload: unknown) => void
   resetInfo: () => void
 
   // Display-Resolution
@@ -89,8 +89,8 @@ export const useCarplayStore = create<CarplayStore>((set, get) => ({
     socket.emit('getSettings')
   },
 
-  stream: (stream) => {
-    socket.emit('stream', stream)
+  stream: (payload: unknown) => {
+    socket.emit('stream', payload)
   },
 
   // Reset all stored info

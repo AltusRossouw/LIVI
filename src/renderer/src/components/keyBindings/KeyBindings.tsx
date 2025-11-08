@@ -33,10 +33,19 @@ export function KeyBindings({ settings, updateKey }: KeyBindingsProps) {
   const [openWaiting, setOpenWaiting] = useState<boolean>(false)
 
   const setKey = useCallback(
-    (keyPressed: KeyboardEvent) => {
-      const oldBindings = { ...settings.bindings }
-      oldBindings[keyToBind] = keyPressed.code
-      updateKey('bindings', oldBindings)
+    (e: KeyboardEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (e.key === 'Escape') {
+        setOpenWaiting(false)
+        setKeyToBind('')
+        return
+      }
+
+      const bindings = { ...settings.bindings }
+      bindings[keyToBind] = e.code
+      updateKey('bindings', bindings)
       setOpenWaiting(false)
       setKeyToBind('')
     },
@@ -46,9 +55,9 @@ export function KeyBindings({ settings, updateKey }: KeyBindingsProps) {
   useEffect(() => {
     if (!openWaiting) return
     const handler = (e: KeyboardEvent) => setKey(e)
-    document.addEventListener('keydown', handler)
+    document.addEventListener('keydown', handler, true)
     return () => {
-      document.removeEventListener('keydown', handler)
+      document.removeEventListener('keydown', handler, true)
     }
   }, [openWaiting, setKey])
 
@@ -60,18 +69,20 @@ export function KeyBindings({ settings, updateKey }: KeyBindingsProps) {
   return (
     <>
       <Grid container spacing={2}>
-        {Object.entries(settings && settings?.bindings ? settings.bindings : []).map(
-          ([action, code]: [string, unknown]) => (
-            <Grid size={{ xs: 3 }} key={action}>
-              <Item>
-                <Typography variant="subtitle2">{action}</Typography>
-                <Button variant="outlined" onClick={() => awaitKeyPress(action)}>
-                  {code as React.ReactNode}
-                </Button>
-              </Item>
-            </Grid>
-          )
-        )}
+        {Object.entries(settings?.bindings ?? {}).map(([action, code]) => (
+          <Grid size={{ xs: 3 }} key={action}>
+            <Item>
+              <Typography variant="subtitle2">{action}</Typography>
+              <Button
+                variant="outlined"
+                onClick={() => awaitKeyPress(action)}
+                disabled={openWaiting}
+              >
+                {code as React.ReactNode}
+              </Button>
+            </Item>
+          </Grid>
+        ))}
       </Grid>
 
       <Modal
@@ -83,6 +94,9 @@ export function KeyBindings({ settings, updateKey }: KeyBindingsProps) {
         <Box sx={style}>
           <Typography id="await-key-bind-title" variant="h6">
             Press key for “{keyToBind}”
+          </Typography>
+          <Typography id="await-key-bind-description" variant="body2" sx={{ mt: 1 }}>
+            Press Esc to cancel.
           </Typography>
         </Box>
       </Modal>

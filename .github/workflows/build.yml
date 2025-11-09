@@ -231,11 +231,51 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           BRANCH_NAME="${BUILD_BRANCH}"
           VERSION="${{ steps.pkg.outputs.version }}"
           NODE_VERSION="${{ steps.rt.outputs.node }}"
           NPM_VERSION="${{ steps.rt.outputs.npm }}"
           ELECTRON_SEMVER="$(node -e "try{console.log(require('./node_modules/electron/package.json').version)}catch(e){try{console.log(require('./package.json').devDependencies.electron)}catch(e){console.log('unknown')}}" )"
+
+          # Chromium version: try electron-to-chromium, then fallback to Electron binary
+          CHROMIUM_VER="$(node -e "
+            try {
+              const { electronToChromium } = require('electron-to-chromium');
+              const v = '${ELECTRON_SEMVER}'.trim();
+              if (!v || v === 'unknown') { console.log('unknown'); process.exit(0); }
+              const clean = v.replace(/^v/i,'').split('-')[0];
+              const mapped = electronToChromium(clean);
+              console.log(mapped ? String(mapped) : 'unknown');
+            } catch { console.log('unknown'); }
+          ")"
+
+          if [ "$CHROMIUM_VER" = "unknown" ] || [ -z "$CHROMIUM_VER" ]; then
+            ELECTRON_BIN="$(node -e "try{console.log(require('electron'))}catch{process.exit(1)}" 2>/dev/null || true)"
+            if [ -n "$ELECTRON_BIN" ] && [ -x "$ELECTRON_BIN" ]; then
+              CHROMIUM_FROM_BIN="$(ELECTRON_RUN_AS_NODE=1 "$ELECTRON_BIN" -e "console.log(process.versions.chrome||'')" 2>/dev/null || true)"
+              if [ -n "$CHROMIUM_FROM_BIN" ]; then
+                CHROMIUM_VER="$CHROMIUM_FROM_BIN"
+              fi
+            fi
+          fi
+
+          # Electron release date (de-DE, Europe/Berlin)
+          ELECTRON_DATE_DE="$(node -e "
+            const cp = require('child_process');
+            const v = '${ELECTRON_SEMVER}'.trim().replace(/^v/i,'');
+            try {
+              const out = cp.execSync('npm view electron@'+v+' time --json',{stdio:['ignore','pipe','ignore']}).toString();
+              const map = JSON.parse(out)||{};
+              const iso = map[v];
+              if (!iso) { console.log('unknown'); process.exit(0); }
+              const d = new Date(iso);
+              console.log(new Intl.DateTimeFormat('de-DE',
+                { timeZone:'Europe/Berlin', day:'2-digit', month:'2-digit', year:'numeric' }
+              ).format(d));
+            } catch { console.log('unknown'); }
+          ")"
 
           mkdir temp-badges
           cd temp-badges
@@ -246,17 +286,26 @@ jobs:
           git config user.email "github-actions@github.com"
 
           mkdir -p .github/badges
+
           echo "{\"schemaVersion\":1,\"label\":\"${BRANCH_NAME}\",\"message\":\"v${VERSION}\",\"color\":\"lightblue\"}" > ".github/badges/${BRANCH_NAME}-version.json"
           echo "{\"schemaVersion\":1,\"label\":\"node\",\"message\":\"${NODE_VERSION}\",\"color\":\"lightgrey\"}" > ".github/badges/${BRANCH_NAME}-node.json"
           echo "{\"schemaVersion\":1,\"label\":\"npm\",\"message\":\"${NPM_VERSION}\",\"color\":\"lightgrey\"}" > ".github/badges/${BRANCH_NAME}-npm.json"
           echo "{\"schemaVersion\":1,\"label\":\"electron\",\"message\":\"${ELECTRON_SEMVER}\",\"color\":\"lightblue\"}" > ".github/badges/${BRANCH_NAME}-electron.json"
 
+          # Chromium mapping + Electron release date + combined info
+          echo "{\"schemaVersion\":1,\"label\":\"chromium\",\"message\":\"${CHROMIUM_VER}\",\"color\":\"informational\"}" > ".github/badges/${BRANCH_NAME}-electron-chromium.json"
+          echo "{\"schemaVersion\":1,\"label\":\"released\",\"message\":\"${ELECTRON_DATE_DE}\",\"color\":\"success\"}" > ".github/badges/${BRANCH_NAME}-electron-date.json"
+          echo "{\"schemaVersion\":1,\"label\":\"Electron\",\"message\":\"${ELECTRON_SEMVER} • Chromium ${CHROMIUM_VER} • ${ELECTRON_DATE_DE}\",\"color\":\"blue\"}" > ".github/badges/${BRANCH_NAME}-electron-info.json"
+
           git add .github/badges/${BRANCH_NAME}-version.json
           git add .github/badges/${BRANCH_NAME}-node.json
           git add .github/badges/${BRANCH_NAME}-npm.json
           git add .github/badges/${BRANCH_NAME}-electron.json
+          git add .github/badges/${BRANCH_NAME}-electron-chromium.json
+          git add .github/badges/${BRANCH_NAME}-electron-date.json
+          git add .github/badges/${BRANCH_NAME}-electron-info.json
 
-          git commit -m "Update ${BRANCH_NAME} badges: version ${VERSION}, node ${NODE_VERSION}, npm ${NPM_VERSION}" || echo "No changes"
+          git commit -m "chore(badges): ${BRANCH_NAME} -> v${VERSION}, node ${NODE_VERSION}, npm ${NPM_VERSION}, electron ${ELECTRON_SEMVER} (chromium ${CHROMIUM_VER}, ${ELECTRON_DATE_DE})" || echo "No changes"
           git push
           cd ..
           rm -rf temp-badges

@@ -1,13 +1,15 @@
-import { Home, Media, Camera, Settings, Info } from '../components/tabs'
+import { Home, Media, Camera, Settings, NewSettings, Info } from '../components/tabs'
 import { RoutePath, RouteProps } from './types'
-// import { settingsRoutes } from './settings'
 
 export const routes: RouteProps[] = [
   {
     path: `/${RoutePath.Settings}`,
     component: Settings
   },
-  // ...settingsRoutes, // TODO Required for new settings UI
+  {
+    path: `/${RoutePath.NewSettings}`,
+    component: NewSettings
+  },
   {
     path: `/${RoutePath.Info}`,
     component: Info

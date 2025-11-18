@@ -28,3 +28,5 @@ export enum THEME {
   LIGHT = 'light',
   DARK = 'dark'
 }
+
+export const EMPTY_STRING = '—'

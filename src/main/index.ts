@@ -481,7 +481,7 @@ async function installOnLinuxFromFile(appImagePath: string): Promise<void> {
 
   const child = spawn(current, [], { detached: true, stdio: 'ignore', env: cleanEnv })
   child.unref()
-  app.exit(0)
+  app.quit()
 }
 
 function sendKioskSync(kiosk: boolean) {

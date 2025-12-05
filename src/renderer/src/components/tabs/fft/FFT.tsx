@@ -28,7 +28,7 @@ export const FFTSpectrum = () => {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const sampleRate = useCarplayStore((s) => s.audioSampleRate) ?? 48000
-  const visualAudioDelayMs = useCarplayStore((s) => s.visualAudioDelayMs) ?? 300
+  const visualAudioDelayMs = useCarplayStore((s) => s.visualAudioDelayMs) ?? 120
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const workerRef = useRef<Worker | null>(null)

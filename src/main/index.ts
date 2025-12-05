@@ -203,7 +203,7 @@ function loadConfig(): ExtraConfig {
     navVolume: 1.0,
     siriVolume: 1.0,
     callVolume: 1.0,
-    visualAudioDelayMs: 300,
+    visualAudioDelayMs: 120,
     bindings: { ...DEFAULT_BINDINGS },
     ...fileConfig
   } as ExtraConfig

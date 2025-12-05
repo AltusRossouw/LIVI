@@ -93,6 +93,9 @@ const api = {
     },
     setVolume: (stream: 'music' | 'nav' | 'siri' | 'call', volume: number): void => {
       ipcRenderer.send('carplay-set-volume', { stream, volume })
+    },
+    setVisualizerEnabled: (enabled: boolean): void => {
+      ipcRenderer.send('carplay-set-visualizer-enabled', !!enabled)
     }
   }
 }

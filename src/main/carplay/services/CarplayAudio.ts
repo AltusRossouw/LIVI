@@ -72,12 +72,19 @@ export class CarplayAudio {
   private audioInfoSent = false
   private _mic: Microphone | null = null
 
+  // Visualizer / FFT toggle
+  private visualizerEnabled = false
+
   constructor(
     private readonly getConfig: () => ExtraConfig,
     private readonly sendCarplayEvent: SendCarplayEvent,
     private readonly sendChunked: SendChunked,
     private readonly sendMicPcm: SendMicPcm
   ) {}
+
+  public setVisualizerEnabled(enabled: boolean) {
+    this.visualizerEnabled = !!enabled
+  }
 
   // Called from CarplayService when a new CarPlay session starts
   public resetForSessionStart() {
@@ -147,7 +154,6 @@ export class CarplayAudio {
     }
 
     this.volumes[stream] = v
-    // Volume changes are rare enough to keep this
     console.debug('[CarplayAudio] setStreamVolume', { stream, volume: v })
   }
 
@@ -206,12 +212,9 @@ export class CarplayAudio {
         } else if (!this.musicRampActive) {
           const navVolume = this.volumes.nav ?? 0.5
           const navGain = this.navActive ? this.gainFromVolume(navVolume) : 0
+          const mixNav = this.navActive && this.navMixQueue.length > 0 && navGain > 0
 
-          if (this.navActive && this.navMixQueue.length > 0 && navGain > 0) {
-            pcm = this.mixMusicAndNav(msg.data, baseGain, navGain)
-          } else {
-            pcm = this.applyGain(msg.data, baseGain)
-          }
+          pcm = this.processMusicChunk(msg.data, baseGain, navGain, mixNav)
         } else {
           const fade = this.musicFade
 
@@ -221,7 +224,6 @@ export class CarplayAudio {
               1,
               Math.round((this.musicRampInMs / 1000) * sampleRate * channels)
             )
-            // Ramp start is rare enough to keep this if you want, but it is not critical.
             console.debug('[CarplayAudio] starting music ramp', {
               samples: fade.remainingSamples,
               sampleRate,
@@ -231,16 +233,21 @@ export class CarplayAudio {
 
           const navVolume = this.volumes.nav ?? 0.5
           const navGain = this.navActive ? this.gainFromVolume(navVolume) : 0
+          const mixNav = this.navActive && this.navMixQueue.length > 0 && navGain > 0
 
           pcm = new Int16Array(totalSamples)
 
           let current = fade.current
           let remaining = fade.remainingSamples
           const target = fade.target
+          const needsRamp = remaining > 0 && current < target
+          const step = needsRamp ? (target - current) / remaining : 0
+
+          let navChunk = this.navMixQueue[0]
+          let navOffset = this.navMixOffset
 
           for (let i = 0; i < totalSamples; i += 1) {
-            if (remaining > 0 && current < target) {
-              const step = (target - current) / remaining
+            if (needsRamp && remaining > 0 && current < target) {
               current += step
               remaining -= 1
             } else {
@@ -250,22 +257,15 @@ export class CarplayAudio {
             const musicSample = msg.data[i] * (baseGain * current)
             let navSample = 0
 
-            if (this.navActive && this.navMixQueue.length > 0 && navGain > 0) {
-              let navChunk = this.navMixQueue[0]
-              let navOffset = this.navMixOffset
+            if (mixNav && navChunk) {
+              navSample = navChunk[navOffset] * navGain
+              navOffset += 1
 
-              if (navChunk) {
-                navSample = navChunk[navOffset] * navGain
-                navOffset += 1
-
-                if (navOffset >= navChunk.length) {
-                  this.navMixQueue.shift()
-                  navChunk = this.navMixQueue[0] || null
-                  navOffset = 0
-                }
+              if (navOffset >= navChunk.length) {
+                this.navMixQueue.shift()
+                navChunk = this.navMixQueue[0] || null
+                navOffset = 0
               }
-
-              this.navMixOffset = navChunk ? navOffset : 0
             }
 
             let mixed = musicSample + navSample
@@ -277,6 +277,7 @@ export class CarplayAudio {
 
           fade.current = current
           fade.remainingSamples = remaining
+          this.navMixOffset = navChunk ? navOffset : 0
 
           if (fade.remainingSamples === 0 || fade.current >= fade.target - 1e-3) {
             this.musicRampActive = false
@@ -302,8 +303,8 @@ export class CarplayAudio {
       // Playback
       player.write(pcm)
 
-      // Mono only for FFT visualization
-      if (meta && msg.data) {
+      // Mono only for FFT visualization (optional)
+      if (this.visualizerEnabled && meta && msg.data) {
         const inSampleRate = meta.frequency ?? 48000
         const inChannels = meta.channel ?? 2
 
@@ -532,7 +533,6 @@ export class CarplayAudio {
     }
     this.audioPlayers.delete(key)
 
-    // on teardown
     console.debug('[CarplayAudio] stopped AudioOutput', {
       label,
       playerKey: key
@@ -645,9 +645,13 @@ export class CarplayAudio {
     return out
   }
 
-  private mixMusicAndNav(musicPcm: Int16Array, musicGain: number, navGain: number): Int16Array {
-    if (navGain <= 0 || this.navMixQueue.length === 0) {
-      // Nothing to mix, just apply music gain
+  private processMusicChunk(
+    musicPcm: Int16Array,
+    musicGain: number,
+    navGain: number,
+    mixNav: boolean
+  ): Int16Array {
+    if (!mixNav) {
       return this.applyGain(musicPcm, musicGain)
     }
 
@@ -657,11 +661,10 @@ export class CarplayAudio {
     let navOffset = this.navMixOffset
 
     for (let i = 0; i < musicPcm.length; i += 1) {
-      const musicSample = musicPcm[i] * musicGain
+      let mixed = musicPcm[i] * musicGain
 
-      let navSample = 0
       if (navChunk) {
-        navSample = navChunk[navOffset] * navGain
+        mixed += navChunk[navOffset] * navGain
         navOffset += 1
 
         if (navOffset >= navChunk.length) {
@@ -671,7 +674,6 @@ export class CarplayAudio {
         }
       }
 
-      let mixed = musicSample + navSample
       if (mixed > 32767) mixed = 32767
       else if (mixed < -32768) mixed = -32768
 

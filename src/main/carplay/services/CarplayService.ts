@@ -197,6 +197,11 @@ export class CarplayService {
         this.audio.setStreamVolume(stream, volume)
       }
     )
+
+    // visualizer / FFT toggle from renderer
+    ipcMain.on('carplay-set-visualizer-enabled', (_evt, enabled: boolean) => {
+      this.audio.setVisualizerEnabled(Boolean(enabled))
+    })
   }
 
   private uploadIcons() {

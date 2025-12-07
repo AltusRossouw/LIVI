@@ -262,6 +262,15 @@ export const Info = () => {
   }, [isDongleConnected])
 
   useEffect(() => {
+    const enabled = isStreaming
+    window.carplay?.ipc?.setVisualizerEnabled?.(enabled)
+
+    return () => {
+      window.carplay?.ipc?.setVisualizerEnabled?.(false)
+    }
+  }, [isStreaming])
+
+  useEffect(() => {
     const off1 = window.app?.onUpdateEvent?.((e: UpdateEvent) => {
       setPhase(e.phase as UpdatePhase)
       setInFlight(e.phase !== 'error' && e.phase !== 'start')

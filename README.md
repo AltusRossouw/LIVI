@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt='pi-carplay' src='documentation/images/banner.png' width="1200" />
+  <img alt='pi-carplay' src='docs/images/banner.png' width="1200" />
 </p>
 
 <p align="center">
@@ -137,17 +137,17 @@ git clone --branch main --single-branch https://github.com/f-io/pi-carplay.git \
 ## Images
 
 <p align="center">
-  <img src="documentation/images/carplay.png" alt="CarPlay" width="58%" />
+  <img src="docs/images/carplay.png" alt="CarPlay" width="58%" />
 </p>
 <p align="center">
-  <img src="documentation/images/carplay_no_phone.png" alt="No Phone" width="48%" align="top" />
+  <img src="docs/images/carplay_no_phone.png" alt="No Phone" width="48%" align="top" />
   &emsp;
-  <img src="documentation/images/media.png" alt="Media" width="48%" align="top" />
+  <img src="docs/images/media.png" alt="Media" width="48%" align="top" />
 </p>
 <p align="center">
-  <img src="documentation/images/info.png" alt="Info" width="48%" align="top" />
+  <img src="docs/images/info.png" alt="Info" width="48%" align="top" />
   &emsp;
-  <img src="documentation/images/settings.png" alt="Settings" width="48%" align="top" />
+  <img src="docs/images/settings.png" alt="Settings" width="48%" align="top" />
 </p>
 
 ---

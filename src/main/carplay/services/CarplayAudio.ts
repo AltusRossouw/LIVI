@@ -52,8 +52,18 @@ export class CarplayAudio {
   private mediaActive = false
   private audioOpenArmed = false
 
-  // Ramp configuration
-  private readonly musicRampInMs = 1000
+  // Ramp configuration (asymmetric)
+  private readonly musicRampDownMs = 500
+  private readonly musicRampUpMs = 1500
+
+  // Music ducking target while nav is active (20%)
+  private readonly navDuckingTarget = 0.2
+
+  // Debounce time after nav stop before ramping music back to 1.0
+  private readonly navResumeDelayMs = 1000
+
+  // After nav stop: delay restoring music until this timestamp
+  private navHoldUntil = 0
 
   // When to start the next music ramp
   private nextMusicRampStartAt = 0
@@ -94,6 +104,7 @@ export class CarplayAudio {
     this.siriActive = false
     this.phonecallActive = false
     this.navActive = false
+    this.navHoldUntil = 0
     this.mediaActive = false
     this.audioOpenArmed = false
     this.musicRampActive = false
@@ -117,6 +128,7 @@ export class CarplayAudio {
     this.siriActive = false
     this.phonecallActive = false
     this.navActive = false
+    this.navHoldUntil = 0
     this.mediaActive = false
     this.audioOpenArmed = false
     this.musicRampActive = false
@@ -155,6 +167,10 @@ export class CarplayAudio {
 
     this.volumes[stream] = v
     console.debug('[CarplayAudio] setStreamVolume', { stream, volume: v })
+  }
+
+  private getRampMsForTransition(from: number, to: number): number {
+    return from > to ? this.musicRampDownMs : this.musicRampUpMs
   }
 
   // Main entrypoint from CarplayService for audio messages.
@@ -209,25 +225,53 @@ export class CarplayAudio {
           pcm = new Int16Array(totalSamples)
         } else if (this.nextMusicRampStartAt > 0 && now < this.nextMusicRampStartAt) {
           pcm = new Int16Array(totalSamples)
-        } else if (!this.musicRampActive) {
-          const navVolume = this.volumes.nav ?? 0.5
-          const navGain = this.navActive ? this.gainFromVolume(navVolume) : 0
-          const mixNav = this.navActive && this.navMixQueue.length > 0 && navGain > 0
-
-          pcm = this.processMusicChunk(msg.data, baseGain, navGain, mixNav)
         } else {
           const fade = this.musicFade
 
-          if (fade.remainingSamples === 0 && fade.current < fade.target) {
-            fade.target = 1
-            fade.remainingSamples = Math.max(
-              1,
-              Math.round((this.musicRampInMs / 1000) * sampleRate * channels)
-            )
+          // Debounce semantics:
+          // - navActive controls whether we are allowed to duck (ramp down)
+          // - navHoldUntil delays restoring (ramp up) after nav stop
+          const canDuckNow = this.navActive
+          const canRestoreNow =
+            !this.navActive && (this.navHoldUntil === 0 || now >= this.navHoldUntil)
+
+          let desiredTarget = fade.target
+          if (canDuckNow) {
+            desiredTarget = this.navDuckingTarget
+          } else if (canRestoreNow) {
+            desiredTarget = 1
+          } else {
+            // In hold window: keep whatever target we already had
+            desiredTarget = fade.target
+          }
+
+          if (fade.target !== desiredTarget) {
+            const rampMs = this.getRampMsForTransition(fade.current, desiredTarget)
+            fade.target = desiredTarget
+            fade.remainingSamples = Math.max(1, Math.round((rampMs / 1000) * sampleRate * channels))
+            this.musicRampActive = true
             console.debug('[CarplayAudio] starting music ramp', {
               samples: fade.remainingSamples,
               sampleRate,
-              channels
+              channels,
+              from: fade.current,
+              to: fade.target,
+              rampMs
+            })
+          }
+
+          if (!this.musicRampActive && Math.abs(fade.current - fade.target) > 1e-3) {
+            // Fallback: ensure we ramp if state got out of sync
+            const rampMs = this.getRampMsForTransition(fade.current, fade.target)
+            this.musicRampActive = true
+            fade.remainingSamples = Math.max(1, Math.round((rampMs / 1000) * sampleRate * channels))
+            console.debug('[CarplayAudio] starting music ramp', {
+              samples: fade.remainingSamples,
+              sampleRate,
+              channels,
+              from: fade.current,
+              to: fade.target,
+              rampMs
             })
           }
 
@@ -235,52 +279,58 @@ export class CarplayAudio {
           const navGain = this.navActive ? this.gainFromVolume(navVolume) : 0
           const mixNav = this.navActive && this.navMixQueue.length > 0 && navGain > 0
 
-          pcm = new Int16Array(totalSamples)
+          if (!this.musicRampActive) {
+            const musicGain = baseGain * fade.current
+            pcm = this.processMusicChunk(msg.data, musicGain, navGain, mixNav)
+          } else {
+            pcm = new Int16Array(totalSamples)
 
-          let current = fade.current
-          let remaining = fade.remainingSamples
-          const target = fade.target
-          const needsRamp = remaining > 0 && current < target
-          const step = needsRamp ? (target - current) / remaining : 0
+            let current = fade.current
+            let remaining = fade.remainingSamples
+            const target = fade.target
+            const needsRamp = remaining > 0 && Math.abs(current - target) > 1e-3
+            const step = needsRamp ? (target - current) / remaining : 0
 
-          let navChunk = this.navMixQueue[0]
-          let navOffset = this.navMixOffset
+            let navChunk = this.navMixQueue[0]
+            let navOffset = this.navMixOffset
 
-          for (let i = 0; i < totalSamples; i += 1) {
-            if (needsRamp && remaining > 0 && current < target) {
-              current += step
-              remaining -= 1
-            } else {
-              current = target
-            }
-
-            const musicSample = msg.data[i] * (baseGain * current)
-            let navSample = 0
-
-            if (mixNav && navChunk) {
-              navSample = navChunk[navOffset] * navGain
-              navOffset += 1
-
-              if (navOffset >= navChunk.length) {
-                this.navMixQueue.shift()
-                navChunk = this.navMixQueue[0] || null
-                navOffset = 0
+            for (let i = 0; i < totalSamples; i += 1) {
+              if (needsRamp && remaining > 0) {
+                current += step
+                remaining -= 1
+              } else {
+                current = target
               }
+
+              const musicSample = msg.data[i] * (baseGain * current)
+              let navSample = 0
+
+              if (mixNav && navChunk) {
+                navSample = navChunk[navOffset] * navGain
+                navOffset += 1
+
+                if (navOffset >= navChunk.length) {
+                  this.navMixQueue.shift()
+                  navChunk = this.navMixQueue[0] || null
+                  navOffset = 0
+                }
+              }
+
+              let mixed = musicSample + navSample
+              if (mixed > 32767) mixed = 32767
+              else if (mixed < -32768) mixed = -32768
+
+              pcm[i] = mixed
             }
 
-            let mixed = musicSample + navSample
-            if (mixed > 32767) mixed = 32767
-            else if (mixed < -32768) mixed = -32768
+            fade.current = current
+            fade.remainingSamples = remaining
+            this.navMixOffset = navChunk ? navOffset : 0
 
-            pcm[i] = mixed
-          }
-
-          fade.current = current
-          fade.remainingSamples = remaining
-          this.navMixOffset = navChunk ? navOffset : 0
-
-          if (fade.remainingSamples === 0 || fade.current >= fade.target - 1e-3) {
-            this.musicRampActive = false
+            if (fade.remainingSamples === 0 || Math.abs(fade.current - fade.target) < 1e-3) {
+              fade.current = fade.target
+              this.musicRampActive = false
+            }
           }
         }
       } else if (logicalKey === 'nav') {
@@ -344,7 +394,16 @@ export class CarplayAudio {
       // Explicit Nav / turn-by-turn start
       if (cmd === AudioCommand.AudioNaviStart || cmd === AudioCommand.AudioTurnByTurnStart) {
         this.navActive = true
+        this.navHoldUntil = 0
         this.clearNavMix()
+
+        if (this.mediaActive && !this.siriActive && !this.phonecallActive) {
+          // We don't compute remainingSamples here; it will be computed on next music chunk
+          this.musicRampActive = true
+          this.musicFade.target = this.navDuckingTarget
+          this.musicFade.remainingSamples = 0
+        }
+
         return
       }
 
@@ -397,7 +456,10 @@ export class CarplayAudio {
       }
 
       if (cmd === AudioCommand.AudioMediaStop) {
-        this.mediaActive = false
+        if (!this.siriActive && !this.phonecallActive) {
+          this.mediaActive = false
+        }
+
         this.audioOpenArmed = false
         this.musicRampActive = false
         this.nextMusicRampStartAt = 0
@@ -405,9 +467,11 @@ export class CarplayAudio {
         this.musicFade.target = 1
         this.musicFade.remainingSamples = 0
 
-        if (this.lastMusicPlayerKey) {
-          this.stopPlayerByKey(this.lastMusicPlayerKey, 'music')
-          this.lastMusicPlayerKey = null
+        if (!this.siriActive && !this.phonecallActive) {
+          if (this.lastMusicPlayerKey) {
+            this.stopPlayerByKey(this.lastMusicPlayerKey, 'music')
+            this.lastMusicPlayerKey = null
+          }
         }
 
         return
@@ -416,6 +480,9 @@ export class CarplayAudio {
       if (cmd === AudioCommand.AudioNaviStop || cmd === AudioCommand.AudioTurnByTurnStop) {
         this.navActive = false
         this.clearNavMix()
+
+        // Debounce: delay restoring music to 1.0, but do NOT make nav "effectively active"
+        this.navHoldUntil = Date.now() + this.navResumeDelayMs
 
         if (!this.mediaActive && this.lastNavPlayerKey) {
           this.stopPlayerByKey(this.lastNavPlayerKey, 'nav')
@@ -484,7 +551,7 @@ export class CarplayAudio {
         if (this.mediaActive) {
           this.musicRampActive = true
           this.musicFade.current = 0
-          this.musicFade.target = 1
+          this.musicFade.target = this.navActive ? this.navDuckingTarget : 1
           this.musicFade.remainingSamples = 0
           this.nextMusicRampStartAt = Date.now()
         } else {

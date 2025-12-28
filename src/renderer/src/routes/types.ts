@@ -40,6 +40,7 @@ export type NumberNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = 
   min?: number
   max?: number
   step?: number
+  default?: number
 }
 
 export type StringNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<

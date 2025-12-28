@@ -1,8 +1,13 @@
-import { ReactNode } from 'react'
+import { FC, PropsWithChildren, ReactNode } from 'react'
 import { Nav } from '../navigation'
 import { useCarplayStore } from '@store/store'
+import { AppLayoutProps } from './types'
 
-export const AppLayout = ({ children, navRef, receivingVideo }: { children: ReactNode }) => {
+export const AppLayout: FC<PropsWithChildren<AppLayoutProps>> = ({
+  children,
+  navRef,
+  receivingVideo
+}) => {
   const settings = useCarplayStore((s) => s.settings)
 
   return (

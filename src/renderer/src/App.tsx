@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useContext } from 'react'
 import { HashRouter as Router, useLocation, useRoutes } from 'react-router'
 import { Carplay, Camera } from './components/pages'
-import { Nav } from './components/navigation/Nav'
 import { Box, Modal } from '@mui/material'
 import { useCarplayStore, useStatusStore } from './store/store'
 import type { KeyCommand } from '@worker/types'

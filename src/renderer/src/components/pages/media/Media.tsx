@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStatusStore } from '@store/store'
 import { MediaEventType, UsbEvent } from './types'
 import {
-  useBelowNavTop,
+  // useBelowNavTop,
   useElementSize,
   useMediaState,
   useOptimisticPlaying,
@@ -25,7 +25,7 @@ import { mediaControlOps } from './utils/mediaControllOps'
 export const Media = () => {
   const isStreaming = useStatusStore((s: { isStreaming: boolean }) => s.isStreaming)
 
-  const top = useBelowNavTop()
+  // const top = useBelowNavTop()
   const [rootRef, { w, h }] = useElementSize<HTMLDivElement>()
   const { snap, livePlayMs } = useMediaState(isStreaming)
 

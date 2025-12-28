@@ -5,3 +5,8 @@ export interface SettingsLayoutProps {
   onSave?: () => boolean
   isDirty: boolean
 }
+
+export interface AppLayoutProps {
+  navRef: React.RefObject<HTMLDivElement | null>
+  receivingVideo: boolean
+}

@@ -186,12 +186,17 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
     },
     {
       type: 'number',
-      label: 'Car specific Audio Delay',
-      path: 'audiodelay',
+      label: 'FFT Visualization Delay',
+      path: 'visualAudioDelayMs',
       displayValue: true,
+      valueTransform: {
+        toView: (v: number) => v,
+        fromView: (v: number) => v,
+        format: (v: number) => `${v} ms`
+      },
       page: {
-        title: 'Car specific Audio Delay',
-        description: 'Car specific Audio Delay'
+        title: 'FFT Visualization Delay',
+        description: 'Delays the FFT visualization to compensate for audio latency.'
       }
     },
     {

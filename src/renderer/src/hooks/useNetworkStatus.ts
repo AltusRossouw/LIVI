@@ -19,8 +19,6 @@ export function useNetworkStatus() {
   useEffect(() => {
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection
 
-    console.log(111, getConnection())
-
     if (!connection) return
 
     const update = () => setNetwork(getConnection())

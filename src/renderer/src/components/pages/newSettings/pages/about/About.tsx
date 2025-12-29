@@ -1,4 +1,3 @@
-import { SettingsLayout } from '@renderer/components/layouts'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemText from '@mui/material/ListItemText'
@@ -14,7 +13,7 @@ import {
 
 export const About = () => {
   return (
-    <SettingsLayout>
+    <>
       <Typography>{name}</Typography>
       <Typography>{description}</Typography>
 
@@ -33,6 +32,6 @@ export const About = () => {
           <ListItemText primary="Contributors" secondary={contributors.join(', ')} />
         </ListItem>
       </List>
-    </SettingsLayout>
+    </>
   )
 }

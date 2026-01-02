@@ -46,6 +46,8 @@ export const Nav = ({ receivingVideo }: NavProps) => {
   // TODO move it to global UI constants
   const isXSIcons = window.innerHeight <= 320
 
+  console.log(window.innerHeight)
+
   const tabSx = {
     minWidth: 0,
     flex: '1 1 0',
@@ -73,43 +75,11 @@ export const Nav = ({ receivingVideo }: NavProps) => {
             display: 'none'
           },
           '& .MuiTabs-list': {
-            height: isXSIcons ? '100%' : `calc(100% - 60px - 1rem)`
-            // height: `calc(100% - 60px - 1rem)`
+            height: '100%'
           },
           height: '100%'
         }}
       >
-        {/*{isVisibleTimeAndWifi && (*/}
-        {/*  <Tab*/}
-        {/*    aria-label={'time'}*/}
-        {/*    disabled={true}*/}
-        {/*    sx={tabSx}*/}
-        {/*    style={{ opacity: 1 }}*/}
-        {/*    label={*/}
-        {/*      <Box sx={{ display: 'flex', alignItems: 'center', flexDirection: 'column' }}>*/}
-        {/*        <Typography style={{ fontSize: '1.5rem' }}>{time}</Typography>*/}
-
-        {/*        <div>*/}
-        {/*          {network.type === 'wifi' ? (*/}
-        {/*            <WifiIcon fontSize="small" style={{ fontSize: '1rem' }} />*/}
-        {/*          ) : (*/}
-        {/*            <>*/}
-        {/*              {(network.type === 'cellular' || network.effectiveType) && (*/}
-        {/*                <div style={{ display: 'flex', flexDirection: 'row' }}>*/}
-        {/*                  <SignalCellularAltIcon fontSize="small" style={{ fontSize: '1rem' }} />*/}
-        {/*                  <Typography style={{ fontSize: '0.75rem' }}>*/}
-        {/*                    {network.effectiveType?.toUpperCase()}*/}
-        {/*                  </Typography>*/}
-        {/*                </div>*/}
-        {/*              )}*/}
-        {/*            </>*/}
-        {/*          )}*/}
-        {/*        </div>*/}
-        {/*      </Box>*/}
-        {/*    }*/}
-        {/*  />*/}
-        {/*)}*/}
-
         {tabs.map((tab) => (
           <Tab
             key={tab.path}

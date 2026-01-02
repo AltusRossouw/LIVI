@@ -1,82 +1,110 @@
 import Box from '@mui/material/Box'
-import { useNavigate } from 'react-router'
-import { Button } from '@mui/material'
 import Stack from '@mui/material/Stack'
+import IconButton from '@mui/material/IconButton'
+import Typography from '@mui/material/Typography'
 import ArrowBackIosOutlinedIcon from '@mui/icons-material/ArrowBackIosOutlined'
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined'
+import { useNavigate } from 'react-router'
 import { SettingsLayoutProps } from './types'
 
-export const SettingsLayout = ({ children, onSave, isDirty }: SettingsLayoutProps) => {
+export const SettingsLayout = ({ children, title, onSave, isDirty }: SettingsLayoutProps) => {
   const navigate = useNavigate()
-  const handleNavigate = () => {
-    navigate(-1)
-  }
+
+  const handleNavigate = () => navigate(-1)
 
   const handleSave = () => {
     const isRequireReset = onSave?.()
-
     if (isRequireReset) {
       console.log('need reset app')
     }
   }
 
+  const showSave = Boolean(onSave) && isDirty
+
   return (
     <Box
-      sx={{ width: '100%', px: 3.5, py: 2.25, overflow: 'hidden', height: 'calc(100dvh - 64px)' }}
+      sx={{
+        position: 'absolute',
+        inset: 0,
+
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+
+        px: 'clamp(12px, 3.5vw, 28px)',
+        pt: 'clamp(8px, 2.2vh, 18px)',
+        pb: 'clamp(10px, 2.2vh, 18px)'
+      }}
     >
-      <div
-        style={{
-          overflow: 'auto',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between'
+      {/* HEADER */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'clamp(36px, 6vw, 56px) 1fr clamp(36px, 6vw, 56px)',
+          alignItems: 'center',
+          flex: '0 0 auto',
+          mb: 'clamp(8px, 1.5vh, 16px)'
         }}
       >
-        <Stack spacing={0} sx={{ overflow: 'auto', height: '100%' }}>
-          {children}
-        </Stack>
-
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginTop: '1rem'
-          }}
-        >
-          <Button
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <IconButton
             onClick={handleNavigate}
+            aria-label="Back"
             sx={{
-              width: '100px',
-              padding: '0.5rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '0.5rem'
+              width: 'clamp(32px, 5.5vw, 44px)',
+              height: 'clamp(32px, 5.5vw, 44px)'
             }}
           >
             <ArrowBackIosOutlinedIcon />
-            Back
-          </Button>
+          </IconButton>
+        </Box>
 
-          {onSave && (
-            <Button
-              onClick={handleSave}
-              sx={{
-                width: '100px',
-                padding: '0.5rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: '0.5rem'
-              }}
-              disabled={!isDirty}
-            >
-              <SaveOutlinedIcon />
-              Save
-            </Button>
-          )}
-        </div>
-      </div>
+        <Typography
+          sx={{
+            textAlign: 'center',
+            fontWeight: 800,
+            lineHeight: 1.05,
+            fontSize: 'clamp(18px, 4.2vh, 42px)'
+          }}
+        >
+          {title}
+        </Typography>
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+          <IconButton
+            onClick={handleSave}
+            aria-label="Save"
+            disabled={!showSave}
+            sx={{
+              width: 44,
+              height: 44,
+              opacity: showSave ? 1 : 0,
+              pointerEvents: showSave ? 'auto' : 'none'
+            }}
+          >
+            <SaveOutlinedIcon />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* CONTENT */}
+      <Box
+        sx={{
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y'
+        }}
+      >
+        <Stack spacing={0} sx={{ minHeight: 0 }}>
+          {children}
+        </Stack>
+      </Box>
     </Box>
   )
 }

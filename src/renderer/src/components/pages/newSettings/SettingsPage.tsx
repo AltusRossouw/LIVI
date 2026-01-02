@@ -31,9 +31,11 @@ export const SettingsPage = () => {
 
   if (!node) return null
 
+  const title = node.label ?? 'Settings'
+
   if ('path' in node && node.page) {
     return (
-      <SettingsLayout onSave={save} isDirty={isDirty}>
+      <SettingsLayout title={title} onSave={save} isDirty={isDirty}>
         <SettingsFieldPage
           node={node}
           value={getValueByPath(state, node.path)}
@@ -49,7 +51,7 @@ export const SettingsPage = () => {
   const children = node.children ?? []
 
   return (
-    <SettingsLayout onSave={save} isDirty={isDirty}>
+    <SettingsLayout title={title} onSave={save} isDirty={isDirty}>
       {children.map((child: SettingsNode<ExtraConfig>, index: Key | null | undefined) => {
         const _path = child.path as string
 

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import { requiresRestartParams } from '../../settings/constants'
 import { getValueByPath, setValueByPath } from '../utils'
 import { useCarplayStore, useStatusStore } from '@store/store'
@@ -17,6 +17,7 @@ export function useSmartSettings<T extends Record<string, any>>(
 ) {
   const overrides = options?.overrides ?? {}
   const [state, setState] = useState<T>(() => ({ ...initial }))
+  const [restartRequested, setRestartRequested] = useState(false)
 
   const saveSettings = useCarplayStore((s) => s.saveSettings)
   const restartBaseline = useCarplayStore((s) => s.restartBaseline)
@@ -35,7 +36,7 @@ export function useSmartSettings<T extends Record<string, any>>(
     [state, settings]
   )
 
-  const needsRestart = useMemo(() => {
+  const needsRestartFromConfig = useMemo(() => {
     const cfg = (settings ?? {}) as any
     const baseline = (restartBaseline ?? settings ?? {}) as any
 
@@ -44,6 +45,14 @@ export function useSmartSettings<T extends Record<string, any>>(
     }
     return false
   }, [settings, restartBaseline])
+
+  const needsRestart = useMemo(() => {
+    return Boolean(needsRestartFromConfig || restartRequested)
+  }, [needsRestartFromConfig, restartRequested])
+
+  const requestRestart = useCallback(() => {
+    setRestartRequested(true)
+  }, [])
 
   const handleFieldChange = (path: string, rawValue: any) => {
     const prevValue = state[path]
@@ -72,7 +81,10 @@ export function useSmartSettings<T extends Record<string, any>>(
     if (!isDongleConnected) return false
 
     await window.carplay.usb.forceReset()
+
     markRestartBaseline()
+    setRestartRequested(false)
+
     return true
   }
 
@@ -83,6 +95,7 @@ export function useSmartSettings<T extends Record<string, any>>(
     isDongleConnected,
     handleFieldChange,
     resetState,
-    restart
+    restart,
+    requestRestart
   }
 }

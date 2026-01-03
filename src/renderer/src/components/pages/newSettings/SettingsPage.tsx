@@ -1,5 +1,5 @@
 import { useCarplayStore, useStatusStore } from '@store/store'
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@main/Globals'
 import { SettingsLayout } from '../../layouts'
 import { useSmartSettingsFromSchema } from './hooks/useSmartSettingsFromSchema'
 import { settingsSchema } from '../../../routes/schemas.ts/schema'
@@ -9,7 +9,7 @@ import { getNodeByPath, getValueByPath } from './utils'
 import { Typography } from '@mui/material'
 import { SettingsFieldPage } from './components/SettingsFieldPage'
 import { SettingsFieldRow } from './components/SettingsFieldRow'
-import { Key } from 'react'
+import type { Key } from 'react'
 import type { SettingsNode } from '@renderer/routes/types'
 
 export function SettingsPage() {
@@ -25,10 +25,8 @@ export function SettingsPage() {
   // @ts-ignore
   const settings = useCarplayStore((s) => s.settings)
 
-  const { state, handleFieldChange, needsRestart, restart } = useSmartSettingsFromSchema(
-    settingsSchema,
-    settings
-  )
+  const { state, handleFieldChange, needsRestart, restart, requestRestart } =
+    useSmartSettingsFromSchema(settingsSchema, settings)
 
   const handleRestart = async () => {
     await restart()
@@ -80,6 +78,7 @@ export function SettingsPage() {
               state={state}
               node={child}
               onChange={(v) => handleFieldChange(_path, v)}
+              requestRestart={requestRestart}
             />
           )
         }

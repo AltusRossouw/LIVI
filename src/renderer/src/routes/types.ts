@@ -68,6 +68,7 @@ export type SettingsCustomPageProps<TStore, TValue> = {
   state: TStore
   node: SettingsCustomNode<TStore>
   onChange: (v: TValue) => void
+  requestRestart?: () => void
 }
 
 export type SettingsCustomNode<TStore = any> = NodeMeta & {

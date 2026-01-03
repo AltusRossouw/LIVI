@@ -17,8 +17,9 @@ interface NavProps {
 export const Nav = ({ receivingVideo }: NavProps) => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const time = useBlinkingTime()
-  const network = useNetworkStatus()
+
+  useBlinkingTime()
+  useNetworkStatus()
 
   const isStreaming = useStatusStore((s) => s.isStreaming)
   const tabs = useTabsConfig(receivingVideo)

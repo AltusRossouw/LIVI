@@ -2,8 +2,8 @@ import { Restart } from '../../components/pages/newSettings/pages/system/Restart
 import { PowerOff } from '../../components/pages/newSettings/pages/system/PowerOff'
 import { Info } from '../../components/pages/info'
 import { About } from '../../components/pages/newSettings/pages/about'
-import { SettingsNode } from '../types'
 import { ExtraConfig } from '@main/Globals'
+import type { SettingsNode } from '@renderer/routes/types'
 
 export const systemSchema: SettingsNode<ExtraConfig> = {
   route: 'system',

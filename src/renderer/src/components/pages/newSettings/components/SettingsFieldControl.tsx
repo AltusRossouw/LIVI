@@ -1,4 +1,4 @@
-import { Box, MenuItem, Select, Slider, Switch, TextField } from '@mui/material'
+import { MenuItem, Select, Slider, Switch, TextField } from '@mui/material'
 import NumberSpinner from './numberSpinner/numberSpinner'
 import { SettingsNode } from '../../../../routes'
 import { ExtraConfig } from '@main/Globals'

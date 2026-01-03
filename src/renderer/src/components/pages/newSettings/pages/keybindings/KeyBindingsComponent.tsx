@@ -4,7 +4,7 @@ import Grid from '@mui/material/Grid'
 import { Box, Button, Modal, Paper, styled, Typography } from '@mui/material'
 
 interface KeyBindingsProps {
-  settings: ExtraConfig
+  state: ExtraConfig
   updateKey: (key: 'bindings', value: ExtraConfig['bindings']) => void
 }
 

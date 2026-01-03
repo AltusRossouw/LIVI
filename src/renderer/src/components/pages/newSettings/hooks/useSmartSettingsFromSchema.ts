@@ -22,7 +22,7 @@ const walkSchema = (
   if ('path' in node) {
     initial[node.path] = getValueByPath(settings, node.path)
 
-    if ('transform' in node && node.transform) {
+    if (typeof node.transform === 'function') {
       overrides[node.path] = { transform: node.transform }
     }
   }

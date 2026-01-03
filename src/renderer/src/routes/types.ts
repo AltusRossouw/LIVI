@@ -1,4 +1,4 @@
-import type { SettingsCustomPageProps } from '../components/pages/newSettings/type'
+import type React from 'react'
 
 export enum RoutePath {
   Home = 'home',
@@ -9,33 +9,33 @@ export enum RoutePath {
   Info = 'info'
 }
 
-export type ValueTransform<StoreValue, ViewValue = StoreValue> = {
+export type ValueTransform<StoreValue = any, ViewValue = StoreValue> = {
   toView?: (value: StoreValue) => ViewValue
-  fromView?: (value: ViewValue) => StoreValue
+  fromView?: (value: ViewValue, prev?: StoreValue) => StoreValue
   format?: (value: ViewValue) => string
 }
 
-export type BaseFieldNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = {
-  label: string
-  path: K
-  displayValue?: boolean
-  displayValueUnit?: string
-  valueTransform?: ValueTransform<TStore[K], ViewValue>
+export type NodeMeta = {
   page?: {
     title?: string
     description?: string
   }
+  displayValue?: boolean
+  displayValueUnit?: string
+  valueTransform?: ValueTransform<any, any>
+  transform?: (value: any, prev?: any) => any
 }
 
-export type CheckboxNode<TStore, K extends keyof TStore> = BaseFieldNode<TStore, K> & {
+export type BaseFieldNode = NodeMeta & {
+  label: string
+  path: string
+}
+
+export type CheckboxNode = BaseFieldNode & {
   type: 'checkbox'
 }
 
-export type NumberNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type NumberNode = BaseFieldNode & {
   type: 'number'
   min?: number
   max?: number
@@ -43,72 +43,55 @@ export type NumberNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = 
   default?: number
 }
 
-export type StringNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type StringNode = BaseFieldNode & {
   type: 'string'
 }
 
-export type ColorNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type ColorNode = BaseFieldNode & {
   type: 'color'
 }
 
-export type SelectNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type SelectNode = BaseFieldNode & {
   type: 'select'
   options: Array<{ label: string; value: string | number }>
 }
 
-export type ToggleNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type ToggleNode = BaseFieldNode & {
   type: 'toggle'
-  path: string
 }
 
-// TODO
-export type SliderNode<TStore, K extends keyof TStore, ViewValue = TStore[K]> = BaseFieldNode<
-  TStore,
-  K,
-  ViewValue
-> & {
+export type SliderNode = BaseFieldNode & {
   type: 'slider'
-  path: string
 }
 
-export type SettingsCustomNode<TStore> = {
+export type SettingsCustomPageProps<TStore, TValue> = {
+  state: TStore
+  node: SettingsCustomNode<TStore>
+  onChange: (v: TValue) => void
+}
+
+export type SettingsCustomNode<TStore = any> = NodeMeta & {
   type: 'custom'
   label: string
-  path?: keyof TStore
-  displayValue?: boolean
+  path: string
   component: React.ComponentType<SettingsCustomPageProps<TStore, any>>
 }
 
-export type RouteNode<TStore> = BaseFieldNode<TStore, any, any> & {
+export type RouteNode<TStore = any> = NodeMeta & {
   type: 'route'
   label: string
   route: string
+  path: string
   children: SettingsNode<TStore>[]
 }
 
-export type SettingsNode<TStore> =
+export type SettingsNode<TStore = any> =
   | RouteNode<TStore>
-  | ToggleNode<TStore, keyof TStore>
-  | CheckboxNode<TStore, keyof TStore>
-  | SelectNode<TStore, keyof TStore, any>
-  | NumberNode<TStore, keyof TStore, any>
-  | StringNode<TStore, keyof TStore>
-  | ColorNode<TStore, keyof TStore>
-  | SliderNode<TStore, keyof TStore, any>
+  | ToggleNode
+  | CheckboxNode
+  | SelectNode
+  | NumberNode
+  | StringNode
+  | ColorNode
+  | SliderNode
   | SettingsCustomNode<TStore>

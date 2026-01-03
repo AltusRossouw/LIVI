@@ -10,9 +10,9 @@ import { Typography } from '@mui/material'
 import { SettingsFieldPage } from './components/SettingsFieldPage'
 import { SettingsFieldRow } from './components/SettingsFieldRow'
 import { Key } from 'react'
-import { SettingsNode } from 'renderer/src/routes'
+import type { SettingsNode } from '@renderer/routes/types'
 
-export const SettingsPage = () => {
+export function SettingsPage() {
   const navigate = useNavigate()
   const { '*': splat } = useParams()
 
@@ -30,6 +30,10 @@ export const SettingsPage = () => {
     settings
   )
 
+  const handleRestart = async () => {
+    await restart()
+  }
+
   if (!node) return null
 
   const title = node.label ?? 'Settings'
@@ -37,7 +41,7 @@ export const SettingsPage = () => {
 
   if ('path' in node && node.page) {
     return (
-      <SettingsLayout title={title} showRestart={showRestart} onRestart={restart}>
+      <SettingsLayout title={title} showRestart={showRestart} onRestart={handleRestart}>
         <SettingsFieldPage
           node={node}
           value={getValueByPath(state, node.path)}
@@ -52,7 +56,7 @@ export const SettingsPage = () => {
   const children = node.children ?? []
 
   return (
-    <SettingsLayout title={title} showRestart={showRestart} onRestart={restart}>
+    <SettingsLayout title={title} showRestart={showRestart} onRestart={handleRestart}>
       {children.map((child: SettingsNode<ExtraConfig>, index: Key | null | undefined) => {
         const _path = child.path as string
 

@@ -1,5 +1,5 @@
 import { RoutePath } from './types'
-import { Home, Media, Camera, Info, Settings } from '../components/pages'
+import { Home, Media, Camera, Settings } from '../components/pages'
 import { settingsRoutes } from './schemas.ts/schema'
 import { Layout } from '../components/layouts/Layout'
 import { SettingsPage as NewSettingsPage } from '../components/pages/newSettings/SettingsPage'

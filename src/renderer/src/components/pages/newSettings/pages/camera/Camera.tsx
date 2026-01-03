@@ -1,4 +1,5 @@
 import type { SettingsCustomPageProps } from '../../type'
+import type { ExtraConfig } from '@main/Globals'
 import { updateCameras as detectCameras } from '@utils/cameraDetection'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStatusStore } from '@store/store'
@@ -12,9 +13,7 @@ function coerceSelectValue<T extends string | number>(
   return value != null && options.includes(value as T) ? (value as T) : ''
 }
 
-type CameraState = { camera?: string }
-
-export const Camera: React.FC<SettingsCustomPageProps<CameraState, string>> = ({
+export const Camera: React.FC<SettingsCustomPageProps<ExtraConfig, string>> = ({
   state,
   onChange
 }) => {
@@ -28,9 +27,9 @@ export const Camera: React.FC<SettingsCustomPageProps<CameraState, string>> = ({
       if (state.camera && state.camera !== '') return
       const cameraId = typeof cfgOrId === 'string' ? cfgOrId : cfgOrId?.camera
 
-      // await autoSave({ camera: cameraId ?? '' })
+      if (cameraId && cameraId !== '') onChange(cameraId)
     },
-    [state.camera]
+    [onChange, state.camera]
   )
 
   useEffect(() => {

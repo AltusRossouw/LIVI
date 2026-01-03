@@ -1,10 +1,14 @@
-import { SettingsNode } from '../types'
+import { SettingsNode, ValueTransform } from '../types'
 import { ExtraConfig } from '../../../../main/Globals'
 
-const audioValueTransform = {
-  toView: (v: number) => Math.round(v * 100),
-  fromView: (v: number) => v / 100,
-  format: (v: number) => `${v} %`
+const audioValueTransform: ValueTransform<number | undefined, number> = {
+  toView: (v) => Math.round((v ?? 1) * 100),
+  fromView: (v, prev) => {
+    const next = v / 100
+    if (!Number.isFinite(next)) return prev ?? 1
+    return next
+  },
+  format: (v) => `${v} %`
 }
 
 export const audioSchema: SettingsNode<ExtraConfig> = {
@@ -65,15 +69,19 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       type: 'number',
       label: 'Audio Buffer',
       path: 'mediaDelay',
-      step: 50, // to-do implement step for number type
-      min: 300, // to-do implement min/max for number type
+      step: 50,
+      min: 300,
       max: 2000,
-      default: 1000, // to-do implement default for number type
+      default: 1000,
       displayValue: true,
       displayValueUnit: 'ms',
       valueTransform: {
-        toView: (v: number) => v,
-        fromView: (v: number) => Math.round(v / 50) * 50,
+        toView: (v: number | undefined) => v ?? 1000,
+        fromView: (v: number, prev?: number) => {
+          const next = Math.round(v / 50) * 50
+          if (!Number.isFinite(next)) return prev ?? 1000
+          return next
+        },
         format: (v: number) => `${v} ms`
       },
       page: {
@@ -87,14 +95,8 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       path: 'mediaSound',
       displayValue: true,
       options: [
-        {
-          label: '44.1 kHz',
-          value: 0
-        },
-        {
-          label: '48 kHz',
-          value: 1
-        }
+        { label: '44.1 kHz', value: 0 },
+        { label: '48 kHz', value: 1 }
       ],
       page: {
         title: 'Sampling Frequency',
@@ -107,18 +109,9 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       path: 'callQuality',
       displayValue: true,
       options: [
-        {
-          label: 'Low',
-          value: 0
-        },
-        {
-          label: 'Medium',
-          value: 1
-        },
-        {
-          label: 'High',
-          value: 2
-        }
+        { label: 'Low', value: 0 },
+        { label: 'Medium', value: 1 },
+        { label: 'High', value: 2 }
       ],
       page: {
         title: 'Call Quality',

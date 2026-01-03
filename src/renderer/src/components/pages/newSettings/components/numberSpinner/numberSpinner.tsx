@@ -8,6 +8,7 @@ import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
 import OutlinedInput from '@mui/material/OutlinedInput'
 import OpenInFullIcon from '@mui/icons-material/OpenInFull'
+import { useTheme, alpha } from '@mui/material/styles'
 
 export default function NumberSpinner({
   id: idProp,
@@ -22,10 +23,13 @@ export default function NumberSpinner({
   isSlider?: boolean
   error?: boolean
 }) {
+  const theme = useTheme()
+
   let id = React.useId()
   if (idProp) {
     id = idProp
   }
+
   return (
     <BaseNumberField.Root
       {...other}
@@ -74,6 +78,7 @@ export default function NumberSpinner({
           <OpenInFullIcon fontSize="small" sx={{ transform: 'translateY(12.5%) rotate(45deg)' }} />
         </BaseNumberField.ScrubAreaCursor>
       </BaseNumberField.ScrubArea>
+
       <Box sx={{ display: 'flex' }}>
         <BaseNumberField.Decrement
           render={
@@ -85,9 +90,7 @@ export default function NumberSpinner({
                 borderTopRightRadius: 0,
                 borderBottomRightRadius: 0,
                 borderRight: '0px',
-                '&.Mui-disabled': {
-                  borderRight: '0px'
-                }
+                '&.Mui-disabled': { borderRight: '0px' }
               }}
             />
           }
@@ -107,9 +110,7 @@ export default function NumberSpinner({
                 onKeyUp={props.onKeyUp}
                 onKeyDown={props.onKeyDown}
                 onFocus={props.onFocus}
-                inputProps={{
-                  readOnly: isSlider
-                }}
+                inputProps={{ readOnly: isSlider }}
                 slotProps={{
                   input: {
                     ...props,
@@ -118,7 +119,8 @@ export default function NumberSpinner({
                       1,
                     sx: {
                       textAlign: 'center',
-                      bgcolor: 'black', // TODO get color from theme
+                      bgcolor: theme.palette.background.paper,
+                      color: theme.palette.text.primary,
                       caretColor: isSlider ? 'transparent' : 'auto'
                     }
                   }
@@ -128,24 +130,23 @@ export default function NumberSpinner({
                   borderRadius: 0,
                   flex: 1,
                   width: '100%',
-                  // ...(isSlider && {
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#444444', // TODO get color from theme
+                    borderColor: theme.palette.divider,
                     borderWidth: '1px'
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#444444', // TODO get color from theme
+                    borderColor: theme.palette.text.secondary,
                     borderWidth: '1px'
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#807f7f', // TODO get color from theme
+                    borderColor: theme.palette.primary.main,
                     borderWidth: '1px'
                   }
-                  // })
                 }}
               />
             )}
           />
+
           {isSlider && (
             <div
               style={{
@@ -155,7 +156,7 @@ export default function NumberSpinner({
                 left: '1px',
                 width: `calc(${other.value}% - 2px)`,
                 maxWidth: '100%',
-                background: 'rgba(255, 0, 0, 0.5)' // TODO get color from theme
+                background: alpha(theme.palette.primary.main, 0.25)
               }}
             />
           )}
@@ -171,9 +172,7 @@ export default function NumberSpinner({
                 borderTopLeftRadius: 0,
                 borderBottomLeftRadius: 0,
                 borderLeft: '0px',
-                '&.Mui-disabled': {
-                  borderLeft: '0px'
-                }
+                '&.Mui-disabled': { borderLeft: '0px' }
               }}
             />
           }

@@ -1,7 +1,4 @@
-import { StreamResolutionProps } from '../streamResolution/types'
-
-export const PowerOff: React.FC<StreamResolutionProps> = () => {
+export function PowerOff(): null {
   window.carplay.quit().catch(console.error)
-
   return null
 }

@@ -1,4 +1,4 @@
-import { SettingsCustomPageProps } from '../components/pages/newSettings/pages/streamResolution/types'
+import type { SettingsCustomPageProps } from '../components/pages/newSettings/type'
 
 export enum RoutePath {
   Home = 'home',
@@ -92,7 +92,7 @@ export type SettingsCustomNode<TStore> = {
   label: string
   path?: keyof TStore
   displayValue?: boolean
-  component: React.ComponentType<SettingsCustomPageProps<TStore>>
+  component: React.ComponentType<SettingsCustomPageProps<TStore, any>>
 }
 
 export type RouteNode<TStore> = BaseFieldNode<TStore, any, any> & {

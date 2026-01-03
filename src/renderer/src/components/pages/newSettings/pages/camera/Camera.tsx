@@ -1,4 +1,4 @@
-import { StreamResolutionProps } from '../streamResolution/types'
+import type { SettingsCustomPageProps } from '../../type'
 import { updateCameras as detectCameras } from '@utils/cameraDetection'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStatusStore } from '@store/store'
@@ -12,7 +12,12 @@ function coerceSelectValue<T extends string | number>(
   return value != null && options.includes(value as T) ? (value as T) : ''
 }
 
-export const Camera: React.FC<StreamResolutionProps> = ({ state, onChange }) => {
+type CameraState = { camera?: string }
+
+export const Camera: React.FC<SettingsCustomPageProps<CameraState, string>> = ({
+  state,
+  onChange
+}) => {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
@@ -77,7 +82,7 @@ export const Camera: React.FC<StreamResolutionProps> = ({ state, onChange }) => 
             </Select>
 
             <Typography color="text.secondary" mb={2}>
-              description
+              Source
             </Typography>
           </>
         ) : (

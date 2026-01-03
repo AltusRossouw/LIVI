@@ -22,12 +22,22 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
       children: [
         {
           type: 'string',
-          label: 'Car name',
+          label: 'Car Name',
           path: 'carName',
           displayValue: true,
           page: {
-            title: 'Car name',
-            description: 'Car name'
+            title: 'Car Name',
+            description: 'The name of the CarPlay device'
+          }
+        },
+        {
+          type: 'string',
+          label: 'UI Name',
+          path: 'oemName',
+          displayValue: true,
+          page: {
+            title: 'UI Name',
+            description: 'The name displayed in the CarPlay UI.'
           }
         },
         {
@@ -43,42 +53,42 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
           children: [
             {
               type: 'select',
-              label: 'Wi-Fi frequency',
+              label: 'Wi-Fi Frequency',
               path: 'wifiType',
               displayValue: true,
               options: [
                 {
-                  label: '2.4ghz',
+                  label: '2.4 GHz',
                   value: '2.4ghz'
                 },
                 {
-                  label: '5ghz',
+                  label: '5 GHz',
                   value: '5ghz'
                 }
               ],
               page: {
-                title: 'Wi-Fi frequency',
-                description: 'Wi-Fi frequency'
-              }
-            },
-            {
-              type: 'number',
-              label: 'Wi-Fi channel',
-              path: 'wifiChannel',
-              displayValue: true,
-              page: {
-                title: 'Wi-Fi channel',
-                description: 'Wi-Fi channel'
+                title: 'Wi-Fi Frequency',
+                description: 'Wi-Fi frequency selection'
               }
             }
+            //{
+            //  type: 'number',
+            //  label: 'Wi-Fi channel',
+            //  path: 'wifiChannel',
+            //  displayValue: true,
+            //  page: {
+            //    title: 'Wi-Fi channel',
+            //    description: 'Wi-Fi channel'
+            //  }
+            //}
           ]
         }
       ]
     },
     {
       type: 'route',
-      label: 'Devices & Sources',
-      route: 'deviceandsources',
+      label: 'Sink & Sources',
+      route: 'sinkandsources',
       path: '',
       children: [
         {
@@ -98,7 +108,7 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
         },
         {
           type: 'select',
-          label: 'Mic type',
+          label: 'Microphone',
           path: 'micType',
           displayValue: true,
           options: [
@@ -112,15 +122,15 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
             }
           ],
           page: {
-            title: 'Mic type',
-            description: 'Mic type'
+            title: 'Microphone',
+            description: 'Microphone selection'
           }
         }
       ]
     },
     {
       type: 'route',
-      label: 'Advanced Dongle Parameters',
+      label: 'Advanced Parameters',
       route: 'dongle',
       path: '',
       children: [
@@ -186,7 +196,7 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
     },
     {
       type: 'number',
-      label: 'FFT Visualization Delay',
+      label: 'FFT Delay',
       path: 'visualAudioDelayMs',
       displayValue: true,
       valueTransform: {

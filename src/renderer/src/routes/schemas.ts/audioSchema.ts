@@ -22,7 +22,7 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       valueTransform: audioValueTransform,
       page: {
         title: 'Music',
-        description: 'Music'
+        description: 'Music Volume'
       }
     },
     {
@@ -34,7 +34,7 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       valueTransform: audioValueTransform,
       page: {
         title: 'Navigation',
-        description: 'Navigation'
+        description: 'Navigation volume'
       }
     },
     {
@@ -46,19 +46,19 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       valueTransform: audioValueTransform,
       page: {
         title: 'Siri',
-        description: 'Siri'
+        description: 'Siri volume'
       }
     },
     {
       type: 'slider',
-      label: 'Phone call',
+      label: 'Phone Call',
       path: 'callVolume',
       displayValue: true,
       displayValueUnit: '%',
       valueTransform: audioValueTransform,
       page: {
-        title: 'Phone call',
-        description: 'Phone call'
+        title: 'Phone Call',
+        description: 'Phone call volume'
       }
     },
     {
@@ -77,8 +77,8 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
         format: (v: number) => `${v} ms`
       },
       page: {
-        title: 'Audio buffer',
-        description: 'Dongle internal audio buffer size in milliseconds'
+        title: 'Audio Buffer',
+        description: 'Dongle audio buffer size in ms'
       }
     },
     {
@@ -98,7 +98,7 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       ],
       page: {
         title: 'Sampling Frequency',
-        description: 'Sampling Frequency'
+        description: 'Native stream sampling frequency'
       }
     },
     {
@@ -122,7 +122,7 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
       ],
       page: {
         title: 'Call Quality',
-        description: 'Call Quality'
+        description: 'Call quality, will affect bandwidth usage'
       }
     },
     {

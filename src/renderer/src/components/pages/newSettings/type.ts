@@ -10,3 +10,8 @@ export interface StackItemProps {
   onClick?: () => void
   node?: SettingsNode<ExtraConfig>
 }
+
+export type SettingsCustomPageProps<TState = ExtraConfig, TValue = unknown> = {
+  state: TState
+  onChange: (value: TValue) => void
+}

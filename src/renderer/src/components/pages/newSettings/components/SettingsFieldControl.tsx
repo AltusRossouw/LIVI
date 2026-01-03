@@ -2,6 +2,7 @@ import { MenuItem, Select, Slider, Switch, TextField } from '@mui/material'
 import NumberSpinner from './numberSpinner/numberSpinner'
 import { SettingsNode } from '../../../../routes'
 import { ExtraConfig } from '@main/Globals'
+import { themeColors } from '@renderer/themeColors'
 
 type Props<T> = {
   node: SettingsNode<ExtraConfig>
@@ -9,29 +10,48 @@ type Props<T> = {
   onChange: (v: T) => void
 }
 
+const defaultColorForPath = (path?: string): string => {
+  switch (path) {
+    case 'primaryColorDark':
+      return themeColors.highlightDark
+    case 'primaryColorLight':
+      return themeColors.highlightLight
+    case 'highlightEditableFieldDark':
+      return themeColors.highlightEditableFieldDark
+    case 'highlightEditableFieldLight':
+      return themeColors.highlightEditableFieldLight
+    default:
+      return themeColors.highlightDark
+  }
+}
+
 export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) => {
   switch (node.type) {
     case 'string':
       return (
-        <TextField value={value ?? ''} onChange={(e) => onChange(e.target.value as T)} fullWidth />
+        <TextField
+          value={(value ?? '') as any}
+          onChange={(e) => onChange(e.target.value as T)}
+          fullWidth
+        />
       )
 
     case 'number':
       return (
         <NumberSpinner
           size="small"
-          value={value ?? 0}
+          value={(value ?? 0) as any}
           onValueChange={(v) => onChange(Number(v) as T)}
         />
       )
 
     case 'checkbox':
-      return <Switch checked={value} onChange={(_, v) => onChange(v as T)} />
+      return <Switch checked={Boolean(value)} onChange={(_, v) => onChange(v as T)} />
 
     case 'slider':
       return (
         <Slider
-          value={Math.round((value ?? 1.0) * 100)}
+          value={Math.round(((value as any) ?? 1.0) * 100)}
           max={100}
           step={5}
           marks
@@ -44,7 +64,7 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
       return (
         <Select
           size="small"
-          value={value}
+          value={value as any}
           sx={{ minWidth: 200 }}
           onChange={(e) => onChange(e.target.value as T)}
         >
@@ -56,18 +76,42 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
         </Select>
       )
 
-    case 'color':
+    case 'color': {
+      const color = (value as unknown as string) || defaultColorForPath(node.path as any)
+
       return (
-        <TextField
-          type="color"
-          value={value || '#ff0000'}
-          style={{
-            width: '100px',
-            height: 'auto'
-          }}
-          onChange={(e) => onChange(e.target.value as T)}
-        />
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+          <TextField
+            type="color"
+            value={color}
+            onChange={(e) => onChange(e.target.value as T)}
+            variant="outlined"
+            sx={{
+              width: 72,
+              minWidth: 72,
+
+              '& .MuiInputBase-root': {
+                boxSizing: 'border-box',
+                height: 'auto',
+                minHeight: 0,
+                padding: '0.35em',
+                display: 'flex',
+                alignItems: 'center'
+              },
+
+              '& input[type="color"]': {
+                boxSizing: 'border-box',
+                width: '100%',
+                height: '1.6em',
+                padding: 0,
+                border: 0,
+                cursor: 'pointer'
+              }
+            }}
+          />
+        </div>
       )
+    }
 
     default:
       return null

@@ -1,4 +1,5 @@
-import { MenuItem, Select, Slider, Switch, TextField } from '@mui/material'
+import { MenuItem, Select, Slider, Switch, TextField, IconButton } from '@mui/material'
+import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined'
 import NumberSpinner from './numberSpinner/numberSpinner'
 import { SettingsNode } from '../../../../routes'
 import { ExtraConfig } from '@main/Globals'
@@ -13,15 +14,15 @@ type Props<T> = {
 const defaultColorForPath = (path?: string): string => {
   switch (path) {
     case 'primaryColorDark':
-      return themeColors.highlightDark
+      return themeColors.primaryColorDark
     case 'primaryColorLight':
-      return themeColors.highlightLight
-    case 'highlightEditableFieldDark':
-      return themeColors.highlightEditableFieldDark
-    case 'highlightEditableFieldLight':
-      return themeColors.highlightEditableFieldLight
+      return themeColors.primaryColorLight
+    case 'highlightColorDark':
+      return themeColors.highlightColorDark
+    case 'highlightColorLight':
+      return themeColors.highlightColorLight
     default:
-      return themeColors.highlightDark
+      return themeColors.highlightColorDark
   }
 }
 
@@ -58,7 +59,7 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
           valueLabelDisplay="auto"
           onChange={(_, v) => onChange(((v as number) / 100) as T)}
           sx={{
-            width: 'calc(100% - 48px)', // 2*24px
+            width: 'calc(100% - 48px)',
             ml: 3,
             mr: 3,
             minWidth: 0,
@@ -84,10 +85,11 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
       )
 
     case 'color': {
-      const color = (value as unknown as string) || defaultColorForPath(node.path as any)
+      const hasCustom = value != null && String(value).trim() !== ''
+      const color = hasCustom ? (value as unknown as string) : defaultColorForPath(node.path as any)
 
       return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', gap: 8 }}>
           <TextField
             type="color"
             value={color}
@@ -116,6 +118,14 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
               }
             }}
           />
+
+          <IconButton
+            size="small"
+            disabled={!hasCustom}
+            onClick={() => onChange(undefined as unknown as T)}
+          >
+            <RestartAltOutlinedIcon fontSize="small" />
+          </IconButton>
         </div>
       )
     }

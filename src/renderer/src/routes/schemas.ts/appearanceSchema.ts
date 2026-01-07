@@ -20,18 +20,18 @@ export const appearanceSchema: SettingsNode<ExtraConfig> = {
     },
     {
       type: 'color',
+      label: 'Highlight Color Dark',
+      path: 'highlightColorDark'
+    },
+    {
+      type: 'color',
       label: 'Primary Color Light',
       path: 'primaryColorLight'
     },
     {
       type: 'color',
-      label: 'Highlight Editable Field Dark',
-      path: 'highlightEditableFieldDark'
-    },
-    {
-      type: 'color',
-      label: 'Highlight Editable Field Light',
-      path: 'highlightEditableFieldLight'
+      label: 'Highlight Color Light',
+      path: 'highlightColorLight'
     },
     {
       type: 'route',

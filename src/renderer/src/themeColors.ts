@@ -10,13 +10,13 @@ export const themeColors = {
   textSecondaryDark: '#bbbbbb',
 
   // Highlight (primary) colors
-  highlightLight: '#ff0000',
-  highlightDark: '#00ffff',
+  primaryColorLight: '#ff0000',
+  primaryColorDark: '#00ffff',
 
   highlightFocusedFieldLight: '#cccccc',
   highlightFocusedFieldDark: '#bbbbbb',
-  highlightEditableFieldLight: '#ff0000',
-  highlightEditableFieldDark: '#00ffff',
+  highlightColorLight: '#ff0000',
+  highlightColorDark: '#00ffff',
 
   // Highlight active carplay stream
   successLight: '#81c784',
@@ -35,7 +35,7 @@ export const themeColors = {
   fftSurfaceLight: 'transparent',
   fftSurfaceDark: 'rgba(0,0,0,0.55)',
 
-  // Optional: soften grid perception on dark backgrounds
+  // Soften grid perception on dark backgrounds
   fftSurfaceBorderLight: 'rgba(0,0,0,0.08)',
   fftSurfaceBorderDark: 'rgba(255,255,255,0.05)',
 

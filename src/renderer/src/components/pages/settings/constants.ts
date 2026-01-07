@@ -15,12 +15,12 @@ export const DEFAULT_FPS = 60
 export const UI_DEBOUNCED_KEYS = new Set<keyof ExtraConfig>([
   'primaryColorDark',
   'primaryColorLight',
-  'highlightEditableFieldDark',
-  'highlightEditableFieldLight'
+  'highlightColorDark',
+  'highlightColorLight'
 ])
 
 export const PRIMARY_KEYS = ['primaryColorDark', 'primaryColorLight'] as const
-export const EDITABLE_KEYS = ['highlightEditableFieldDark', 'highlightEditableFieldLight'] as const
+export const EDITABLE_KEYS = ['highlightColorDark', 'highlightColorLight'] as const
 export const CAR_NAME_MAX = 20
 export const OEM_LABEL_MAX = 13
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
 import { useStatusStore } from '@store/store'
 import { MediaEventType, UsbEvent } from './types'
 import {
@@ -16,6 +16,10 @@ import { mediaScaleOps } from './utils/mediaScaleOps'
 import { mediaLayoutArtworksOps } from './utils/mediaLayoutArtworksOps'
 import { mediaProjectionOps } from './utils/mediaProjectionOps'
 import { mediaControlOps } from './utils/mediaControllOps'
+
+const FFTSpectrum = lazy(() =>
+  import('./components/FFTSpectrum').then((m) => ({ default: m.FFTSpectrum }))
+)
 
 export const Media = () => {
   const isStreaming = useStatusStore((s: { isStreaming: boolean }) => s.isStreaming)
@@ -46,7 +50,7 @@ export const Media = () => {
   // Compute usable inner width (hard clamp) for anything that must not overflow
   const innerMaxWidth = Math.max(0, Math.floor(w - pagePadClamped * 2))
 
-  // Layout + artwork (use scaled values + clamped padding so no “in-between” glitches)
+  // Layout + artwork
   const { canTwoCol, artPx, innerW } = mediaLayoutArtworksOps({
     ctrlSize,
     progressH: progressHScaled,
@@ -76,6 +80,20 @@ export const Media = () => {
     mediaPayloadError
   )
   const { press, bump, reset: resetPress } = usePressFeedback()
+
+  // Artwork <-> FFT toggle
+  const [showFft, setShowFft] = useState(false)
+
+  const toggleArtworkFft = useCallback(() => {
+    setShowFft((v) => !v)
+  }, [])
+
+  // Enable visualizer only when FFT is visible (and streaming)
+  useEffect(() => {
+    const enabled = !!showFft && !!isStreaming
+    window.carplay?.ipc?.setVisualizerEnabled?.(enabled)
+    return () => window.carplay?.ipc?.setVisualizerEnabled?.(false)
+  }, [showFft, isStreaming])
 
   // Per-button focus
   const [focus, setFocus] = useState<{ play: boolean; next: boolean; prev: boolean }>({
@@ -136,6 +154,7 @@ export const Media = () => {
       if (data?.type === 'unplugged') {
         clearOverride()
         resetPress()
+        setShowFft(false)
       }
     }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -188,6 +207,100 @@ export const Media = () => {
 
   // Always show progress bar (unless payload error)
   const showProgressBar = !mediaPayloadError
+
+  const ART_ROUND = canTwoCol ? 34 : 18
+  const fftPad = Math.max(8, Math.round(artPx * 0.06))
+
+  // IMPORTANT:
+  // - We keep rounded clipping ONLY for artwork.
+  // - For FFT we do NOT round/clip; we also slightly scaleY to avoid the "stretched" look.
+  const artworkBoxStyle: React.CSSProperties = {
+    width: artPx,
+    height: artPx,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    userSelect: 'none'
+  }
+
+  const onArtworkKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      e.stopPropagation()
+      toggleArtworkFft()
+    }
+  }
+
+  const ArtworkOrFft = (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={toggleArtworkFft}
+      onKeyDown={onArtworkKeyDown}
+      style={artworkBoxStyle}
+      aria-label={showFft ? 'Show artwork' : 'Show spectrum'}
+      title={showFft ? 'Show artwork' : 'Show spectrum'}
+    >
+      {showFft ? (
+        <div
+          className="fft-surface"
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: 0,
+            overflow: 'visible',
+            padding: fftPad,
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <div
+            className="fft-surface-inner"
+            style={{
+              width: '100%',
+              height: '100%',
+              transform: 'scaleY(0.85)',
+              transformOrigin: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Suspense fallback={null}>
+              <FFTSpectrum />
+            </Suspense>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="artwork-surface"
+          style={{
+            width: '100%',
+            height: '100%',
+            borderRadius: ART_ROUND,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {imageDataUrl ? (
+            <img
+              src={imageDataUrl}
+              alt="Cover"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              draggable={false}
+            />
+          ) : (
+            <div style={{ opacity: 0.6, fontSize: 12 }}>No Artwork</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 
   return (
     <div
@@ -271,29 +384,7 @@ export const Media = () => {
               </div>
             </div>
 
-            <div
-              style={{
-                width: artPx,
-                height: artPx,
-                borderRadius: 34,
-                overflow: 'hidden',
-                background: 'rgba(255,255,255,0.06)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginLeft: 'auto'
-              }}
-            >
-              {imageDataUrl ? (
-                <img
-                  src={imageDataUrl}
-                  alt="Cover"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div style={{ opacity: 0.6, fontSize: 12 }}>No Artwork</div>
-              )}
-            </div>
+            <div style={{ marginLeft: 'auto' }}>{ArtworkOrFft}</div>
           </div>
         ) : (
           <div
@@ -355,30 +446,7 @@ export const Media = () => {
             </div>
 
             {innerW > MIN_SCREEN_SIZE_FOR_ATRWORK && (
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div
-                  style={{
-                    width: artPx,
-                    height: artPx,
-                    borderRadius: 18,
-                    overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.06)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {imageDataUrl ? (
-                    <img
-                      src={imageDataUrl}
-                      alt="Cover"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{ opacity: 0.6, fontSize: 12 }}>No Artwork</div>
-                  )}
-                </div>
-              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>{ArtworkOrFft}</div>
             )}
           </div>
         )}
@@ -415,7 +483,7 @@ export const Media = () => {
           />
         </div>
 
-        {/* Always render progress bar (unless payload error) – hard width clamp */}
+        {/* Always render progress bar (unless payload error) */}
         {showProgressBar && (
           <div style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
             <ProgressBar

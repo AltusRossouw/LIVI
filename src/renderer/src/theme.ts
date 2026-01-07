@@ -68,7 +68,31 @@ function buildTheme(mode: THEME.LIGHT | THEME.DARK) {
       MuiCssBaseline: {
         styleOverrides: {
           ...commonLayout,
-          body: { backgroundColor: isLight ? themeColors.light : themeColors.dark }
+          body: { backgroundColor: isLight ? themeColors.light : themeColors.dark },
+          '.fft-surface': {
+            backgroundColor: isLight ? themeColors.fftSurfaceLight : themeColors.fftSurfaceDark,
+            ...(isLight
+              ? {}
+              : {
+                  backgroundImage:
+                    'radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 60%)'
+                })
+          },
+          '.fft-surface-inner': {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          },
+          '.artwork-surface': {
+            backgroundColor: isLight
+              ? themeColors.artworkSurfaceLight
+              : themeColors.artworkSurfaceDark,
+            boxShadow: `0 0 0 1px ${
+              isLight ? themeColors.artworkSurfaceBorderLight : themeColors.artworkSurfaceBorderDark
+            } inset`
+          }
         }
       },
       MuiTabs: {

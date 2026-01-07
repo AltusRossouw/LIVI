@@ -1,6 +1,6 @@
 import { SettingsNode } from '../types'
 import { ExtraConfig } from '../../../../main/Globals'
-import { IconUploaderPage } from '../../components/pages/settings/pages/system/IconUploaderPage'
+import { IconUploader } from '../../components/pages/settings/pages/system/IconUploader'
 
 export const appearanceSchema: SettingsNode<ExtraConfig> = {
   type: 'route',
@@ -39,7 +39,7 @@ export const appearanceSchema: SettingsNode<ExtraConfig> = {
       route: 'ui-icon',
       path: '',
       children: [
-        { type: 'custom', label: 'UI Icon', path: 'dongleIcon180', component: IconUploaderPage }
+        { type: 'custom', label: 'UI Icon', path: 'dongleIcon180', component: IconUploader }
       ]
     }
   ]

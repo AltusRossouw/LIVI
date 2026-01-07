@@ -1,5 +1,6 @@
-import { Info } from '../../components/pages/info'
-import { About } from '../../components/pages/settings/pages/about'
+import { SoftwareUpdate } from '../../components/pages/settings/pages/system/SoftwareUpdate'
+import { DongleInfo } from '../../components/pages/settings/pages/system/DongleInfo'
+import { About } from '../../components/pages/settings/pages/system/About'
 import { Restart } from '../../components/pages/settings/pages/system/Restart'
 import { PowerOff } from '../../components/pages/settings/pages/system/PowerOff'
 import type { SettingsNode } from '../types'
@@ -13,17 +14,26 @@ export const systemSchema: SettingsNode<ExtraConfig> = {
   children: [
     {
       type: 'route',
-      label: 'Info',
-      route: 'info',
-      path: '',
-      children: [{ type: 'custom', label: 'Info', path: 'carName', component: Info }]
-    },
-    {
-      type: 'route',
       label: 'About',
       route: 'about',
       path: '',
       children: [{ type: 'custom', label: 'About', path: 'carName', component: About }]
+    },
+    {
+      type: 'route',
+      label: 'Dongle Info',
+      route: 'songleInfo',
+      path: '',
+      children: [{ type: 'custom', label: 'Dongle Info', path: 'carName', component: DongleInfo }]
+    },
+    {
+      type: 'route',
+      label: 'Software Update',
+      route: 'softwareUpdate',
+      path: '',
+      children: [
+        { type: 'custom', label: 'Software Update', path: 'carName', component: SoftwareUpdate }
+      ]
     },
     {
       type: 'route',

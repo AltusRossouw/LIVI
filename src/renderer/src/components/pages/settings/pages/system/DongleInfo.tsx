@@ -77,7 +77,6 @@ export function DongleInfo() {
 
   const [message, setMessage] = useState<string>('')
 
-  // Auto refresh on connect (no manual refresh button)
   useEffect(() => {
     let cancelled = false
 
@@ -87,23 +86,31 @@ export function DongleInfo() {
 
         if (!isDongleConnected) {
           useCarplayStore.getState().resetInfo()
-          setMessage('No dongle connected.')
           return
         }
 
-        const info = await window.carplay.usb.getDeviceInfo()
+        const info = await window.carplay?.usb?.getDeviceInfo?.()
         if (cancelled) return
 
-        if (info?.device) {
-          useCarplayStore.setState({
-            serial: info.serialNumber,
-            manufacturer: info.manufacturerName,
-            product: info.productName,
-            fwVersion: info.fwVersion
-          })
-        } else {
+        const hasAny =
+          !!info?.device ||
+          !!info?.serialNumber ||
+          !!info?.manufacturerName ||
+          !!info?.productName ||
+          !!info?.fwVersion
+
+        if (!hasAny) {
+          useCarplayStore.getState().resetInfo()
           setMessage('Dongle info not available.')
+          return
         }
+
+        useCarplayStore.setState({
+          serial: info?.serialNumber,
+          manufacturer: info?.manufacturerName,
+          product: info?.productName,
+          fwVersion: info?.fwVersion
+        })
       } catch (err) {
         if (cancelled) return
         console.warn('[DongleInfo] getDeviceInfo failed', err)

@@ -127,7 +127,7 @@ git clone --branch main --single-branch https://github.com/f-io/pi-carplay.git \
   <img src="docs/images/media.png" alt="Media" width="48%" align="top" />
 </p>
 <p align="center">
-  <img src="docs/images/info.png" alt="Info" width="48%" align="top" />
+  <img src="docs/images/fft.png" alt="Info" width="48%" align="top" />
   &emsp;
   <img src="docs/images/settings.png" alt="Settings" width="48%" align="top" />
 </p>

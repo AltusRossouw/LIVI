@@ -132,6 +132,10 @@ git clone --branch main --single-branch https://github.com/f-io/pi-carplay.git \
   <img src="docs/images/settings.png" alt="Settings" width="48%" align="top" />
 </p>
 
+## Credits
+
+See [CREDITS](CREDITS.md) for acknowledgements and prior art.
+
 ## Disclaimer
 
 _Apple and CarPlay are trademarks of Apple Inc. Android and Android Auto are trademarks of Google LLC. This project is not affiliated with or endorsed by Apple or Google. All product names, logos, and brands are the property of their respective owners._

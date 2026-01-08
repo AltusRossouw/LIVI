@@ -206,6 +206,11 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const setPcmData = useCarplayStore((s) => s.setPcmData)
 
   useEffect(() => {
+    if (pathname !== '/') return
+    void window.carplay.ipc.sendFrame().catch(() => {})
+  }, [pathname])
+
+  useEffect(() => {
     console.log('[UI] Dongle connected:', isDongleConnected)
   }, [isDongleConnected])
 

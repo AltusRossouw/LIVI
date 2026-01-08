@@ -2,8 +2,6 @@ export enum ROUTES {
   HOME = '/',
   MEDIA = '/media',
   CAMERA = '/camera',
-  INFO = '/info',
-  OLD_SETTINGS = '/old-settings',
   SETTINGS = '/settings',
   QUIT = 'quit'
 }

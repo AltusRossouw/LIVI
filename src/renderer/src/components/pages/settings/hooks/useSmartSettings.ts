@@ -10,6 +10,11 @@ type OverrideConfig<T> = {
 
 type Overrides<T> = Partial<Record<keyof T, OverrideConfig<T>>>
 
+function isRestartRelevantPath(path?: string) {
+  if (!path) return true
+  return !(path === 'bindings' || path.startsWith('bindings.'))
+}
+
 export function useSmartSettings<T extends Record<string, any>>(
   initial: T,
   settings: T,
@@ -41,6 +46,7 @@ export function useSmartSettings<T extends Record<string, any>>(
     const baseline = (restartBaseline ?? settings ?? {}) as any
 
     for (const key of requiresRestartParams) {
+      if (!isRestartRelevantPath(key)) continue
       if (cfg[key] !== baseline[key]) return true
     }
     return false
@@ -50,7 +56,8 @@ export function useSmartSettings<T extends Record<string, any>>(
     return Boolean(needsRestartFromConfig || restartRequested)
   }, [needsRestartFromConfig, restartRequested])
 
-  const requestRestart = useCallback(() => {
+  const requestRestart = useCallback((path?: string) => {
+    if (!isRestartRelevantPath(path)) return
     setRestartRequested(true)
   }, [])
 

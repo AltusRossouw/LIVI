@@ -64,6 +64,30 @@ export type SliderNode = BaseFieldNode & {
   type: 'slider'
 }
 
+export type KeyBindingKey =
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+  | 'selectUp'
+  | 'selectDown'
+  | 'back'
+  | 'home'
+  | 'play'
+  | 'pause'
+  | 'next'
+  | 'prev'
+
+export type KeyBindingNode = NodeMeta & {
+  type: 'keybinding'
+  label: string
+  path: string
+  bindingKey: KeyBindingKey
+  defaultValue?: string
+  resetLabel?: string
+  clearLabel?: string
+}
+
 export type SettingsCustomPageProps<TStore, TValue> = {
   state: TStore
   node: SettingsCustomNode<TStore>
@@ -95,4 +119,5 @@ export type SettingsNode<TStore = any> =
   | StringNode
   | ColorNode
   | SliderNode
+  | KeyBindingNode
   | SettingsCustomNode<TStore>

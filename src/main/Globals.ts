@@ -32,3 +32,18 @@ export interface KeyBindings {
   next: string
   prev: string
 }
+
+export const DEFAULT_BINDINGS: KeyBindings = {
+  up: 'ArrowUp',
+  down: 'ArrowDown',
+  left: 'ArrowLeft',
+  right: 'ArrowRight',
+  selectUp: 'KeyU',
+  selectDown: 'Enter',
+  back: 'Backspace',
+  home: 'KeyH',
+  play: 'KeyP',
+  pause: 'KeyS',
+  next: 'KeyN',
+  prev: 'KeyB'
+}

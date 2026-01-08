@@ -4,7 +4,7 @@ import { SettingsLayout } from '../../layouts'
 import { useSmartSettingsFromSchema } from './hooks/useSmartSettingsFromSchema'
 import { settingsSchema } from '../../../routes/schemas.ts/schema'
 import { useNavigate, useParams } from 'react-router'
-import { StackItem } from './components'
+import { StackItem, KeyBindingRow } from './components'
 import { getNodeByPath, getValueByPath } from './utils'
 import { Typography } from '@mui/material'
 import { SettingsFieldPage } from './components/SettingsFieldPage'
@@ -81,6 +81,10 @@ export function SettingsPage() {
               requestRestart={requestRestart}
             />
           )
+        }
+
+        if (child.type === 'keybinding') {
+          return <KeyBindingRow key={`${_path}:${child.label}`} node={child} />
         }
 
         return (

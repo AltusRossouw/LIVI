@@ -1,4 +1,3 @@
-import { KeyBindings } from '../../components/pages/settings/pages/keybindings'
 import { Camera } from '../../components/pages/settings/pages/camera'
 import { SettingsNode } from '../types'
 import { ExtraConfig } from '../../../../main/Globals'
@@ -71,16 +70,6 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
                 description: 'Wi-Fi frequency selection'
               }
             }
-            //{
-            //  type: 'number',
-            //  label: 'Wi-Fi channel',
-            //  path: 'wifiChannel',
-            //  displayValue: true,
-            //  page: {
-            //    title: 'Wi-Fi channel',
-            //    description: 'Wi-Fi channel'
-            //  }
-            //}
           ]
         }
       ]
@@ -211,16 +200,26 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
     },
     {
       type: 'route',
-      label: 'Keybindings',
-      route: 'keybindings',
+      label: 'Key Bindings',
+      route: 'keyBindings',
       path: '',
       children: [
-        {
-          path: 'bindings',
-          type: 'custom',
-          label: 'Keybindings',
-          component: KeyBindings
-        }
+        { type: 'keybinding', label: 'Up', path: 'bindings', bindingKey: 'up' },
+        { type: 'keybinding', label: 'Down', path: 'bindings', bindingKey: 'down' },
+        { type: 'keybinding', label: 'Left', path: 'bindings', bindingKey: 'left' },
+        { type: 'keybinding', label: 'Right', path: 'bindings', bindingKey: 'right' },
+
+        { type: 'keybinding', label: 'Select Up', path: 'bindings', bindingKey: 'selectUp' },
+        { type: 'keybinding', label: 'Select Down', path: 'bindings', bindingKey: 'selectDown' },
+
+        { type: 'keybinding', label: 'Back', path: 'bindings', bindingKey: 'back' },
+        { type: 'keybinding', label: 'Home', path: 'bindings', bindingKey: 'home' },
+
+        { type: 'keybinding', label: 'Play', path: 'bindings', bindingKey: 'play' },
+        { type: 'keybinding', label: 'Pause', path: 'bindings', bindingKey: 'pause' },
+
+        { type: 'keybinding', label: 'Next', path: 'bindings', bindingKey: 'next' },
+        { type: 'keybinding', label: 'Previous', path: 'bindings', bindingKey: 'prev' }
       ]
     }
   ]

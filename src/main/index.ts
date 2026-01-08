@@ -12,7 +12,7 @@ import { electronApp, is } from '@electron-toolkit/utils'
 import { DEFAULT_CONFIG } from '@carplay/node'
 import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from './carplay/assets/carIcons'
 import { Socket } from './Socket'
-import { ExtraConfig, KeyBindings } from './Globals'
+import { ExtraConfig, DEFAULT_BINDINGS } from './Globals'
 import { USBService } from './usb/USBService'
 import { CarplayService } from './carplay/services/CarplayService'
 import { execFile, spawn } from 'node:child_process'
@@ -180,21 +180,6 @@ protocol.registerSchemesAsPrivileged([
 
 const appPath = app.getPath('userData')
 const configPath = join(appPath, 'config.json')
-
-const DEFAULT_BINDINGS: KeyBindings = {
-  up: 'ArrowUp',
-  down: 'ArrowDown',
-  left: 'ArrowLeft',
-  right: 'ArrowRight',
-  selectUp: 'KeyU',
-  selectDown: 'Enter',
-  back: 'Backspace',
-  home: 'KeyH',
-  play: 'KeyP',
-  pause: 'KeyS',
-  next: 'KeyN',
-  prev: 'KeyB'
-}
 
 function loadConfig(): ExtraConfig {
   let fileConfig: Partial<ExtraConfig> = {}

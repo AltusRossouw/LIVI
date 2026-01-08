@@ -53,11 +53,14 @@ export const useSmartSettingsFromSchema = (
 
   const smart = useSmartSettings(initialState, settings ?? {}, { overrides }) as any
 
-  const requestRestart = useCallback(() => {
-    if (typeof smart?.requestRestart === 'function') {
-      smart.requestRestart()
-    }
-  }, [smart])
+  const requestRestart = useCallback(
+    (path?: string) => {
+      if (typeof smart?.requestRestart === 'function') {
+        smart.requestRestart(path)
+      }
+    },
+    [smart]
+  )
 
   return {
     ...smart,

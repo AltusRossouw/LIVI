@@ -106,17 +106,30 @@ export const useFocus = () => {
         const idx = list.indexOf(active)
         const targetIdx = idx + delta
         if (targetIdx >= 0 && targetIdx < list.length) next = list[targetIdx]
-
-        if (targetIdx <= 1) {
-          const scrolledWrapper = mainRoot?.querySelector(
-            '[data-scrolled-wrapper]'
-          ) as HTMLElement | null
-
-          scrolledWrapper?.scrollTo(0, 0)
-        }
       }
 
       if (next) {
+        const scrolledWrapper = mainRoot?.querySelector(
+          '[data-scrolled-wrapper]'
+        ) as HTMLElement | null
+
+        if (scrolledWrapper && !scrolledWrapper.contains(next)) {
+          scrolledWrapper.scrollTop = 0
+        }
+
+        if (scrolledWrapper) {
+          const nr = next.getBoundingClientRect()
+          const wr = scrolledWrapper.getBoundingClientRect()
+
+          if (nr.top < wr.top) {
+            scrolledWrapper.scrollTop -= wr.top - nr.top
+          } else if (nr.bottom > wr.bottom) {
+            scrolledWrapper.scrollTop += nr.bottom - wr.bottom
+          }
+        } else {
+          next.scrollIntoView({ block: 'nearest' })
+        }
+
         next.focus({ preventScroll: true })
 
         appContext?.onSetAppContext?.({
@@ -125,8 +138,7 @@ export const useFocus = () => {
             focusedElId: null
           }
         })
-
-        return document.activeElement === next
+        return true
       }
 
       return false

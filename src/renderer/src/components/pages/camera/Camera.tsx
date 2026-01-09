@@ -263,8 +263,7 @@ export const Camera: React.FC<CameraProps> = ({
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        position: 'relative',
-        background: '#000'
+        position: 'relative'
       }}
     >
       <video
@@ -288,10 +287,8 @@ export const Camera: React.FC<CameraProps> = ({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            color: '#fff',
             textAlign: 'center',
             padding: '6px 10px',
-            background: 'rgba(0,0,0,0.45)',
             borderRadius: 6,
             whiteSpace: 'pre-line'
           }}
@@ -311,8 +308,6 @@ export const Camera: React.FC<CameraProps> = ({
             position: 'absolute',
             right: 8,
             bottom: 8,
-            color: '#fff',
-            background: 'rgba(0,0,0,0.45)',
             padding: '4px 8px',
             borderRadius: 4
           }}

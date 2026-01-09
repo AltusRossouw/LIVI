@@ -9,7 +9,7 @@ import {
   promises as fsp
 } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
-import { DEFAULT_CONFIG } from '@carplay/node'
+import { DEFAULT_CONFIG } from './carplay/driver/DongleDriver'
 import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from './carplay/assets/carIcons'
 import { Socket } from './Socket'
 import { ExtraConfig, DEFAULT_BINDINGS } from './Globals'

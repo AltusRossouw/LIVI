@@ -7,13 +7,17 @@ export type BindKey =
   | 'up'
   | 'down'
   | 'back'
+  | 'home'
   | 'selectDown'
+  | 'selectUp'
   | 'next'
   | 'prev'
+  | 'playOrPause'
   | 'play'
   | 'pause'
-  | 'seekFwd'
-  | 'seekBack'
+  | 'acceptPhone'
+  | 'rejectPhone'
+  | 'siri'
 
 export type useKeyDownProps = {
   receivingVideo: boolean

@@ -36,6 +36,7 @@ export type ValidCommand =
   | 'invalid'
   | 'pause'
   | 'play'
+  | 'playOrPause'
   | 'selectDown'
   | 'back'
   | 'down'
@@ -43,6 +44,9 @@ export type ValidCommand =
   | 'prev'
   | 'up'
   | 'selectUp'
+  | 'acceptPhone'
+  | 'rejectPhone'
+  | 'siri'
   | 'frame'
   | 'mic'
   | 'deviceFound'
@@ -59,6 +63,7 @@ export function isValidCommand(cmd: string): cmd is ValidCommand {
     'invalid',
     'pause',
     'play',
+    'playOrPause',
     'selectDown',
     'back',
     'down',
@@ -66,6 +71,9 @@ export function isValidCommand(cmd: string): cmd is ValidCommand {
     'prev',
     'up',
     'selectUp',
+    'acceptPhone',
+    'rejectPhone',
+    'siri',
     'frame',
     'mic',
     'deviceFound',
@@ -87,8 +95,12 @@ export type KeyCommand =
   | 'home'
   | 'play'
   | 'pause'
+  | 'playOrPause'
   | 'next'
   | 'prev'
+  | 'acceptPhone'
+  | 'rejectPhone'
+  | 'siri'
 
 /** Commands the UI can post to the CarPlay worker */
 export type Command =

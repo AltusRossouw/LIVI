@@ -60,7 +60,8 @@ const api = {
 
   settings: {
     get: (): Promise<ExtraConfig> => ipcRenderer.invoke('getSettings'),
-    save: (settings: ExtraConfig): Promise<void> => ipcRenderer.invoke('save-settings', settings),
+    save: (settings: Partial<ExtraConfig>): Promise<void> =>
+      ipcRenderer.invoke('save-settings', settings),
     onUpdate: (callback: ApiCallback<[ExtraConfig]>): void => {
       ipcRenderer.on('settings', callback)
     }

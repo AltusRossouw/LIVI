@@ -73,10 +73,14 @@ export type KeyBindingKey =
   | 'selectDown'
   | 'back'
   | 'home'
+  | 'playOrPause'
   | 'play'
   | 'pause'
   | 'next'
   | 'prev'
+  | 'acceptPhone'
+  | 'rejectPhone'
+  | 'siri'
 
 export type KeyBindingNode = NodeMeta & {
   type: 'keybinding'

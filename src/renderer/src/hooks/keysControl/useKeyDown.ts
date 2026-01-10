@@ -336,25 +336,32 @@ export const useKeyDown = ({
       const isTransport =
         code === b?.next ||
         code === b?.prev ||
+        code === b?.playOrPause ||
         code === b?.play ||
         code === b?.pause ||
-        code === b?.seekFwd ||
-        code === b?.seekBack
+        code === b?.acceptPhone ||
+        code === b?.rejectPhone ||
+        code === b?.siri
 
       if (settings && !isCarPlayActive && isTransport) {
-        const action: BindKey =
+        const action: KeyCommand =
           code === b?.next
             ? 'next'
             : code === b?.prev
               ? 'prev'
-              : code === b?.play
-                ? 'play'
-                : code === b?.pause
-                  ? 'pause'
-                  : code === b?.seekFwd
-                    ? 'seekFwd'
-                    : 'seekBack'
-        onSetKeyCommand(action as KeyCommand)
+              : code === b?.playOrPause
+                ? 'playOrPause'
+                : code === b?.play
+                  ? 'play'
+                  : code === b?.pause
+                    ? 'pause'
+                    : code === b?.acceptPhone
+                      ? 'acceptPhone'
+                      : code === b?.rejectPhone
+                        ? 'rejectPhone'
+                        : 'siri'
+
+        onSetKeyCommand(action)
         onSetCommandCounter((p) => p + 1)
         broadcastMediaKey(action)
       }

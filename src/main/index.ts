@@ -183,8 +183,16 @@ const configPath = join(appPath, 'config.json')
 
 function loadConfig(): ExtraConfig {
   let fileConfig: Partial<ExtraConfig> = {}
-  if (existsSync(configPath)) fileConfig = JSON.parse(readFileSync(configPath, 'utf8'))
+  if (existsSync(configPath)) {
+    try {
+      fileConfig = JSON.parse(readFileSync(configPath, 'utf8'))
+    } catch (e) {
+      console.warn('[config] Failed to parse config.json, using defaults:', e)
+      fileConfig = {}
+    }
+  }
 
+  // Start with defaults
   const merged: ExtraConfig = {
     ...DEFAULT_CONFIG,
     kiosk: true,
@@ -195,27 +203,25 @@ function loadConfig(): ExtraConfig {
     siriVolume: 1.0,
     callVolume: 1.0,
     visualAudioDelayMs: 120,
-    bindings: { ...DEFAULT_BINDINGS },
-    ...fileConfig
+    ...fileConfig,
+    bindings: { ...DEFAULT_BINDINGS, ...(fileConfig.bindings || {}) }
   } as ExtraConfig
 
-  if (!merged.dongleIcon120) {
-    merged.dongleIcon120 = ICON_120_B64
-  }
-  if (!merged.dongleIcon180) {
-    merged.dongleIcon180 = ICON_180_B64
-  }
-  if (!merged.dongleIcon256) {
-    merged.dongleIcon256 = ICON_256_B64
-  }
-
-  merged.bindings = { ...DEFAULT_BINDINGS, ...(fileConfig.bindings || {}) }
+  if (!merged.dongleIcon120) merged.dongleIcon120 = ICON_120_B64
+  if (!merged.dongleIcon180) merged.dongleIcon180 = ICON_180_B64
+  if (!merged.dongleIcon256) merged.dongleIcon256 = ICON_256_B64
 
   const needWrite = !existsSync(configPath) || JSON.stringify(fileConfig) !== JSON.stringify(merged)
+
   if (needWrite) {
-    writeFileSync(configPath, JSON.stringify(merged, null, 2))
-    console.log('[config] Written complete config.json with all defaults')
+    try {
+      writeFileSync(configPath, JSON.stringify(merged, null, 2))
+      console.log('[config] Written complete config.json with all defaults')
+    } catch (e) {
+      console.warn('[config] Failed to write config.json:', e)
+    }
   }
+
   return merged
 }
 config = loadConfig()
@@ -478,47 +484,10 @@ async function installOnLinuxFromFile(appImagePath: string): Promise<void> {
 function sendKioskSync(kiosk: boolean) {
   mainWindow?.webContents.send('settings:kiosk-sync', kiosk)
 }
+
 function persistKioskAndBroadcast(kiosk: boolean) {
   if (config.kiosk === kiosk) return
-  config = { ...config, kiosk }
-  try {
-    writeFileSync(
-      configPath,
-      JSON.stringify(
-        {
-          ...config,
-          width: +config.width,
-          height: +config.height,
-          fps: +config.fps,
-          dpi: +config.dpi,
-          format: +config.format,
-          iBoxVersion: +config.iBoxVersion,
-          phoneWorkMode: +config.phoneWorkMode,
-          packetMax: +config.packetMax,
-          mediaDelay: +config.mediaDelay,
-          visualAudioDelayMs: config.visualAudioDelayMs,
-          wifiType: config.wifiType,
-          wifiChannel: config.wifiChannel,
-          primaryColorDark: config.primaryColorDark,
-          primaryColorLight: config.primaryColorLight,
-          highlightColorDark: config.highlightColorDark,
-          highlightColorLight: config.highlightColorLight,
-          dongleIcon120: config.dongleIcon120,
-          dongleIcon180: config.dongleIcon180,
-          dongleIcon256: config.dongleIcon256
-        },
-        null,
-        2
-      )
-    )
-  } catch (e) {
-    console.warn('[config] persist kiosk failed:', e)
-  }
-  if (socket) {
-    socket.config = config
-    socket.sendSettings()
-  }
-  sendKioskSync(kiosk)
+  saveSettings({ kiosk })
 }
 
 function currentKiosk(): boolean {
@@ -707,7 +676,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('settings:get-kiosk', () => currentKiosk())
   ipcMain.handle('getSettings', () => config)
-  ipcMain.handle('save-settings', (_evt, settings: ExtraConfig) => {
+  ipcMain.handle('save-settings', (_evt, settings: Partial<ExtraConfig>) => {
     saveSettings(settings)
     return true
   })
@@ -852,90 +821,80 @@ function sizesEqual(a: ExtraConfig, b: ExtraConfig) {
 }
 
 // Settings IPC
-function saveSettings(next: ExtraConfig) {
-  // persist
-  writeFileSync(
-    configPath,
-    JSON.stringify(
-      {
-        ...next,
-        width: +next.width,
-        height: +next.height,
-        fps: +next.fps,
-        dpi: +next.dpi,
-        format: +next.format,
-        iBoxVersion: +next.iBoxVersion,
-        phoneWorkMode: +next.phoneWorkMode,
-        packetMax: +next.packetMax,
-        mediaDelay: +next.mediaDelay,
-        visualAudioDelayMs: next.visualAudioDelayMs,
-        wifiType: next.wifiType,
-        wifiChannel: next.wifiChannel,
-        primaryColorDark: next.primaryColorDark,
-        primaryColorLight: next.primaryColorLight,
-        highlightColorDark: next.highlightColorDark,
-        highlightColorLight: next.highlightColorLight,
-        dongleIcon120: next.dongleIcon120,
-        dongleIcon180: next.dongleIcon180,
-        dongleIcon256: next.dongleIcon256
-      },
-      null,
-      2
-    )
-  )
+function saveSettings(next: Partial<ExtraConfig>) {
+  const merged: ExtraConfig = {
+    ...config,
+    ...next,
+    bindings: {
+      ...DEFAULT_BINDINGS,
+      ...(config.bindings ?? {}),
+      ...(next.bindings ?? {})
+    }
+  } as ExtraConfig
+
+  try {
+    writeFileSync(configPath, JSON.stringify(merged, null, 2))
+  } catch (e) {
+    console.warn('[config] saveSettings failed:', e)
+  }
 
   const prev = config
-  config = { ...next }
+  config = merged
 
-  socket.config = config
-  socket.sendSettings()
+  if (socket) {
+    socket.config = config
+    socket.sendSettings()
+  }
   sendKioskSync(config.kiosk)
 
   if (!mainWindow) return
 
-  const sizeChanged = !sizesEqual(prev, next)
-  const kioskChanged = prev.kiosk !== next.kiosk
+  const sizeChanged = !sizesEqual(prev, config)
+  const kioskChanged = prev.kiosk !== config.kiosk
 
   if (process.platform === 'darwin') {
+    const wantFs = !!config.kiosk
+    const isFs = mainWindow.isFullScreen()
+
     if (kioskChanged) {
-      if (next.kiosk) {
+      if (wantFs) {
         if (sizeChanged) {
-          applyWindowedContentSize(mainWindow, next.width || 800, next.height || 480)
-          applyAspectRatioFullscreen(mainWindow, next.width || 800, next.height || 480)
+          applyWindowedContentSize(mainWindow, config.width || 800, config.height || 480)
+          applyAspectRatioFullscreen(mainWindow, config.width || 800, config.height || 480)
         }
-        mainWindow.setFullScreen(true)
+        if (!isFs) mainWindow.setFullScreen(true)
       } else {
-        mainWindow.setFullScreen(false)
+        if (isFs) mainWindow.setFullScreen(false)
         if (sizeChanged) {
-          applyWindowedContentSize(mainWindow, next.width || 800, next.height || 480)
+          applyWindowedContentSize(mainWindow, config.width || 800, config.height || 480)
         }
       }
     } else if (sizeChanged) {
-      if (next.kiosk) {
-        applyWindowedContentSize(mainWindow, next.width || 800, next.height || 480)
-        applyAspectRatioFullscreen(mainWindow, next.width || 800, next.height || 480)
+      if (wantFs) {
+        applyWindowedContentSize(mainWindow, config.width || 800, config.height || 480)
+        applyAspectRatioFullscreen(mainWindow, config.width || 800, config.height || 480)
       } else {
-        applyWindowedContentSize(mainWindow, next.width || 800, next.height || 480)
+        applyWindowedContentSize(mainWindow, config.width || 800, config.height || 480)
       }
     }
   } else {
-    // Linux/Windows
+    // Linux
     if (kioskChanged) {
-      mainWindow.setKiosk(!!next.kiosk)
+      mainWindow.setKiosk(!!config.kiosk)
       if (sizeChanged) {
-        if (next.kiosk) {
+        if (config.kiosk) {
           applyAspectRatioWindowed(mainWindow, 0, 0)
         } else {
-          mainWindow.setContentSize(next.width, next.height, false)
-          applyAspectRatioWindowed(mainWindow, next.width, next.height)
+          mainWindow.setContentSize(config.width, config.height, false)
+          applyAspectRatioWindowed(mainWindow, config.width, config.height)
         }
       }
     } else if (sizeChanged) {
-      if (next.kiosk) {
+      if (config.kiosk) {
         applyAspectRatioWindowed(mainWindow, 0, 0)
       } else {
-        mainWindow.setContentSize(next.width, next.height, false)
-        applyAspectRatioWindowed(mainWindow, next.width, next.height)
+        mainWindow.setContentSize(config.width, config.height, false)
+        applyAspectRatioWindowed(mainWindow, config.width, config.height)
       }
     }
   }

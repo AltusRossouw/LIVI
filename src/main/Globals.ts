@@ -27,10 +27,14 @@ export interface KeyBindings {
   down: string
   back: string
   home: string
+  playOrPause: string
   play: string
   pause: string
   next: string
   prev: string
+  acceptPhone: string
+  rejectPhone: string
+  siri: string
 }
 
 export const DEFAULT_BINDINGS: KeyBindings = {
@@ -38,12 +42,16 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   down: 'ArrowDown',
   left: 'ArrowLeft',
   right: 'ArrowRight',
-  selectUp: 'KeyU',
+  selectUp: '',
   selectDown: 'Enter',
   back: 'Backspace',
   home: 'KeyH',
-  play: 'KeyP',
-  pause: 'KeyS',
+  playOrPause: 'KeyP',
+  play: '',
+  pause: '',
   next: 'KeyN',
-  prev: 'KeyB'
+  prev: 'KeyB',
+  acceptPhone: 'KeyA',
+  rejectPhone: 'KeyR',
+  siri: 'KeyV'
 }

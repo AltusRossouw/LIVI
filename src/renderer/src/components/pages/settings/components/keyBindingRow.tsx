@@ -43,14 +43,22 @@ export function KeyBindingRow({ node }: { node: KeyBindingNode }) {
     return normalize(settings?.bindings?.[node.bindingKey])
   }, [settings?.bindings, node.bindingKey])
 
-  // default value (from main)
+  // default value (from schema node OR DEFAULT_BINDINGS fallback)
   const defaultValue = useMemo(() => {
     const fallback = (DEFAULT_BINDINGS as any)?.[node.bindingKey] as string | undefined
     return normalize(node.defaultValue ?? fallback)
   }, [node.bindingKey, node.defaultValue])
 
-  const hasDefault = defaultValue !== ''
-  const isDefault = hasDefault ? currentValue === defaultValue : true
+  // IMPORTANT: default can be '' (meaning: unbound)
+  const hasDefault = useMemo(() => {
+    if (node.defaultValue !== undefined && node.defaultValue !== null) return true
+    return Object.prototype.hasOwnProperty.call(DEFAULT_BINDINGS as any, node.bindingKey)
+  }, [node.bindingKey, node.defaultValue])
+
+  const isDefault = useMemo(() => {
+    if (!hasDefault) return true
+    return currentValue === defaultValue
+  }, [currentValue, defaultValue, hasDefault])
 
   const displayValue = capturing ? 'Press a key…' : currentValue || '---'
 

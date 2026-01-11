@@ -107,6 +107,7 @@ declare global {
         sendMultiTouch(points: MultiTouchPoint[]): void
         sendKeyCommand(key: string): void
         onEvent(callback: (event: unknown, ...args: unknown[]) => void): void
+        offEvent(callback: (event: unknown, ...args: unknown[]) => void): void
         setVisualizerEnabled(enabled: boolean): void
         readMedia(): Promise<MediaPayload>
         onVideoChunk(handler: (payload: unknown) => void): void

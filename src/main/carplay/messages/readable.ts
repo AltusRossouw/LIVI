@@ -12,8 +12,9 @@ export enum AudioCommand {
   AudioSiriStop = 9,
   AudioMediaStart = 10,
   AudioMediaStop = 11,
-  AudioAlertStart = 12,
-  AudioAlertStop = 13,
+  AudioAttentionStart = 12,
+  AudioAttentionStop = 13,
+  AudioAttentionRinging = 14,
   AudioTurnByTurnStart = 15,
   AudioTurnByTurnStop = 16
 }
@@ -223,7 +224,7 @@ export class AudioData extends Message {
     if (payloadBytes <= 0) return
 
     if (payloadBytes === 1) {
-      this.command = data.readInt8(12)
+      this.command = data.readUInt8(12)
     } else if (payloadBytes === 4) {
       this.volumeDuration = data.readFloatLE(12)
     } else if (payloadBytes > 0) {

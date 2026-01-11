@@ -100,6 +100,20 @@ export class CarplayService {
         this.sendChunked('carplay-video-chunk', msg.data?.buffer as ArrayBuffer, 512 * 1024)
       } else if (msg instanceof AudioData) {
         this.audio.handleAudioData(msg)
+
+        // Forward command-only AudioData messages to renderer so UI can react
+        // (call ringing, siri start/stop, nav start/stop, etc)
+        if (msg.command != null) {
+          this.webContents.send('carplay-event', {
+            type: 'audio',
+            payload: {
+              command: msg.command,
+              audioType: msg.audioType,
+              decodeType: msg.decodeType,
+              volume: msg.volume
+            }
+          })
+        }
       } else if (msg instanceof MediaData) {
         if (!msg.payload) return
 

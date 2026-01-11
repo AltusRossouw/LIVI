@@ -53,6 +53,8 @@ export enum CommandMapping {
   rejectPhone = 301, // 'Reject Phone Call'
   requestVideoFocus = 500,
   releaseVideoFocus = 501,
+  naviFocus = 506,
+  naviRelease = 507,
   wifiEnable = 1000,
   autoConnetEnable = 1001,
   wifiConnect = 1002,

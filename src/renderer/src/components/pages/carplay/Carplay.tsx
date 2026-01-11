@@ -3,6 +3,7 @@ import { Box, Typography, useTheme, alpha } from '@mui/material'
 import { keyframes } from '@mui/system'
 import { useLocation, useNavigate } from 'react-router'
 import { CommandMapping } from '@main/carplay/messages/common'
+import { AudioCommand } from '@main/carplay/messages/readable'
 
 import { ExtraConfig } from '@main/Globals'
 import { useCarplayStore, useStatusStore } from '../../../store/store'
@@ -23,6 +24,9 @@ interface CarplayProps {
   settings: ExtraConfig
   command: KeyCommand
   commandCounter: number
+
+  navVideoOverlayActive: boolean
+  setNavVideoOverlayActive: (v: boolean) => void
 }
 
 // Overlay visuals
@@ -187,7 +191,9 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   setReceivingVideo,
   settings,
   command,
-  commandCounter
+  commandCounter,
+  navVideoOverlayActive,
+  setNavVideoOverlayActive
 }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -221,6 +227,41 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasStartedRef = useRef(false)
   const [renderReady, setRenderReady] = useState(false)
+  const lastNonCarplayPathRef = useRef<string | null>(null)
+  const autoSwitchedRef = useRef(false)
+  const pendingVideoFocusRef = useRef(false)
+
+  // Attention-driven UI switching (call / siri / nav)
+  type AttentionKind = 'call' | 'siri'
+  type AttentionPayload = { kind: AttentionKind; active: boolean; phase?: string }
+
+  const attentionBackPathRef = useRef<string | null>(null)
+  const attentionSwitchedByRef = useRef<AttentionKind | null>(null)
+
+  // Keep track of the last host UI route (anything except "/")
+  useEffect(() => {
+    if (pathname !== '/') {
+      attentionBackPathRef.current = pathname
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    // When NAV video overlay is shown on top of the host UI (not on "/")
+    if (!navVideoOverlayActive || pathname === '/') return
+
+    const dismiss = () => {
+      setNavVideoOverlayActive(false)
+    }
+
+    // Any touch/click/pen should immediately dismiss
+    window.addEventListener('pointerdown', dismiss, { capture: true, passive: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', dismiss, {
+        capture: true
+      } as AddEventListenerOptions)
+    }
+  }, [navVideoOverlayActive, pathname])
 
   // Overlay offset
   const [overlayY, setOverlayY] = useState(0)
@@ -401,6 +442,37 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     }
   }, [location.pathname, navigate])
 
+  const applyAttention = useCallback(
+    (p: AttentionPayload) => {
+      const inCarplay = location.pathname === '/'
+
+      if (p.kind !== 'call' && p.kind !== 'siri') return
+
+      // ACTIVE => switch to CarPlay
+      if (p.active) {
+        if (inCarplay) return
+
+        // mark why we switched (so we only return if we switched)
+        attentionSwitchedByRef.current = p.kind
+
+        navigate('/', { replace: true })
+        return
+      }
+
+      // INACTIVE => only return if we previously switched because of this kind
+      if (attentionSwitchedByRef.current !== p.kind) return
+      attentionSwitchedByRef.current = null
+
+      const back = attentionBackPathRef.current
+
+      // return to last host route (kept up-to-date by the pathname effect)
+      if (back && back !== '/' && location.pathname === '/') {
+        navigate(back, { replace: true })
+      }
+    },
+    [location.pathname, navigate]
+  )
+
   // CarPlay worker messages
   useEffect(() => {
     if (!carplayWorker) return
@@ -417,6 +489,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           setStreaming(false)
           setReceivingVideo(false)
           resetInfo()
+          setNavVideoOverlayActive(false)
           break
 
         case 'requestBuffer': {
@@ -537,7 +610,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     const handler = (_evt: unknown, data: unknown) => {
       const d = (data ?? {}) as Record<string, unknown>
       const t = typeof d.type === 'string' ? d.type : undefined
-
       switch (t) {
         case 'resolution': {
           const payload = d.payload as { width?: number; height?: number } | undefined
@@ -548,6 +620,12 @@ const CarplayComponent: React.FC<CarplayProps> = ({
             })
             useStatusStore.setState({ isStreaming: true })
             setReceivingVideo(true)
+            if (pendingVideoFocusRef.current) {
+              pendingVideoFocusRef.current = false
+              if (pathname !== '/') {
+                navigate('/', { replace: true })
+              }
+            }
           }
           break
         }
@@ -570,6 +648,22 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           }
           break
         }
+        case 'audio': {
+          const cmd = (d as { payload?: { command?: number } }).payload?.command
+          if (typeof cmd !== 'number') break
+          if (cmd === AudioCommand.AudioPhonecallStart) {
+            applyAttention({ kind: 'call', active: true, phase: 'active' })
+          } else if (cmd === AudioCommand.AudioPhonecallStop) {
+            applyAttention({ kind: 'call', active: false, phase: 'ended' })
+          } else if (cmd === AudioCommand.AudioAttentionRinging) {
+            applyAttention({ kind: 'call', active: true, phase: 'ringing' })
+          } else if (cmd === AudioCommand.AudioSiriStart) {
+            applyAttention({ kind: 'siri', active: true })
+          } else if (cmd === AudioCommand.AudioSiriStop) {
+            applyAttention({ kind: 'siri', active: false })
+          }
+          break
+        }
         case 'media': {
           const playStatus = (
             d as {
@@ -588,10 +682,71 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         case 'unplugged':
           useStatusStore.setState({ isDongleConnected: false, isStreaming: false })
           useCarplayStore.getState().resetInfo()
+          setNavVideoOverlayActive(false)
           break
         case 'command': {
           const value = (d as { message?: { value?: number } }).message?.value
-          if (value === CommandMapping.requestHostUI) gotoHostUI()
+          if (typeof value !== 'number') break
+
+          //  NAV overlay manual dismiss
+          if (navVideoOverlayActive && pathname !== '/') {
+            if (value === CommandMapping.back || value === CommandMapping.selectDown) {
+              setNavVideoOverlayActive(false)
+              break
+            }
+          }
+
+          if (value === CommandMapping.requestHostUI) {
+            gotoHostUI()
+            break
+          }
+
+          if (value === CommandMapping.naviFocus) {
+            if (pathname !== '/') {
+              setNavVideoOverlayActive(true)
+            }
+            break
+          }
+
+          if (value === CommandMapping.naviRelease) {
+            setNavVideoOverlayActive(false)
+            break
+          }
+
+          if (value === CommandMapping.requestVideoFocus) {
+            if (attentionSwitchedByRef.current) break
+
+            if (pathname !== '/') {
+              lastNonCarplayPathRef.current = pathname
+              autoSwitchedRef.current = true
+            }
+
+            if (!isStreaming) {
+              pendingVideoFocusRef.current = true
+              break
+            }
+
+            if (pathname !== '/') {
+              navigate('/', { replace: true })
+            }
+            break
+          }
+
+          if (value === CommandMapping.releaseVideoFocus) {
+            if (attentionSwitchedByRef.current) {
+              autoSwitchedRef.current = false
+              lastNonCarplayPathRef.current = null
+              break
+            }
+
+            if (autoSwitchedRef.current && lastNonCarplayPathRef.current) {
+              navigate(lastNonCarplayPathRef.current, { replace: true })
+            }
+            autoSwitchedRef.current = false
+            lastNonCarplayPathRef.current = null
+            break
+          }
+
           break
         }
       }
@@ -600,19 +755,11 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     // subscribe
     window.carplay.ipc.onEvent(handler)
 
-    // best-effort cleanup for legacy emitter shape
+    // cleanup
     return () => {
-      const remove = (
-        window as unknown as {
-          electron?: {
-            ipcRenderer?: { removeListener?: (ch: string, l: (...a: unknown[]) => void) => void }
-          }
-        }
-      ).electron?.ipcRenderer?.removeListener
-      if (typeof remove === 'function')
-        remove('carplay-event', handler as (...args: unknown[]) => void)
+      window.carplay.ipc.offEvent(handler)
     }
-  }, [gotoHostUI, setReceivingVideo])
+  }, [gotoHostUI, setReceivingVideo, navigate, pathname, navVideoOverlayActive, isStreaming])
 
   // Resize observer => inform render worker
   useEffect(() => {
@@ -624,18 +771,21 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   // Key commands
   useEffect(() => {
-    if (commandCounter) {
-      window.carplay.ipc.sendKeyCommand(command)
-    }
-  }, [command, commandCounter])
+    if (!commandCounter) return
+    if (!isStreaming) return
+
+    window.carplay.ipc.sendKeyCommand(command)
+  }, [command, commandCounter, isStreaming])
 
   // Cleanup
   useEffect(() => {
     return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
+
       carplayWorker.terminate()
-      renderWorkerRef.current?.terminate()
-      renderWorkerRef.current = null
-      offscreenCanvasRef.current = null
     }
   }, [carplayWorker])
 
@@ -655,15 +805,32 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   const mode: 'dongle' | 'phone' = !isDongleConnected ? 'dongle' : 'phone'
 
+  const inCarplay = pathname === '/'
+  const showCarplayOverlay = inCarplay || navVideoOverlayActive
+
   return (
     <div
       id="carplay-root"
       ref={mainElem}
-      style={
-        pathname === '/'
-          ? { height: '100%', width: '100%', touchAction: 'none', position: 'relative' }
-          : { display: 'none' }
-      }
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        touchAction: 'none',
+
+        // show as full UI when on "/" OR as overlay when navFocusActive
+        visibility: showCarplayOverlay ? 'visible' : 'hidden',
+        opacity: showCarplayOverlay ? 1 : 0,
+        transition: 'opacity 120ms ease',
+
+        // IMPORTANT:
+        // - In CarPlay route: allow touch (so touchHandlers work)
+        // - In overlay mode: do NOT swallow clicks/touch/keys for the host UI
+        pointerEvents: inCarplay && isStreaming ? 'auto' : 'none',
+
+        zIndex: showCarplayOverlay ? 999 : -1
+      }}
     >
       {/* Overlay (ring + icon chips) */}
       {pathname === '/' && (

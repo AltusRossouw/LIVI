@@ -10,6 +10,13 @@ const { usb, getDeviceList } = usbModule
 export class USBService {
   private lastDongleState: boolean = false
   private stopped = false
+  private resetInProgress = false
+  private shutdownInProgress = false
+
+  public beginShutdown(): void {
+    if (process.platform !== 'darwin') return
+    this.shutdownInProgress = true
+  }
 
   private delay(ms: number) {
     return new Promise<void>((r) => setTimeout(r, ms))
@@ -50,6 +57,7 @@ export class USBService {
 
   private listenToUsbEvents() {
     usb.on('attach', (device) => {
+      if (this.stopped || this.resetInProgress) return
       this.broadcastGenericUsbEvent({ type: 'attach', device })
       if (this.isDongle(device) && !this.lastDongleState) {
         console.log('[USBService] Dongle connected:', device)
@@ -61,6 +69,7 @@ export class USBService {
     })
 
     usb.on('detach', (device) => {
+      if (this.stopped || this.resetInProgress) return
       this.broadcastGenericUsbEvent({ type: 'detach', device })
       if (this.isDongle(device) && this.lastDongleState) {
         console.log('[USBService] Dongle disconnected:', device)
@@ -96,11 +105,27 @@ export class USBService {
 
   private registerIpcHandlers() {
     ipcMain.handle('usb-detect-dongle', async () => {
+      if (process.platform === 'darwin' && (this.shutdownInProgress || this.resetInProgress)) {
+        return false
+      }
       const devices = getDeviceList()
       return devices.some(this.isDongle)
     })
 
     ipcMain.handle('carplay:usbDevice', async () => {
+      if (process.platform === 'darwin' && (this.shutdownInProgress || this.resetInProgress)) {
+        return {
+          device: false,
+          vendorId: null,
+          productId: null,
+          deviceName: '',
+          serialNumber: '',
+          manufacturerName: '',
+          productName: '',
+          fwVersion: 'Unknown'
+        }
+      }
+
       const devices = getDeviceList()
       const detectDev = devices.find(this.isDongle)
       if (!detectDev) {
@@ -128,6 +153,10 @@ export class USBService {
     })
 
     ipcMain.handle('usb-last-event', async () => {
+      if (process.platform === 'darwin' && (this.shutdownInProgress || this.resetInProgress)) {
+        return { type: 'unplugged', device: null }
+      }
+
       if (this.lastDongleState) {
         const devices = getDeviceList()
         const dev = devices.find(this.isDongle)
@@ -233,18 +262,24 @@ export class USBService {
       this.notifyReset('usb-reset-done', false)
       return false
     }
+    this.resetInProgress = true
     try {
       console.log('[USB] Graceful reset: stopping CarPlay...')
       await this.carplay.stop()
       await new Promise((resolve) => setTimeout(resolve, 300))
+
       this.lastDongleState = false
       this.broadcastGenericUsbEvent({ type: 'detach', device: dongle })
       this.notifyDeviceChange(dongle, false)
+
       return await this.resetDongle(dongle)
     } catch (e) {
       console.error('[USB] Exception during graceful reset', e)
       this.notifyReset('usb-reset-done', false)
       return false
+    } finally {
+      await new Promise((resolve) => setTimeout(resolve, 400))
+      this.resetInProgress = false
     }
   }
 

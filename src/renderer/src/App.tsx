@@ -27,6 +27,7 @@ function AppInner() {
   const [receivingVideo, setReceivingVideo] = useState(false)
   const [commandCounter, setCommandCounter] = useState(0)
   const [keyCommand, setKeyCommand] = useState('')
+  const [navVideoOverlayActive, setNavVideoOverlayActive] = useState(false)
   const editingField = appContext?.keyboardNavigation?.focusedElId
   // const [editingField, setEditingField] = useState<HTMLElement | null>(null)
   const location = useLocation()
@@ -104,9 +105,25 @@ function AppInner() {
   })
 
   useEffect(() => {
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => document.removeEventListener('keydown', onKeyDown, true)
-  }, [onKeyDown])
+    const handler = (e: KeyboardEvent) => {
+      if (navVideoOverlayActive && location.pathname !== ROUTES.HOME) {
+        const back = settings?.bindings?.back
+        const enter = settings?.bindings?.selectDown
+
+        if (e.code === back || e.code === enter || e.key === 'Escape') {
+          setNavVideoOverlayActive(false)
+          e.preventDefault()
+          e.stopPropagation()
+          return
+        }
+      }
+
+      onKeyDown(e)
+    }
+
+    document.addEventListener('keydown', handler, true)
+    return () => document.removeEventListener('keydown', handler, true)
+  }, [onKeyDown, navVideoOverlayActive, location.pathname, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -130,6 +147,8 @@ function AppInner() {
           settings={settings}
           command={keyCommand as KeyCommand}
           commandCounter={commandCounter}
+          navVideoOverlayActive={navVideoOverlayActive}
+          setNavVideoOverlayActive={setNavVideoOverlayActive}
         />
       )}
 

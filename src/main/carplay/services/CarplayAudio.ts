@@ -48,6 +48,11 @@ export class CarplayAudio {
   private phonecallActive = false
   private navActive = false
 
+  // UI hint state
+  private uiCallIncoming = false
+  private uiSiriHintActive = false
+  private uiNavHintActive = false
+
   // Media session state (music)
   private mediaActive = false
   private audioOpenArmed = false
@@ -96,6 +101,21 @@ export class CarplayAudio {
     this.visualizerEnabled = !!enabled
   }
 
+  private emitAttention(
+    kind: 'call' | 'siri' | 'nav',
+    active: boolean,
+    extra?: Record<string, unknown>
+  ) {
+    this.sendCarplayEvent({
+      type: 'attention',
+      payload: {
+        kind,
+        active,
+        ...(extra ?? {})
+      }
+    })
+  }
+
   // Called from CarplayService when a new CarPlay session starts
   public resetForSessionStart() {
     this.stopAllAudioPlayers()
@@ -118,6 +138,11 @@ export class CarplayAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
+
+    // UI hint state reset
+    this.uiCallIncoming = false
+    this.uiSiriHintActive = false
+    this.uiNavHintActive = false
   }
 
   // Called from CarplayService when a CarPlay session stops
@@ -142,6 +167,11 @@ export class CarplayAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
+
+    // UI hint state reset
+    this.uiCallIncoming = false
+    this.uiSiriHintActive = false
+    this.uiNavHintActive = false
   }
 
   // Called from CarplayService.start() after config is loaded.
@@ -390,6 +420,54 @@ export class CarplayAudio {
     // Command-only messages: Siri / phone / media / nav control
     if (msg.command != null) {
       const cmd = msg.command
+
+      // UI attention hints (renderer decides what to do)
+
+      // Incoming call: pre-accept / ringing
+      if (cmd === AudioCommand.AudioAttentionStart || cmd === AudioCommand.AudioAttentionRinging) {
+        if (!this.uiCallIncoming) {
+          this.uiCallIncoming = true
+          this.emitAttention('call', true, { phase: 'incoming' })
+        }
+      }
+
+      // Call ended / rejected / finished
+      if (cmd === AudioCommand.AudioPhonecallStop) {
+        if (this.uiCallIncoming) {
+          this.uiCallIncoming = false
+          this.emitAttention('call', false, { phase: 'ended' })
+        }
+      }
+
+      // Siri visual feedback
+      if (cmd === AudioCommand.AudioSiriStart) {
+        if (!this.uiSiriHintActive) {
+          this.uiSiriHintActive = true
+          this.emitAttention('siri', true)
+        }
+      }
+
+      if (cmd === AudioCommand.AudioSiriStop) {
+        if (this.uiSiriHintActive) {
+          this.uiSiriHintActive = false
+          this.emitAttention('siri', false)
+        }
+      }
+
+      // Navigation overlay hints
+      if (cmd === AudioCommand.AudioNaviStart || cmd === AudioCommand.AudioTurnByTurnStart) {
+        if (!this.uiNavHintActive) {
+          this.uiNavHintActive = true
+          this.emitAttention('nav', true)
+        }
+      }
+
+      if (cmd === AudioCommand.AudioNaviStop || cmd === AudioCommand.AudioTurnByTurnStop) {
+        if (this.uiNavHintActive) {
+          this.uiNavHintActive = false
+          this.emitAttention('nav', false)
+        }
+      }
 
       // Explicit Nav / turn-by-turn start
       if (cmd === AudioCommand.AudioNaviStart || cmd === AudioCommand.AudioTurnByTurnStart) {

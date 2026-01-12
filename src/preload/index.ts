@@ -79,9 +79,10 @@ const api = {
     onEvent: (callback: ApiCallback): void => {
       ipcRenderer.on('carplay-event', callback)
     },
-
+    offEvent: (callback: ApiCallback): void => {
+      ipcRenderer.removeListener('carplay-event', callback)
+    },
     readMedia: (): Promise<unknown> => ipcRenderer.invoke('carplay-media-read'),
-
     onVideoChunk: (handler: ChunkHandler): void => {
       videoChunkHandler = handler
       videoChunkQueue.forEach((chunk) => handler(chunk))

@@ -147,20 +147,27 @@ app.on('before-quit', async (e) => {
   e.preventDefault()
 
   try {
-    carplayService['shuttingDown'] = true
-    await carplayService.stop()
+    ;(carplayService as any).shuttingDown = true
 
+    // macOS: block all usb IPC/polling as early as possible
     if (process.platform === 'darwin') {
-      await usbService.gracefulForceReset()
-    } else {
-      await usbService.forceReset()
+      usbService.beginShutdown()
     }
 
-    await usbService.stop()
+    // Stop CarPlay pipeline first
+    await carplayService.stop().catch(() => {})
+
+    // macOS only: send the reset so iPhone drops session immediately
+    if (process.platform === 'darwin') {
+      await usbService.gracefulForceReset().catch(() => {})
+    }
+
+    // Stop hotplug listeners last
+    await usbService.stop().catch(() => {})
   } catch (err) {
     console.warn('Error while quitting:', err)
   } finally {
-    setImmediate(() => app.quit())
+    setImmediate(() => app.exit(0))
   }
 })
 

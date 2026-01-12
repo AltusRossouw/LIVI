@@ -17,6 +17,25 @@ It is a standalone cross-platform Electron head unit with hardware-accelerated v
 ![TS Main](https://img.shields.io/github/actions/workflow/status/f-io/pi-carplay/typecheck.yml?branch=main&label=TS%20main)
 ![Build Main](https://img.shields.io/github/actions/workflow/status/f-io/pi-carplay/build.yml?branch=main&label=build%20main)
 
+## Dongle Firmware Feature Matrix
+
+The available features depend on the firmware version running on the Carlinkit dongle.
+Listed limitations are firmware-level restrictions and cannot be fixed by the application.
+
+| Firmware Version | Nav Auto Switch | Call Auto Switch | Audio Metadata | Webinterface | Notes |
+| :--------------: | :-------------: | :--------------: | :------------: | :----------: | :---- |
+| 2025.10.15.1127  | 🟢 | 🟢 | 🟢 | 🟢 | Full feature set |
+| 2025.02.25.1521  | 🔴 | 🟢 | 🟢 | 🟢 | No auto switching on navigation guidance |
+| 2021.05.xx.xxxx  | 🔴 | 🟡 | 🔴 | 🔴 | Limited protocol support |
+
+### Legend
+- `🟢` = Supported
+- `🔴` = Not supported
+- `🟡` = Unkown
+
+### Notes
+- The web updater is unreliable in most cases; a manual (USB) update is usually required.
+
 ## Installation
 
 ### Raspberry Pi OS

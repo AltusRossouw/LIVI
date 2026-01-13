@@ -30,6 +30,7 @@ import { APP_START_TS, DEFAULT_MEDIA_DATA_RESPONSE } from './constants'
 import { readMediaFile } from './utils/readMediaFile'
 import { asDomUSBDevice } from './utils/asDomUSBDevice'
 import { CarplayAudio, LogicalStreamKey } from './CarplayAudio'
+import { FirmwareUpdateService } from './FirmwareUpdateService'
 
 let dongleConnected = false
 
@@ -39,6 +40,9 @@ type VolumeConfig = {
   siriVolume?: number
   callVolume?: number
 }
+
+type DongleFirmwareAction = 'check' | 'update'
+type DongleFirmwareRequest = { action: DongleFirmwareAction }
 
 export class CarplayService {
   private driver = new DongleDriver()
@@ -61,6 +65,7 @@ export class CarplayService {
   private dongleFwVersion?: string
   private boxInfo?: unknown
   private lastDongleInfoEmitKey = ''
+  private firmware = new FirmwareUpdateService()
 
   private audio: CarplayAudio
 
@@ -158,7 +163,7 @@ export class CarplayService {
         this.dongleFwVersion = msg.version
         this.emitDongleInfoIfChanged()
       } else if (msg instanceof BoxInfo) {
-        this.boxInfo = msg.settings
+        this.boxInfo = mergePreferExisting(this.boxInfo, msg.settings)
         this.emitDongleInfoIfChanged()
       }
     })
@@ -207,7 +212,7 @@ export class CarplayService {
       }
     })
 
-    ipcMain.on('carplay-key-command', (_, command) => {
+    ipcMain.on('carplay-key-command', (_evt, command) => {
       this.driver.send(new SendCommand(command))
     })
 
@@ -227,6 +232,55 @@ export class CarplayService {
       }
     })
 
+    ipcMain.handle('dongle-fw', async (_evt, req: DongleFirmwareRequest) => {
+      await this.reloadConfigFromDisk()
+
+      const action = req?.action
+
+      if (action === 'check') {
+        this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'check:start' })
+
+        const result = await this.firmware.checkForUpdate({
+          appVer: this.getApkVer(),
+          dongleFwVersion: this.dongleFwVersion ?? null,
+          boxInfo: this.boxInfo
+        })
+
+        this.webContents?.send('carplay-event', {
+          type: 'fwUpdate',
+          stage: 'check:done',
+          result
+        })
+
+        return result
+      }
+
+      if (action === 'update') {
+        try {
+          this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'update:start' })
+
+          await this.firmware.startUpdate({
+            appVer: this.getApkVer(),
+            dongleFwVersion: this.dongleFwVersion ?? null,
+            boxInfo: this.boxInfo
+          })
+
+          this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'update:started' })
+          return { ok: true }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          this.webContents?.send('carplay-event', {
+            type: 'fwUpdate',
+            stage: 'update:error',
+            message: msg
+          })
+          return { ok: false, error: msg }
+        }
+      }
+
+      return { ok: false, error: `Unknown action: ${String(action)}` }
+    })
+
     ipcMain.on(
       'carplay-set-volume',
       (_evt, payload: { stream: LogicalStreamKey; volume: number }) => {
@@ -239,6 +293,21 @@ export class CarplayService {
     ipcMain.on('carplay-set-visualizer-enabled', (_evt, enabled: boolean) => {
       this.audio.setVisualizerEnabled(Boolean(enabled))
     })
+  }
+
+  private async reloadConfigFromDisk(): Promise<void> {
+    try {
+      const configPath = path.join(app.getPath('userData'), 'config.json')
+      if (!fs.existsSync(configPath)) return
+      const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8')) as ExtraConfig
+      this.config = { ...this.config, ...userConfig }
+    } catch {
+      // ignore
+    }
+  }
+
+  private getApkVer(): string {
+    return this.config.apkVer
   }
 
   private uploadIcons() {
@@ -330,22 +399,15 @@ export class CarplayService {
     this.isStarting = true
     this.startPromise = (async () => {
       try {
-        const configPath = path.join(app.getPath('userData'), 'config.json')
-        try {
-          const userConfig = JSON.parse(fs.readFileSync(configPath, 'utf8')) as ExtraConfig
-          this.config = { ...this.config, ...userConfig }
+        await this.reloadConfigFromDisk()
 
-          const ext = this.config as VolumeConfig
-
-          this.audio.setInitialVolumes({
-            music: typeof ext.audioVolume === 'number' ? ext.audioVolume : undefined,
-            nav: typeof ext.navVolume === 'number' ? ext.navVolume : undefined,
-            siri: typeof ext.siriVolume === 'number' ? ext.siriVolume : undefined,
-            call: typeof ext.callVolume === 'number' ? ext.callVolume : undefined
-          })
-        } catch {
-          // defaults
-        }
+        const ext = this.config as VolumeConfig
+        this.audio.setInitialVolumes({
+          music: typeof ext.audioVolume === 'number' ? ext.audioVolume : undefined,
+          nav: typeof ext.navVolume === 'number' ? ext.navVolume : undefined,
+          siri: typeof ext.siriVolume === 'number' ? ext.siriVolume : undefined,
+          call: typeof ext.callVolume === 'number' ? ext.callVolume : undefined
+        })
 
         this.audio.resetForSessionStart()
 
@@ -410,7 +472,6 @@ export class CarplayService {
     }
 
     if (ok) await new Promise((r) => setTimeout(r, 150))
-
     return ok
   }
 
@@ -506,4 +567,51 @@ export class CarplayService {
       offset = end
     }
   }
+}
+function asObject(input: unknown): Record<string, unknown> | null {
+  if (!input) return null
+
+  if (typeof input === 'object' && input !== null) return input as Record<string, unknown>
+
+  if (typeof input === 'string') {
+    const s = input.trim()
+    if (!s) return null
+    try {
+      const parsed = JSON.parse(s)
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+    } catch {
+      // ignore
+    }
+  }
+
+  return null
+}
+
+function isMeaningful(v: unknown): boolean {
+  if (v == null) return false
+  if (typeof v === 'string') return v.trim().length > 0
+  return true
+}
+
+function mergePreferExisting(prev: unknown, next: unknown): unknown {
+  const p = asObject(prev)
+  const n = asObject(next)
+
+  if (!p && !n) return next ?? prev
+  if (!p && n) return next
+  if (p && !n) return prev
+
+  // both objects
+  const out: Record<string, unknown> = { ...p }
+
+  for (const [k, v] of Object.entries(n!)) {
+    if (isMeaningful(v)) {
+      out[k] = v
+    } else {
+      // keep existing if present
+      if (!(k in out)) out[k] = v
+    }
+  }
+
+  return out
 }

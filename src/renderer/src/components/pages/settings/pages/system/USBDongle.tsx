@@ -1,6 +1,18 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Box, Divider, Stack, Typography } from '@mui/material'
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Stack,
+  Typography
+} from '@mui/material'
 import { useCarplayStore, useStatusStore } from '@store/store'
 
 type Row = {
@@ -37,12 +49,10 @@ type BoxInfoPayload = {
 function normalizeBoxInfo(input: unknown): BoxInfoPayload | null {
   if (!input) return null
 
-  // Sometimes it's already an object
   if (typeof input === 'object') {
     return input as BoxInfoPayload
   }
 
-  // Sometimes a JSON string
   if (typeof input === 'string') {
     const s = input.trim()
     if (!s) return null
@@ -63,7 +73,36 @@ function fmt(v: unknown): string | null {
   return s.length ? s : null
 }
 
-export function DongleInfo() {
+type DongleFwApiRaw = {
+  err: number
+  token?: string
+  ver?: string
+  size?: string | number
+  id?: string
+  notes?: string
+  forced?: number | boolean
+  msg?: string
+  error?: string
+}
+
+type DongleFwCheckResponse = {
+  ok: boolean
+  hasUpdate: boolean
+  forced: boolean
+  size: string | number
+  token?: string
+  request?: Record<string, unknown>
+  raw: DongleFwApiRaw
+  error?: string
+}
+
+function isDongleFwCheckResponse(v: unknown): v is DongleFwCheckResponse {
+  if (!v || typeof v !== 'object') return false
+  const o = v as any
+  return typeof o.ok === 'boolean' && o.raw && typeof o.raw === 'object' && 'err' in o.raw
+}
+
+export function USBDongle() {
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
   const isStreaming = useStatusStore((s) => s.isStreaming)
 
@@ -109,6 +148,83 @@ export function DongleInfo() {
     fontVariantNumeric: 'tabular-nums'
   }
 
+  // Dongle FW check/update UI state
+  const [fwBusy, setFwBusy] = useState<null | 'check' | 'update'>(null)
+  const [fwResult, setFwResult] = useState<DongleFwCheckResponse | null>(null)
+  const [fwUiError, setFwUiError] = useState<string | null>(null)
+
+  // Changelog dialog UI state
+  const [changelogOpen, setChangelogOpen] = useState(false)
+
+  const ok = Boolean(fwResult?.ok) && fwResult?.raw?.err === 0
+  const latestVer = typeof fwResult?.raw?.ver === 'string' ? fwResult.raw.ver.trim() : ''
+  const forced = Boolean(fwResult?.forced)
+  const notes = typeof fwResult?.raw?.notes === 'string' ? fwResult.raw.notes : undefined
+  const hasUpdate = Boolean(fwResult?.hasUpdate) && latestVer.length > 0
+  const latestFwLabel = ok ? (hasUpdate ? latestVer : '—') : '—'
+  const hasChangelog = typeof notes === 'string' && notes.trim().length > 0
+
+  const fwStatusText = useMemo(() => {
+    if (fwBusy === 'check') return 'Checking…'
+    if (fwBusy === 'update') return 'Starting update…'
+    if (!fwResult) return '—'
+
+    if (!fwResult.ok || fwResult.raw?.err !== 0) {
+      const msg =
+        (fwResult.raw as any)?.msg ||
+        (fwResult.raw as any)?.error ||
+        fwResult.error ||
+        'Unknown error'
+      return `Error: ${String(msg)}`
+    }
+
+    if (hasUpdate) return forced ? 'Update available (forced)' : 'Update available'
+    return 'Up to date'
+  }, [fwBusy, fwResult, hasUpdate, forced])
+
+  const canCheck =
+    fwBusy == null &&
+    Boolean(isDongleConnected) &&
+    Boolean(fmt(dongleFwVersion)) &&
+    Boolean(fmt(boxInfo?.uuid)) &&
+    Boolean(fmt(boxInfo?.MFD)) &&
+    Boolean(fmt(boxInfo?.productType))
+
+  const handleFwAction = useCallback(
+    async (action: 'check' | 'update') => {
+      setFwUiError(null)
+
+      try {
+        setFwBusy(action)
+
+        // Call preload -> main IPC
+        const raw = await window.carplay.ipc.dongleFirmware(action)
+        console.log('[DongleInfo] dongleFirmware raw =', raw)
+
+        if (!isDongleFwCheckResponse(raw)) {
+          setFwResult(null)
+          setFwUiError(`Invalid response from main process (type=${typeof raw})`)
+          return
+        }
+
+        setFwResult(raw)
+
+        if (!raw.ok || raw.raw?.err !== 0) {
+          const msg =
+            (raw.raw as any)?.msg || (raw.raw as any)?.error || raw.error || 'Unknown error'
+          setFwUiError(String(msg))
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        setFwUiError(msg)
+        setFwResult(null)
+      } finally {
+        setFwBusy(null)
+      }
+    },
+    [setFwBusy]
+  )
+
   const rowsTop = useMemo<Row[]>(
     () => [
       { label: 'Dongle', value: isDongleConnected ? 'Connected' : 'Not connected' },
@@ -134,9 +250,17 @@ export function DongleInfo() {
     [vendorId, productId, usbFwVersion]
   )
 
-  const rowsDongle = useMemo<Row[]>(
+  const rowsFw = useMemo<Row[]>(
     () => [
       { label: 'Dongle FW', value: dongleFwVersion, mono: true },
+      { label: 'Latest FW', value: latestFwLabel, mono: true },
+      { label: 'FW Status', value: fwStatusText, mono: true }
+    ],
+    [dongleFwVersion, latestFwLabel, fwStatusText]
+  )
+
+  const rowsDongleInfo = useMemo<Row[]>(
+    () => [
       { label: 'UUID', value: fmt(boxInfo?.uuid), mono: true },
       { label: 'MFD', value: fmt(boxInfo?.MFD), mono: true },
       { label: 'ProductType', value: fmt(boxInfo?.productType), mono: true },
@@ -148,7 +272,7 @@ export function DongleInfo() {
       { label: 'Features', value: fmt(boxInfo?.supportFeatures) },
       { label: 'CusCode', value: fmt(boxInfo?.CusCode), mono: true }
     ],
-    [dongleFwVersion, boxInfo]
+    [boxInfo]
   )
 
   const rowsStreams = useMemo<Row[]>(
@@ -208,7 +332,93 @@ export function DongleInfo() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="subtitle2" color="text.secondary">
+        Firmware
+      </Typography>
+
+      {renderRows(rowsFw)}
+
+      {/* FW actions */}
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          disabled={!canCheck}
+          onClick={() => handleFwAction('check')}
+        >
+          {fwBusy === 'check' ? (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={14} />
+              Check for Updates
+            </Box>
+          ) : (
+            'Check for Updates'
+          )}
+        </Button>
+
+        <Button
+          variant="contained"
+          size="small"
+          disabled={!hasUpdate || fwBusy != null}
+          onClick={() => handleFwAction('update')}
+        >
+          {fwBusy === 'update' ? (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={14} />
+              Update
+            </Box>
+          ) : forced ? (
+            'Update (forced)'
+          ) : (
+            'Update'
+          )}
+        </Button>
+
+        <Button
+          variant="text"
+          size="small"
+          disabled={!hasChangelog}
+          onClick={() => setChangelogOpen(true)}
+        >
+          Changelog
+        </Button>
+      </Stack>
+
+      {/* Changelog dialog (vendor-provided, optional) */}
+      <Dialog open={changelogOpen} onClose={() => setChangelogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Vendor changelog</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            This information is provided by the dongle vendor and may be incomplete or untranslated.
+          </Typography>
+
+          <Typography variant="body2" sx={{ ...Mono, whiteSpace: 'pre-wrap' }}>
+            {notes?.trim() || '—'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button variant="text" onClick={() => setChangelogOpen(false)}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {fwUiError ? (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {fwUiError}
+        </Alert>
+      ) : null}
+
+      <Divider />
+
       {renderRows(rowsTop)}
+
+      <Divider />
+
+      <Typography variant="subtitle2" color="text.secondary">
+        Streams
+      </Typography>
+      {renderRows(rowsStreams)}
 
       <Divider />
 
@@ -222,16 +432,8 @@ export function DongleInfo() {
       <Typography variant="subtitle2" color="text.secondary">
         Dongle Info
       </Typography>
-      {renderRows(rowsDongle)}
 
-      <Divider />
-
-      <Typography variant="subtitle2" color="text.secondary">
-        Streams
-      </Typography>
-      {renderRows(rowsStreams)}
-
-      <Divider />
+      {renderRows(rowsDongleInfo)}
 
       <Typography variant="subtitle2" color="text.secondary">
         Paired / Connected Devices

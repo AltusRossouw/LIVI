@@ -61,7 +61,7 @@ type MediaPayload = {
   }
 } | null
 
-type DongleFirmwareAction = 'check' | 'update'
+type DongleFirmwareAction = 'check' | 'download' | 'upload' | 'status'
 
 type DongleFirmwareCheckResult =
   | {

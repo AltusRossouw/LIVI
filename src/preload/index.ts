@@ -79,7 +79,7 @@ const api = {
     start: (): Promise<void> => ipcRenderer.invoke('carplay-start'),
     stop: (): Promise<void> => ipcRenderer.invoke('carplay-stop'),
     sendFrame: (): Promise<void> => ipcRenderer.invoke('carplay-sendframe'),
-    dongleFirmware: (action: 'check' | 'update'): Promise<unknown> =>
+    dongleFirmware: (action: 'check' | 'download' | 'upload' | 'status'): Promise<unknown> =>
       ipcRenderer.invoke('dongle-fw', { action }),
     sendTouch: (x: number, y: number, action: number): void =>
       ipcRenderer.send('carplay-touch', { x, y, action }),

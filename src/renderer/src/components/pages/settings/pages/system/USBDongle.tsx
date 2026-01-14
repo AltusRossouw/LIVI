@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
   Alert,
@@ -10,10 +10,12 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  LinearProgress,
   Stack,
   Typography
 } from '@mui/material'
 import { useCarplayStore, useStatusStore } from '@store/store'
+import { useNetworkStatus } from '../../../../../hooks/useNetworkStatus'
 
 type Row = {
   label: string
@@ -85,13 +87,18 @@ type DongleFwApiRaw = {
   error?: string
 }
 
+type LocalFwStatus =
+  | { ok: true; ready: true; path: string; bytes: number; model: string; latestVer?: string }
+  | { ok: true; ready: false; reason: string }
+  | { ok: false; error: string }
+
 type DongleFwCheckResponse = {
   ok: boolean
   hasUpdate: boolean
   forced: boolean
   size: string | number
   token?: string
-  request?: Record<string, unknown>
+  request?: Record<string, unknown> & { local?: LocalFwStatus }
   raw: DongleFwApiRaw
   error?: string
 }
@@ -102,9 +109,30 @@ function isDongleFwCheckResponse(v: unknown): v is DongleFwCheckResponse {
   return typeof o.ok === 'boolean' && o.raw && typeof o.raw === 'object' && 'err' in o.raw
 }
 
+type FwPhase = 'start' | 'download' | 'ready' | 'error' | 'upload'
+
+type FwProgress = {
+  percent?: number
+  received?: number
+  total?: number
+}
+
+type FwDialogState = {
+  open: boolean
+  phase: FwPhase
+  progress: FwProgress
+  error: string
+  message: string
+  inFlight: boolean
+}
+
 export function USBDongle() {
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
   const isStreaming = useStatusStore((s) => s.isStreaming)
+
+  // Network status
+  const network = useNetworkStatus()
+  const isOnline = network.online
 
   // USB descriptor
   const vendorId = useCarplayStore((s) => s.vendorId)
@@ -125,6 +153,12 @@ export function USBDongle() {
   const audioChannels = useCarplayStore((s) => s.audioChannels)
   const audioBitDepth = useCarplayStore((s) => s.audioBitDepth)
 
+  // Auto-close dialog
+  const autoCloseTimerRef = useRef<number | null>(null)
+  const [fwWaitingForReconnect, setFwWaitingForReconnect] = useState(false)
+  const [fwSawDisconnect, setFwSawDisconnect] = useState(false)
+
+  // Parsed box info
   const boxInfo = useMemo(() => normalizeBoxInfo(boxInfoRaw), [boxInfoRaw])
   const devList = useMemo(
     () => (Array.isArray(boxInfo?.DevList) ? (boxInfo?.DevList ?? []) : []),
@@ -149,9 +183,19 @@ export function USBDongle() {
   }
 
   // Dongle FW check/update UI state
-  const [fwBusy, setFwBusy] = useState<null | 'check' | 'update'>(null)
+  const [fwBusy, setFwBusy] = useState<null | 'status' | 'check' | 'download' | 'upload'>(null)
   const [fwResult, setFwResult] = useState<DongleFwCheckResponse | null>(null)
   const [fwUiError, setFwUiError] = useState<string | null>(null)
+
+  // "SoftwareUpdate-like" dialog state for dongle firmware download/upload
+  const [fwDlg, setFwDlg] = useState<FwDialogState>({
+    open: false,
+    phase: 'start',
+    progress: {},
+    error: '',
+    message: '',
+    inFlight: false
+  })
 
   // Changelog dialog UI state
   const [changelogOpen, setChangelogOpen] = useState(false)
@@ -164,38 +208,392 @@ export function USBDongle() {
   const latestFwLabel = ok ? (hasUpdate ? latestVer : '—') : '—'
   const hasChangelog = typeof notes === 'string' && notes.trim().length > 0
 
+  // Local firmware status (manifest-based)
+  const local = fwResult?.request?.local
+
+  const localReady = local?.ok === true && local.ready === true
+  const localPath = localReady ? local.path : ''
+  const localBytes = localReady ? local.bytes : 0
+  const localReason =
+    local && local.ok === true && local.ready === false
+      ? local.reason
+      : local && local.ok === false
+        ? local.error
+        : ''
+
+  const safePreview = (v: unknown): string => {
+    try {
+      if (v == null) return String(v)
+      if (typeof v === 'string') return v
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+
+      const json = JSON.stringify(
+        v,
+        (_k, val) =>
+          typeof val === 'string' && val.length > 2000 ? val.slice(0, 2000) + '…' : val,
+        2
+      )
+
+      return json.length > 6000 ? json.slice(0, 6000) + '\n…(truncated)…' : json
+    } catch (e) {
+      return `<<unstringifiable: ${e instanceof Error ? e.message : String(e)}>>`
+    }
+  }
+
+  const human = (n: number) =>
+    n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`
+
   const fwStatusText = useMemo(() => {
+    if (fwBusy === 'status') return 'Checking local status…'
     if (fwBusy === 'check') return 'Checking…'
-    if (fwBusy === 'update') return 'Starting update…'
+    if (fwBusy === 'download') return 'Downloading…'
+    if (fwBusy === 'upload') return 'Uploading…'
     if (!fwResult) return '—'
 
+    // 1. actual API errors
     if (!fwResult.ok || fwResult.raw?.err !== 0) {
-      const msg =
-        (fwResult.raw as any)?.msg ||
-        (fwResult.raw as any)?.error ||
-        fwResult.error ||
-        'Unknown error'
+      const msg = fwResult.raw?.msg || fwResult.raw?.error || fwResult.error || 'Unknown error'
       return `Error: ${String(msg)}`
     }
 
+    // after error check:
+    const local = fwResult.request?.local
+    if (local?.ok === true && local.ready === true) {
+      // return 'Downloaded (ready to upload)'
+    }
+
+    // 2. update availability
     if (hasUpdate) return forced ? 'Update available (forced)' : 'Update available'
+
+    // 3. local status is informational only
+    if (local) {
+      if (local.ok === true && local.ready === true) return 'Downloaded (ready to upload)'
+      if (local.ok === true && local.ready === false) return local.reason
+      if (local.ok === false) return local.error
+      return 'Local firmware status unknown'
+    }
+
     return 'Up to date'
   }, [fwBusy, fwResult, hasUpdate, forced])
 
   const canCheck =
     fwBusy == null &&
+    isOnline &&
     Boolean(isDongleConnected) &&
     Boolean(fmt(dongleFwVersion)) &&
     Boolean(fmt(boxInfo?.uuid)) &&
     Boolean(fmt(boxInfo?.MFD)) &&
     Boolean(fmt(boxInfo?.productType))
 
+  const canDownload = fwBusy == null && Boolean(isDongleConnected) && hasUpdate && isOnline
+
+  // Upload is ONLY allowed when the downloaded firmware matches THIS exact dongle (manifest checks)
+  const canUpload = fwBusy == null && Boolean(isDongleConnected) && localReady
+
+  const fwPct = useMemo(() => {
+    const p = fwDlg.progress?.percent
+    if (typeof p !== 'number' || !Number.isFinite(p)) return null
+    const clamped = Math.max(0, Math.min(1, p))
+    return Math.round(clamped * 100)
+  }, [fwDlg.progress])
+
+  const fwPhaseText =
+    fwDlg.phase === 'download'
+      ? 'Downloading'
+      : fwDlg.phase === 'upload'
+        ? 'Uploading'
+        : fwDlg.phase === 'ready'
+          ? 'Done'
+          : fwDlg.phase === 'start'
+            ? 'Starting…'
+            : fwDlg.phase === 'error'
+              ? 'Error'
+              : 'Working…'
+
+  const clearAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current != null) {
+      window.clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+  }, [])
+
+  const closeFwDialog = useCallback(() => {
+    clearAutoCloseTimer()
+    setFwWaitingForReconnect(false)
+    setFwSawDisconnect(false)
+
+    setFwDlg({
+      open: false,
+      phase: 'start',
+      progress: {},
+      error: '',
+      message: '',
+      inFlight: false
+    })
+  }, [clearAutoCloseTimer])
+
+  // Listen to main-process fwUpdate events
+  useEffect(() => {
+    const handler = (_event: unknown, payload: any) => {
+      if (!payload || typeof payload !== 'object') return
+      if (payload.type !== 'fwUpdate') return
+
+      const stage = String(payload.stage || '')
+      if (!stage) return
+
+      // download
+      if (stage === 'download:start') {
+        setFwDlg({
+          open: true,
+          phase: 'start',
+          progress: {},
+          error: '',
+          message: '',
+          inFlight: true
+        })
+        return
+      }
+      if (stage === 'download:progress') {
+        const received = typeof payload.received === 'number' ? payload.received : 0
+        const total = typeof payload.total === 'number' ? payload.total : 0
+        const percent =
+          typeof payload.percent === 'number'
+            ? payload.percent
+            : total > 0
+              ? received / total
+              : undefined
+
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'download',
+          inFlight: true,
+          error: '',
+          message: '',
+          progress: { received, total, percent }
+        }))
+        return
+      }
+      if (stage === 'download:done') {
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'ready',
+          inFlight: false,
+          error: '',
+          message: payload.path ? `Saved to: ${String(payload.path)}` : 'Saved'
+        }))
+        return
+      }
+      if (stage === 'download:error') {
+        const msg = payload.message ? String(payload.message) : 'Download failed'
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'error',
+          inFlight: false,
+          error: msg,
+          message: msg
+        }))
+        return
+      }
+
+      // upload
+      if (stage === 'upload:start') {
+        setFwDlg({
+          open: true,
+          phase: 'start',
+          progress: {},
+          error: '',
+          message: '',
+          inFlight: true
+        })
+        return
+      }
+      if (stage === 'upload:progress') {
+        const received = typeof payload.sent === 'number' ? payload.sent : 0
+        const total = typeof payload.total === 'number' ? payload.total : 0
+        const percent =
+          typeof payload.percent === 'number'
+            ? payload.percent
+            : total > 0
+              ? received / total
+              : undefined
+
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'upload',
+          inFlight: true,
+          error: '',
+          message: '',
+          progress: { received, total, percent }
+        }))
+        return
+      }
+      if (stage === 'upload:done') {
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'ready',
+          inFlight: false,
+          error: '',
+          message: payload.message ? String(payload.message) : 'Upload complete'
+        }))
+        return
+      }
+      if (stage === 'upload:error') {
+        const msg = payload.message ? String(payload.message) : 'Upload failed'
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'error',
+          inFlight: false,
+          error: msg,
+          message: msg
+        }))
+        return
+      }
+    }
+
+    window.carplay?.ipc?.onEvent?.(handler)
+    return () => {
+      window.carplay?.ipc?.offEvent?.(handler)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!fwDlg.open) return
+
+    // Cancel any pending auto-close when state changes
+    if (autoCloseTimerRef.current != null) {
+      window.clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+
+    // Upload reconnect auto-close:
+    if (fwWaitingForReconnect) {
+      if (!isDongleConnected) {
+        if (!fwSawDisconnect) setFwSawDisconnect(true)
+        return
+      }
+
+      if (fwSawDisconnect && isDongleConnected) {
+        setFwWaitingForReconnect(false)
+        setFwSawDisconnect(false)
+        closeFwDialog()
+      }
+      return
+    }
+
+    // Download auto-close:
+    const isDownloadDone =
+      fwDlg.phase === 'ready' &&
+      !fwDlg.inFlight &&
+      !fwDlg.error &&
+      typeof fwDlg.message === 'string' &&
+      (fwDlg.message.startsWith('Saved') || fwDlg.message.startsWith('Already downloaded'))
+
+    if (!isDownloadDone) return
+
+    autoCloseTimerRef.current = window.setTimeout(() => {
+      closeFwDialog()
+      autoCloseTimerRef.current = null
+    }, 900)
+
+    return () => {
+      if (autoCloseTimerRef.current != null) {
+        window.clearTimeout(autoCloseTimerRef.current)
+        autoCloseTimerRef.current = null
+      }
+    }
+  }, [
+    fwDlg.open,
+    fwDlg.phase,
+    fwDlg.inFlight,
+    fwDlg.error,
+    fwDlg.message,
+    fwWaitingForReconnect,
+    fwSawDisconnect,
+    isDongleConnected,
+    closeFwDialog
+  ])
+
   const handleFwAction = useCallback(
-    async (action: 'check' | 'update') => {
+    async (action: 'status' | 'check' | 'download' | 'upload') => {
       setFwUiError(null)
 
       try {
         setFwBusy(action)
+
+        // Preflight for download: if already localReady -> just show dialog message and exit
+        if (action === 'download') {
+          try {
+            const st = await window.carplay.ipc.dongleFirmware('status')
+            if (isDongleFwCheckResponse(st)) {
+              setFwResult((prev) => {
+                if (!prev) return st
+                return {
+                  ...prev,
+                  request: {
+                    ...(prev.request ?? {}),
+                    ...(st.request ?? {})
+                  }
+                }
+              })
+
+              const stLocal = st.request?.local
+              const ready = stLocal?.ok === true && stLocal.ready === true
+
+              if (st.ok && st.raw?.err === 0 && ready) {
+                setFwDlg({
+                  open: true,
+                  phase: 'ready',
+                  progress: {},
+                  error: '',
+                  message: stLocal.path
+                    ? `Already downloaded.\nSaved to: ${String(stLocal.path)}`
+                    : 'Already downloaded.',
+                  inFlight: false
+                })
+                return
+              }
+            }
+          } catch {
+            // ignore status preflight errors; we can still attempt download
+          }
+
+          setFwDlg({
+            open: true,
+            phase: 'start',
+            progress: {},
+            error: '',
+            message: '',
+            inFlight: true
+          })
+        }
+
+        if (action === 'upload') {
+          // UI safety: never upload unless localReady is true
+          if (!localReady) {
+            setFwUiError(localReason || 'Local firmware is not ready for this dongle.')
+            return
+          }
+
+          // Wait for dongle reboot/reconnect after upload
+          setFwWaitingForReconnect(true)
+          setFwSawDisconnect(false)
+
+          // Start dialog even if main doesn't emit progress yet
+          setFwDlg({
+            open: true,
+            phase: 'start',
+            progress: {},
+            error: '',
+            message: localPath ? `Using: ${localPath}` : '',
+            inFlight: true
+          })
+        }
 
         // Call preload -> main IPC
         const raw = await window.carplay.ipc.dongleFirmware(action)
@@ -203,27 +601,91 @@ export function USBDongle() {
 
         if (!isDongleFwCheckResponse(raw)) {
           setFwResult(null)
-          setFwUiError(`Invalid response from main process (type=${typeof raw})`)
+          setFwUiError(
+            `Invalid response from main process (type=${typeof raw})\n\nRAW:\n${safePreview(raw)}`
+          )
+          setFwDlg((prev) => ({
+            ...prev,
+            open: true,
+            phase: 'error',
+            inFlight: false,
+            error: 'Invalid response from main process',
+            message: 'Invalid response from main process'
+          }))
           return
         }
 
-        setFwResult(raw)
+        setFwResult((prev) => {
+          if (action === 'status') {
+            if (!prev) return raw
+
+            return {
+              ...prev,
+              request: {
+                ...(prev.request ?? {}),
+                ...(raw.request ?? {})
+              },
+              raw: {
+                ...prev.raw,
+                msg: raw.raw?.msg ?? prev.raw?.msg
+              }
+            }
+          }
+          return raw
+        })
 
         if (!raw.ok || raw.raw?.err !== 0) {
-          const msg =
-            (raw.raw as any)?.msg || (raw.raw as any)?.error || raw.error || 'Unknown error'
+          const msg = raw.raw?.msg || raw.raw?.error || raw.error || 'Unknown error'
           setFwUiError(String(msg))
+          setFwDlg((prev) => ({
+            ...prev,
+            open: true,
+            phase: 'error',
+            inFlight: false,
+            error: String(msg),
+            message: String(msg)
+          }))
+          return
+        }
+
+        // If it returns ok/err=0 but no events, close dialog with a generic message.
+        if (action === 'upload') {
+          setFwDlg((prev) => ({
+            ...prev,
+            open: true,
+            phase: 'ready',
+            inFlight: false,
+            error: '',
+            message: 'Upload request sent.'
+          }))
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setFwUiError(msg)
         setFwResult(null)
+
+        setFwDlg((prev) => ({
+          ...prev,
+          open: true,
+          phase: 'error',
+          inFlight: false,
+          error: msg,
+          message: msg
+        }))
       } finally {
         setFwBusy(null)
       }
     },
-    [setFwBusy]
+    [localReady, localReason, localPath]
   )
+
+  useEffect(() => {
+    // Pull local manifest status whenever the dongle becomes available
+    if (!isDongleConnected) return
+    if (!fmt(dongleFwVersion) || !fmt(boxInfo?.uuid)) return
+
+    handleFwAction('status').catch(() => {})
+  }, [isDongleConnected, dongleFwVersion, boxInfo?.uuid, handleFwAction])
 
   const rowsTop = useMemo<Row[]>(
     () => [
@@ -250,13 +712,26 @@ export function USBDongle() {
     [vendorId, productId, usbFwVersion]
   )
 
+  const localLabel = useMemo(() => {
+    if (!fwResult) return '—'
+    if (localReady) return `Ready • ${human(localBytes)}`
+    if (localReason) return localReason
+    return 'Not ready'
+  }, [fwResult, localReady, localBytes, localReason])
+
   const rowsFw = useMemo<Row[]>(
     () => [
       { label: 'Dongle FW', value: dongleFwVersion, mono: true },
       { label: 'Latest FW', value: latestFwLabel, mono: true },
-      { label: 'FW Status', value: fwStatusText, mono: true }
+      { label: 'FW Status', value: fwStatusText, mono: true },
+      {
+        label: 'Local FW',
+        value: localLabel,
+        mono: true,
+        tooltip: localReady ? localPath : localReason
+      }
     ],
-    [dongleFwVersion, latestFwLabel, fwStatusText]
+    [dongleFwVersion, latestFwLabel, fwStatusText, localLabel, localReady, localPath, localReason]
   )
 
   const rowsDongleInfo = useMemo<Row[]>(
@@ -359,18 +834,39 @@ export function USBDongle() {
         <Button
           variant="contained"
           size="small"
-          disabled={!hasUpdate || fwBusy != null}
-          onClick={() => handleFwAction('update')}
+          disabled={!canDownload}
+          onClick={() => handleFwAction('download')}
         >
-          {fwBusy === 'update' ? (
+          {fwBusy === 'download' ? (
             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
               <CircularProgress size={14} />
-              Update
+              Download
             </Box>
           ) : forced ? (
-            'Update (forced)'
+            'Download (forced)'
           ) : (
-            'Update'
+            'Download'
+          )}
+        </Button>
+
+        <Button
+          variant="contained"
+          size="small"
+          disabled={!canUpload}
+          onClick={() => handleFwAction('upload')}
+          title={
+            !canUpload
+              ? localReason || 'No matching firmware downloaded for this dongle.'
+              : localPath
+          }
+        >
+          {fwBusy === 'upload' ? (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={14} />
+              Upload
+            </Box>
+          ) : (
+            'Upload'
           )}
         </Button>
 
@@ -383,6 +879,45 @@ export function USBDongle() {
           Changelog
         </Button>
       </Stack>
+
+      {/* Progress dialog (download/upload) */}
+      <Dialog open={fwDlg.open} onClose={() => {}} disableEscapeKeyDown>
+        <DialogTitle>Dongle Firmware</DialogTitle>
+        <DialogContent sx={{ width: 360 }}>
+          <Typography sx={{ mb: 1 }}>{fwPhaseText}</Typography>
+
+          <LinearProgress
+            variant={fwPct != null ? 'determinate' : 'indeterminate'}
+            value={fwPct != null ? fwPct : undefined}
+          />
+
+          {fwPct != null && (fwDlg.progress.total ?? 0) > 0 && (
+            <Typography variant="body2" sx={{ mt: 1 }} color="text.secondary">
+              {fwPct}% • {human(fwDlg.progress.received ?? 0)} / {human(fwDlg.progress.total ?? 0)}
+            </Typography>
+          )}
+
+          {fwDlg.error && (
+            <Typography variant="body2" sx={{ mt: 1 }} color="error">
+              {fwDlg.error}
+            </Typography>
+          )}
+
+          {!fwDlg.error && fwDlg.message && (
+            <Typography variant="body2" sx={{ mt: 1 }} color="text.secondary">
+              {fwDlg.message}
+            </Typography>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          {fwDlg.phase === 'error' && (
+            <Button variant="outlined" onClick={closeFwDialog}>
+              Close
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       {/* Changelog dialog (vendor-provided, optional) */}
       <Dialog open={changelogOpen} onClose={() => setChangelogOpen(false)} fullWidth maxWidth="sm">

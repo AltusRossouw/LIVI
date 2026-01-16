@@ -267,7 +267,6 @@ type BoxSettingsBody = {
   syncTime: number
   androidAutoSizeW: number
   androidAutoSizeH: number
-  WiFiChannel: number
   wifiChannel: number
   mediaSound: 0 | 1
   callQuality: 0 | 1 | 2
@@ -297,7 +296,6 @@ export class SendBoxSettings extends SendableMessageWithPayload {
       syncTime: this.syncTime ?? getCurrentTimeInMs(),
       androidAutoSizeW: cfg.width,
       androidAutoSizeH: cfg.height,
-      WiFiChannel: channel,
       wifiChannel: channel,
       mediaSound: cfg.mediaSound,
       callQuality: cfg.callQuality,

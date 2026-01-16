@@ -262,6 +262,12 @@ export class SendOpen extends SendableMessageWithPayload {
   }
 }
 
+type NaviScreenInfo = {
+  width: number
+  height: number
+  fps: number
+}
+
 type BoxSettingsBody = {
   mediaDelay: number
   syncTime: number
@@ -276,6 +282,7 @@ type BoxSettingsBody = {
   btName: string
   boxName: string
   OemName: string
+  naviScreenInfo?: NaviScreenInfo
 }
 
 export class SendBoxSettings extends SendableMessageWithPayload {
@@ -305,6 +312,15 @@ export class SendBoxSettings extends SendableMessageWithPayload {
       btName: cfg.carName,
       boxName: cfg.oemName ?? cfg.carName,
       OemName: cfg.oemName ?? cfg.carName
+    }
+
+    // Add navigation screen info if enabled (CarPlay Dashboard/Instrument Cluster)
+    if (cfg.naviScreen?.enabled) {
+      body.naviScreenInfo = {
+        width: cfg.naviScreen.width,
+        height: cfg.naviScreen.height,
+        fps: cfg.naviScreen.fps
+      }
     }
 
     return Buffer.from(JSON.stringify(body), 'ascii')
@@ -372,4 +388,12 @@ export class SendCloseDongle extends SendableMessage {
 
 export class SendDisconnectPhone extends SendableMessage {
   type = MessageType.DisconnectPhone
+}
+
+export class SendNaviFocusRequest extends SendableMessage {
+  type = MessageType.NaviFocusRequest
+}
+
+export class SendNaviFocusRelease extends SendableMessage {
+  type = MessageType.NaviFocusRelease
 }

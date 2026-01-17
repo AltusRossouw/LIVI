@@ -27,7 +27,7 @@ export interface KeyBindings {
   down: string
   back: string
   home: string
-  playOrPause: string
+  playPause: string
   play: string
   pause: string
   next: string
@@ -46,7 +46,7 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   selectDown: 'Enter',
   back: 'Backspace',
   home: 'KeyH',
-  playOrPause: 'KeyP',
+  playPause: 'KeyP',
   play: '',
   pause: '',
   next: 'KeyN',

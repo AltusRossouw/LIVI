@@ -36,7 +36,7 @@ export type ValidCommand =
   | 'invalid'
   | 'pause'
   | 'play'
-  | 'playOrPause'
+  | 'playPause'
   | 'selectDown'
   | 'back'
   | 'down'
@@ -63,7 +63,7 @@ export function isValidCommand(cmd: string): cmd is ValidCommand {
     'invalid',
     'pause',
     'play',
-    'playOrPause',
+    'playPause',
     'selectDown',
     'back',
     'down',
@@ -95,7 +95,7 @@ export type KeyCommand =
   | 'home'
   | 'play'
   | 'pause'
-  | 'playOrPause'
+  | 'playPause'
   | 'next'
   | 'prev'
   | 'acceptPhone'

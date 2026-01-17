@@ -37,5 +37,6 @@ export enum MediaEventType {
   PAUSE = 'pause',
   STOP = 'stop',
   PREV = 'prev',
-  NEXT = 'next'
+  NEXT = 'next',
+  PLAYPAUSE = 'playpause'
 }

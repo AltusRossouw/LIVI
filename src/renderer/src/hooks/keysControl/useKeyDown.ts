@@ -336,7 +336,7 @@ export const useKeyDown = ({
       const isTransport =
         code === b?.next ||
         code === b?.prev ||
-        code === b?.playOrPause ||
+        code === b?.playPause ||
         code === b?.play ||
         code === b?.pause ||
         code === b?.acceptPhone ||
@@ -349,8 +349,8 @@ export const useKeyDown = ({
             ? 'next'
             : code === b?.prev
               ? 'prev'
-              : code === b?.playOrPause
-                ? 'playOrPause'
+              : code === b?.playPause
+                ? 'playPause'
                 : code === b?.play
                   ? 'play'
                   : code === b?.pause

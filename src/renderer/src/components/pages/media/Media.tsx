@@ -123,23 +123,34 @@ export const Media = () => {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const cmd = (e as CustomEvent<{ command?: string }>).detail?.command?.toLowerCase()
-      if (!cmd) return
+      const cmdRaw = (e as CustomEvent<{ command?: string }>).detail?.command
+      if (!cmdRaw) return
 
-      if (
+      const cmd = cmdRaw.toLowerCase()
+
+      const isPlayLike =
         cmd === MediaEventType.PLAY ||
         cmd === MediaEventType.PAUSE ||
-        cmd === MediaEventType.STOP
-      ) {
+        cmd === MediaEventType.STOP ||
+        cmd === MediaEventType.PLAYPAUSE
+
+      if (isPlayLike) {
         bump(MediaEventType.PLAY)
         flash(playBtnRef)
-      } else if (cmd === MediaEventType.NEXT) {
+        return
+      }
+
+      if (cmd === MediaEventType.NEXT) {
         bump(MediaEventType.NEXT)
         flash(nextBtnRef)
-      } else if (cmd === MediaEventType.PREV) {
+        return
+      }
+
+      if (cmd === MediaEventType.PREV) {
         bump(MediaEventType.PREV)
         flash(prevBtnRef)
         allowBackwardOnceRef.current = true
+        return
       }
     }
 

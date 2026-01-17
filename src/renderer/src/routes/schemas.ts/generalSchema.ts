@@ -210,7 +210,7 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
         { type: 'keybinding', label: 'Back', path: 'bindings', bindingKey: 'back' },
         { type: 'keybinding', label: 'Home', path: 'bindings', bindingKey: 'home' },
 
-        { type: 'keybinding', label: 'Play/Pause', path: 'bindings', bindingKey: 'playOrPause' },
+        { type: 'keybinding', label: 'Play/Pause', path: 'bindings', bindingKey: 'playPause' },
         { type: 'keybinding', label: 'Play', path: 'bindings', bindingKey: 'play' },
         { type: 'keybinding', label: 'Pause', path: 'bindings', bindingKey: 'pause' },
 

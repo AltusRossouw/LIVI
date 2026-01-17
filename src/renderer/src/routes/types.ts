@@ -73,7 +73,7 @@ export type KeyBindingKey =
   | 'selectDown'
   | 'back'
   | 'home'
-  | 'playOrPause'
+  | 'playPause'
   | 'play'
   | 'pause'
   | 'next'

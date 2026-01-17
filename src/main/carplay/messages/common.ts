@@ -48,7 +48,7 @@ export enum CommandMapping {
   home = 200, // 'Button Home'
   play = 201, // 'Button Play'
   pause = 202, // 'Button Pause'
-  playOrPause = 203, // 'Button Switch Play/Pause'
+  playPause = 203, // 'Button Toggle Play/Pause'
   next = 204, // 'Button Next Track'
   prev = 205, // 'Button Prev Track'
   acceptPhone = 300, // 'Accept Phone Call'

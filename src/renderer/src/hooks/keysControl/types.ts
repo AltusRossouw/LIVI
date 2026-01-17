@@ -12,7 +12,7 @@ export type BindKey =
   | 'selectUp'
   | 'next'
   | 'prev'
-  | 'playOrPause'
+  | 'playPause'
   | 'play'
   | 'pause'
   | 'acceptPhone'

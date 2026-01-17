@@ -7,6 +7,7 @@ export function usePressFeedback() {
   const [press, setPress] = useState<Record<MediaEventType, boolean>>({
     [MediaEventType.PLAY]: false,
     [MediaEventType.PAUSE]: false,
+    [MediaEventType.PLAYPAUSE]: false,
     [MediaEventType.STOP]: false,
     [MediaEventType.PREV]: false,
     [MediaEventType.NEXT]: false
@@ -15,6 +16,7 @@ export function usePressFeedback() {
   const timers = useRef<Record<keyof typeof press, number | null>>({
     play: null,
     pause: null,
+    playpause: null,
     stop: null,
     next: null,
     prev: null
@@ -34,7 +36,7 @@ export function usePressFeedback() {
       const k = key as keyof typeof press
       if (timers.current[k]) window.clearTimeout(timers.current[k]!)
     })
-    setPress({ play: false, pause: false, stop: false, next: false, prev: false })
+    setPress({ play: false, pause: false, playpause: false, stop: false, next: false, prev: false })
   }, [])
 
   return { press, bump, reset }

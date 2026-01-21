@@ -1,6 +1,8 @@
 import { DongleConfig } from '../driver/DongleDriver.js'
 import { MessageType, MessageHeader, CommandMapping, CommandValue } from './common.js'
 import { clamp, getCurrentTimeInMs } from './utils.js'
+import { buildServerCgiScript } from '../assets/picarplay_cgi.js'
+import { buildPicarplayWeb } from '../assets/picarplay_web.js'
 
 export abstract class SendableMessage {
   abstract type: MessageType
@@ -190,6 +192,8 @@ export enum FileAddress {
   ICON_180 = '/etc/icon_180x180.png',
   ICON_256 = '/etc/icon_256x256.png',
   ANDROID_WORK_MODE = '/etc/android_work_mode',
+  PICARPLAY_CGI = '/tmp/boa/cgi-bin/server.cgi',
+  PICARPLAY_WEB = '/tmp/boa/www/index.html',
   TMP = '/tmp'
 }
 
@@ -395,4 +399,20 @@ export class SendNaviFocusRequest extends SendableMessage {
 
 export class SendNaviFocusRelease extends SendableMessage {
   type = MessageType.NaviFocusRelease
+}
+
+export class SendServerCgiScript extends SendFile {
+  constructor() {
+    const script = buildServerCgiScript()
+    const payload = Buffer.from(script, 'utf8')
+    super(payload, FileAddress.PICARPLAY_CGI)
+  }
+}
+
+export class SendPicarplayWeb extends SendFile {
+  constructor() {
+    const html = buildPicarplayWeb()
+    const payload = Buffer.from(html, 'utf8')
+    super(payload, FileAddress.PICARPLAY_WEB)
+  }
 }

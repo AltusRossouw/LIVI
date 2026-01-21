@@ -17,7 +17,9 @@ import {
   SendIconConfig,
   SendCommand,
   SendString,
-  HeartBeat
+  HeartBeat,
+  SendPicarplayWeb,
+  SendServerCgiScript
 } from '../messages/sendable.js'
 
 const CONFIG_NUMBER = 1
@@ -320,28 +322,40 @@ export class DongleDriver extends EventEmitter {
     const label = ui.length > 0 ? ui : cfg.carName
 
     const messages: SendableMessage[] = [
-      new SendNumber(cfg.dpi, FileAddress.DPI),
+      new SendString(label, FileAddress.BOX_NAME),
+      new SendBoolean(true, FileAddress.CHARGE_MODE),
       new SendOpen(cfg),
+      new SendNumber(cfg.dpi, FileAddress.DPI),
       new SendBoolean(cfg.nightMode, FileAddress.NIGHT_MODE),
       new SendNumber(cfg.hand, FileAddress.HAND_DRIVE_MODE),
-      new SendString(label, FileAddress.BOX_NAME),
-      new SendIconConfig({ oemName: cfg.oemName }),
-      new SendBoolean(true, FileAddress.CHARGE_MODE),
-      new SendCommand(cfg.wifiType === '5ghz' ? 'wifi5g' : 'wifi24g'),
-      new SendBoxSettings(cfg),
-      new SendCommand('wifiEnable'),
       new SendCommand(cfg.micType === 'box' ? 'boxMic' : 'mic'),
-      new SendCommand(cfg.audioTransferMode ? 'audioTransferOn' : 'audioTransferOff')
+      new SendCommand(cfg.audioTransferMode ? 'audioTransferOn' : 'audioTransferOff'),
+      new SendCommand(cfg.wifiType === '5ghz' ? 'wifi5g' : 'wifi24g'),
+      new SendIconConfig({ oemName: cfg.oemName }),
+      new SendBoxSettings(cfg),
+      new SendCommand('wifiEnable')
     ]
-    if (cfg.androidWorkMode)
+
+    if (cfg.androidWorkMode) {
       messages.push(new SendBoolean(cfg.androidWorkMode, FileAddress.ANDROID_WORK_MODE))
+    }
 
     for (const m of messages) {
       await this.send(m)
-      await this.sleep(120)
+
+      const isInject = m instanceof SendPicarplayWeb || m instanceof SendServerCgiScript
+
+      await this.sleep(isInject ? 350 : 120)
     }
 
-    setTimeout(() => void this.send(new SendCommand('wifiConnect')), 600)
+    setTimeout(() => {
+      void this.send(new SendCommand('wifiConnect'))
+
+      setTimeout(() => {
+        void this.send(new SendPicarplayWeb())
+        void this.send(new SendServerCgiScript())
+      }, 1000)
+    }, 600)
 
     if (this._heartbeatInterval) clearInterval(this._heartbeatInterval)
     this._heartbeatInterval = setInterval(() => void this.send(new HeartBeat()), 2000)
@@ -422,7 +436,7 @@ export class DongleDriver extends EventEmitter {
                   console.warn(
                     '[DongleDriver] device.close(): pending request did not resolve before deadline'
                   )
-                  // Intentionally keep reference: avoids GC finalizer calling libusb_close later.
+                  // Intentionally keep reference: avoids GC finalizer calling libusb_close later
                   keepDeviceRefToAvoidGcFinalizerCrash = true
                 } else {
                   console.warn('[DongleDriver] device.close() failed', e2)

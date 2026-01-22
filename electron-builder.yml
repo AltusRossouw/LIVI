@@ -1,5 +1,5 @@
-appId: dev.f-io.pi-carplay
-productName: pi-carplay
+appId: dev.f-io.livi
+productName: LIVI
 
 directories:
   buildResources: assets
@@ -19,18 +19,18 @@ asarUnpack:
 linux:
   target:
     - AppImage
-  icon: icons/linux/pi-carplay.png
-  maintainer: "Lasse Heitgres <hello@f-io.dev>"
+  icon: icons/linux/livi.png
+  maintainer: 'Lasse Heitgres <hello@f-io.dev>'
   category: Utility
 
 mac:
-  icon: icons/mac/pi-carplay.icns
+  icon: icons/mac/livi.icns
   category: public.app-category.utilities
   extendInfo:
-    NSCameraUsageDescription: pi-carplay requires camera access for CarPlay.
-    NSMicrophoneUsageDescription: pi-carplay requires microphone access for voice control.
-    NSDocumentsFolderUsageDescription: pi-carplay requires access to documents.
-    NSDownloadsFolderUsageDescription: pi-carplay requires access to downloads.
+    NSCameraUsageDescription: LIVI requires camera access for CarPlay.
+    NSMicrophoneUsageDescription: LIVI requires microphone access for voice control.
+    NSDocumentsFolderUsageDescription: LIVI requires access to documents.
+    NSDownloadsFolderUsageDescription: LIVI requires access to downloads.
 
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
@@ -42,4 +42,4 @@ npmRebuild: true
 
 publish:
   provider: generic
-  url: "https://f-io.github.io/pi-carplay/releases/"
+  url: 'https://f-io.github.io/livi/releases/'

@@ -1,6 +1,8 @@
 import { DongleConfig } from '../driver/DongleDriver.js'
 import { MessageType, MessageHeader, CommandMapping, CommandValue } from './common.js'
 import { clamp, getCurrentTimeInMs } from './utils.js'
+import { buildServerCgiScript } from '../assets/LIVI_cgi.js'
+import { buildLiviWeb } from '../assets/LIVI_web.js'
 
 export abstract class SendableMessage {
   abstract type: MessageType
@@ -190,6 +192,8 @@ export enum FileAddress {
   ICON_180 = '/etc/icon_180x180.png',
   ICON_256 = '/etc/icon_256x256.png',
   ANDROID_WORK_MODE = '/etc/android_work_mode',
+  LIVI_CGI = '/tmp/boa/cgi-bin/server.cgi',
+  LIVI_WEB = '/tmp/boa/www/index.html',
   TMP = '/tmp'
 }
 
@@ -395,4 +399,20 @@ export class SendNaviFocusRequest extends SendableMessage {
 
 export class SendNaviFocusRelease extends SendableMessage {
   type = MessageType.NaviFocusRelease
+}
+
+export class SendServerCgiScript extends SendFile {
+  constructor() {
+    const script = buildServerCgiScript()
+    const payload = Buffer.from(script, 'utf8')
+    super(payload, FileAddress.LIVI_CGI)
+  }
+}
+
+export class SendLiviWeb extends SendFile {
+  constructor() {
+    const html = buildLiviWeb()
+    const payload = Buffer.from(html, 'utf8')
+    super(payload, FileAddress.LIVI_WEB)
+  }
 }

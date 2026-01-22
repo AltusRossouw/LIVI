@@ -17,9 +17,7 @@ import {
   SendIconConfig,
   SendCommand,
   SendString,
-  HeartBeat,
-  SendPicarplayWeb,
-  SendServerCgiScript
+  HeartBeat
 } from '../messages/sendable.js'
 
 const CONFIG_NUMBER = 1
@@ -71,8 +69,8 @@ export const DEFAULT_CONFIG: DongleConfig = {
   apkVer: '2025.03.19.1126',
   phoneWorkMode: 2,
   packetMax: 49152,
-  carName: 'pi-carplay',
-  oemName: 'pi-carplay',
+  carName: 'LIVI',
+  oemName: 'App',
   nightMode: true,
   hand: HandDriveType.LHD,
   mediaDelay: 1000,
@@ -342,20 +340,10 @@ export class DongleDriver extends EventEmitter {
 
     for (const m of messages) {
       await this.send(m)
-
-      const isInject = m instanceof SendPicarplayWeb || m instanceof SendServerCgiScript
-
-      await this.sleep(isInject ? 350 : 120)
+      await this.sleep(120)
     }
 
-    setTimeout(() => {
-      void this.send(new SendCommand('wifiConnect'))
-
-      setTimeout(() => {
-        void this.send(new SendPicarplayWeb())
-        void this.send(new SendServerCgiScript())
-      }, 1000)
-    }, 600)
+    setTimeout(() => void this.send(new SendCommand('wifiConnect')), 600)
 
     if (this._heartbeatInterval) clearInterval(this._heartbeatInterval)
     this._heartbeatInterval = setInterval(() => void this.send(new HeartBeat()), 2000)

@@ -495,7 +495,7 @@ async function installFromDmg(dmgPath: string): Promise<void> {
   }
 
   const srcApp = join(mountPoint, appFolder)
-  const dstApp = '/Applications/pi-carplay.app'
+  const dstApp = '/Applications/LIVI.app'
   const desired = await getMacDesiredOwner(dstApp)
 
   sendUpdateEvent({ phase: 'copying' })
@@ -782,9 +782,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:getLatestRelease', async () => {
     try {
-      const repo = process.env.UPDATE_REPO || 'f-io/pi-carplay'
+      const repo = process.env.UPDATE_REPO || 'f-io/livi'
       const feed = process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
-      const res = await fetch(feed, { headers: { 'User-Agent': 'pi-carplay-updater' } })
+      const res = await fetch(feed, { headers: { 'User-Agent': 'LIVI-updater' } })
       if (!res.ok) throw new Error(`feed ${res.status}`)
       const json = (await res.json()) as unknown as GhRelease
       const raw = (json.tag_name || json.name || '').toString()
@@ -811,10 +811,10 @@ app.whenReady().then(() => {
 
       let url = directUrl
       if (!url) {
-        const repo = process.env.UPDATE_REPO || 'f-io/pi-carplay'
+        const repo = process.env.UPDATE_REPO || 'f-io/livi'
         const feed =
           process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
-        const res = await fetch(feed, { headers: { 'User-Agent': 'pi-carplay-updater' } })
+        const res = await fetch(feed, { headers: { 'User-Agent': 'LIVI-updater' } })
         if (!res.ok) throw new Error(`feed ${res.status}`)
         const json = (await res.json()) as unknown as GhRelease
         url = pickAssetForPlatform(json.assets || []).url

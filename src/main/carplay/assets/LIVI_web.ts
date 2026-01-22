@@ -1,10 +1,10 @@
-export const buildPicarplayWeb = (): string =>
+export const buildLiviWeb = (): string =>
   [
     '<!doctype html>',
     '<html>',
     '<head>',
     '  <meta charset="utf-8">',
-    '  <title>pi-carplay dongle tools</title>',
+    '  <title>LIVI dongle tools</title>',
     '  <meta name="viewport" content="width=device-width, initial-scale=1">',
     '  <style>',
     '    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif;',
@@ -26,7 +26,7 @@ export const buildPicarplayWeb = (): string =>
     '  </style>',
     '</head>',
     '<body>',
-    '  <h1>pi-carplay dongle tools</h1>',
+    '  <h1>LIVI dongle tools</h1>',
     '  <p>This helper page is served directly from the dongle.</p>',
     '  <section>',
     '    <h2>Riddle / AdvancedFeatures</h2>',

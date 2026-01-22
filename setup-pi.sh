@@ -7,7 +7,7 @@ set -euo pipefail
 
 # 0) Variables
 USER_HOME="$HOME"
-APPIMAGE_PATH="$USER_HOME/livi/LIVI.AppImage"
+APPIMAGE_PATH="$USER_HOME/LIVI/LIVI.AppImage"
 APPIMAGE_DIR="$(dirname "$APPIMAGE_PATH")"
 
 echo "→ Creating target directory: $APPIMAGE_DIR"
@@ -40,7 +40,7 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 
 # ICON INSTALLATION
-ICON_URL="https://raw.githubusercontent.com/f-io/livi/dev/assets/icons/linux/livi.png"
+ICON_URL="https://raw.githubusercontent.com/f-io/LIVI/dev/assets/icons/linux/livi.png"
 ICON_DEST="$USER_HOME/.local/share/icons/livi.png"
 
 if [ -d "$USER_HOME/.local/share" ]; then
@@ -62,7 +62,7 @@ fi
 
 # Fetch latest ARM64 AppImage from GitHub
 echo "→ Fetching latest LIVI release"
-latest_url=$(curl -s https://api.github.com/repos/f-io/livi/releases/latest \
+latest_url=$(curl -s https://api.github.com/repos/f-io/LIVI/releases/latest \
   | grep "browser_download_url" \
   | grep "arm64.AppImage" \
   | cut -d '"' -f 4)
@@ -87,7 +87,7 @@ chmod +x "$APPIMAGE_PATH"
 echo "→ Creating autostart entry"
 AUTOSTART_DIR="$USER_HOME/.config/autostart"
 mkdir -p "$AUTOSTART_DIR"
-cat > "$AUTOSTART_DIR/livi.desktop" <<EOF
+cat > "$AUTOSTART_DIR/LIVI.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=LIVI
@@ -97,7 +97,7 @@ Terminal=false
 X-GNOME-Autostart-enabled=true
 Categories=AudioVideo;
 EOF
-echo "Autostart entry at $AUTOSTART_DIR/livi.desktop"
+echo "Autostart entry at $AUTOSTART_DIR/LIVI.desktop"
 
 # Create Desktop shortcut
 echo "→ Creating desktop shortcut"
@@ -108,7 +108,7 @@ else
 fi
 
 mkdir -p "$DESKTOP_DIR"
-cat > "$DESKTOP_DIR/livi.desktop" <<EOF
+cat > "$DESKTOP_DIR/LIVI.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=LIVI
@@ -119,7 +119,7 @@ Terminal=false
 Categories=AudioVideo;
 StartupNotify=false
 EOF
-chmod +x "$DESKTOP_DIR/livi.desktop"
-echo "Desktop shortcut at $DESKTOP_DIR/livi.desktop"
+chmod +x "$DESKTOP_DIR/LIVI.desktop"
+echo "Desktop shortcut at $DESKTOP_DIR/LIVI.desktop"
 
 echo "✅ Installation complete!"

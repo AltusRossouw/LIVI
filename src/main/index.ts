@@ -782,7 +782,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:getLatestRelease', async () => {
     try {
-      const repo = process.env.UPDATE_REPO || 'f-io/livi'
+      const repo = process.env.UPDATE_REPO || 'f-io/LIVI'
       const feed = process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
       const res = await fetch(feed, { headers: { 'User-Agent': 'LIVI-updater' } })
       if (!res.ok) throw new Error(`feed ${res.status}`)
@@ -811,7 +811,7 @@ app.whenReady().then(() => {
 
       let url = directUrl
       if (!url) {
-        const repo = process.env.UPDATE_REPO || 'f-io/livi'
+        const repo = process.env.UPDATE_REPO || 'f-io/LIVI'
         const feed =
           process.env.UPDATE_FEED || `https://api.github.com/repos/${repo}/releases/latest`
         const res = await fetch(feed, { headers: { 'User-Agent': 'LIVI-updater' } })

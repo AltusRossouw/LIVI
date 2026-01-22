@@ -42,4 +42,4 @@ npmRebuild: true
 
 publish:
   provider: generic
-  url: 'https://f-io.github.io/livi/releases/'
+  url: 'https://f-io.github.io/LIVI/releases/'

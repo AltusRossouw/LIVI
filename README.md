@@ -12,10 +12,10 @@ It is a standalone cross-platform Electron head unit with hardware-accelerated v
 
 ## Project Status
 
-![Release](https://img.shields.io/github/v/release/f-io/livi?label=release)
-![Main Version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-version.json)
-![TS Main](https://img.shields.io/github/actions/workflow/status/f-io/livi/typecheck.yml?branch=main&label=TS%20main)
-![Build Main](https://img.shields.io/github/actions/workflow/status/f-io/livi/build.yml?branch=main&label=build%20main)
+![Release](https://img.shields.io/github/v/release/f-io/LIVI?label=release)
+![Main Version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-version.json)
+![TS Main](https://img.shields.io/github/actions/workflow/status/f-io/LIVI/typecheck.yml?branch=main&label=TS%20main)
+![Build Main](https://img.shields.io/github/actions/workflow/status/f-io/LIVI/build.yml?branch=main&label=build%20main)
 
 ## Dongle Firmware Feature Matrix
 
@@ -44,7 +44,7 @@ Listed limitations are firmware-level restrictions and cannot be fixed by the ap
 ### Raspberry Pi OS
 
 ```bash
-curl -LO https://raw.githubusercontent.com/f-io/livi/main/setup-pi.sh
+curl -LO https://raw.githubusercontent.com/f-io/LIVI/main/setup-pi.sh
 sudo chmod +x setup-pi.sh
 ./setup-pi.sh
 ```
@@ -102,11 +102,11 @@ brew install sox
 
 ## Build Environment
 
-![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-node.json)
-![npm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-npm.json)
-![electron](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron.json)
-![chrome](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron-date.json)
-![release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron-chromium.json)
+![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-node.json)
+![npm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-npm.json)
+![electron](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron.json)
+![chrome](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron-date.json)
+![release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron-chromium.json)
 
 ### System Requirements (build)
 
@@ -121,8 +121,8 @@ Make sure the following packages and tools are installed on your system before b
 ### Clone & Build
 
 ```bash
-git clone --branch main --single-branch https://github.com/f-io/livi.git \
-  && cd livi \
+git clone --branch main --single-branch https://github.com/f-io/LIVI.git \
+  && cd LIVI \
   && npm run install:clean \
   && npm run build \
   && npm run build:armLinux

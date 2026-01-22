@@ -460,11 +460,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         if (p.kind === 'siri') {
           clearSiriReleaseTimer()
 
-          // If Siri starts while we are already on CarPlay, nothing to do
-          if (inCarplay && attentionSwitchedByRef.current === 'siri') {
-            attentionSwitchedByRef.current = null
-          }
-
           // Already on CarPlay -> nothing to do
           if (inCarplay) return
         }
@@ -472,6 +467,10 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         // Calls: if we are already on CarPlay during a call, nothing to do
         if (p.kind === 'call' && inCarplay) {
           return
+        }
+
+        if (location.pathname !== '/') {
+          attentionBackPathRef.current = location.pathname
         }
 
         // Remember where we came from

@@ -1,4 +1,4 @@
-import { UpdatePhase } from './types'
+import { UpdatePhases } from './types'
 
 export const CMP_CONFIG = {
   [-1]: {
@@ -15,10 +15,10 @@ export const CMP_CONFIG = {
   }
 }
 
-export const INSTALL_PHASES: readonly UpdatePhase[] = [
-  'mounting',
-  'copying',
-  'unmounting',
-  'installing',
-  'relaunching'
+export const INSTALL_PHASES: readonly UpdatePhases[] = [
+  UpdatePhases.mounting,
+  UpdatePhases.copying,
+  UpdatePhases.unmounting,
+  UpdatePhases.installing,
+  UpdatePhases.relaunching
 ]

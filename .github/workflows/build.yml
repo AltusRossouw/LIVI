@@ -262,7 +262,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pi-carplay-${{ steps.pkg.outputs.version }}-${{ matrix.platform }}.${{ matrix.artifact_ext }}
+          name: LIVI-${{ steps.pkg.outputs.version }}-${{ matrix.platform }}.${{ matrix.artifact_ext }}
           path: |
             dist/*${{ matrix.artifact_ext == 'dmg' && 'arm64.dmg' || (matrix.artifact_ext == 'AppImage' && (matrix.platform == 'arm64' && '-arm64.AppImage' || '-x86_64.AppImage')) }}
           retention-days: 7

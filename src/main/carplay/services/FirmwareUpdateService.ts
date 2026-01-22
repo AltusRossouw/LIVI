@@ -375,7 +375,7 @@ export class FirmwareUpdateService {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: input.token,
           OS: 'Android',
-          'User-Agent': 'pi-carplay'
+          'User-Agent': 'LIVI'
         }
       })
 

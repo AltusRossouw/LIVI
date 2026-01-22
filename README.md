@@ -1,10 +1,10 @@
 <p align="center">
-  <img alt='pi-carplay' src='docs/images/banner.png' width="1200" />
+  <img alt='LIVI' src='docs/images/banner.png' width="1200" />
 </p>
 
-# pi-carplay
+# LIVI – Linux In-Vehicle Infotainment
 
-pi-carplay is an open-source **Apple CarPlay and Android Auto head unit for Linux**.
+LIVI is an open-source **Apple CarPlay and Android Auto head unit for Linux**.
 
 It is a standalone cross-platform Electron head unit with hardware-accelerated video decoding, low-latency audio, multitouch + D-Pad navigation, and support for very small embedded/OEM displays.
 
@@ -12,10 +12,10 @@ It is a standalone cross-platform Electron head unit with hardware-accelerated v
 
 ## Project Status
 
-![Release](https://img.shields.io/github/v/release/f-io/pi-carplay?label=release)
-![Main Version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-version.json)
-![TS Main](https://img.shields.io/github/actions/workflow/status/f-io/pi-carplay/typecheck.yml?branch=main&label=TS%20main)
-![Build Main](https://img.shields.io/github/actions/workflow/status/f-io/pi-carplay/build.yml?branch=main&label=build%20main)
+![Release](https://img.shields.io/github/v/release/f-io/livi?label=release)
+![Main Version](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-version.json)
+![TS Main](https://img.shields.io/github/actions/workflow/status/f-io/livi/typecheck.yml?branch=main&label=TS%20main)
+![Build Main](https://img.shields.io/github/actions/workflow/status/f-io/livi/build.yml?branch=main&label=build%20main)
 
 ## Dongle Firmware Feature Matrix
 
@@ -44,7 +44,7 @@ Listed limitations are firmware-level restrictions and cannot be fixed by the ap
 ### Raspberry Pi OS
 
 ```bash
-curl -LO https://raw.githubusercontent.com/f-io/pi-carplay/main/setup-pi.sh
+curl -LO https://raw.githubusercontent.com/f-io/livi/main/setup-pi.sh
 sudo chmod +x setup-pi.sh
 ./setup-pi.sh
 ```
@@ -65,7 +65,7 @@ This AppImage has been tested on Debian Trixie (13). No additional software is r
 
 ```bash
 sudo bash -c '
-  RULE_FILE="/etc/udev/rules.d/99-pi-carplay.rules"
+  RULE_FILE="/etc/udev/rules.d/99-LIVI.rules"
   USER_NAME="${SUDO_USER:-$USER}"
 
   echo "Creating udev rule for Carlinkit dongle (owner: $USER_NAME)"
@@ -82,16 +82,16 @@ sudo bash -c '
 ```
 
 ```bash
-chmod +x pi-carplay-*-x86_64.AppImage
+chmod +x LIVI-*-x86_64.AppImage
 ```
 
 ### Mac (arm64)
 
-Just download the `-arm64.dmg`, open it, and drag pi-carplay.app into Applications. Then remove the Gatekeeper quarantine once and launch the app.
+Just download the `-arm64.dmg`, open it, and drag LIVI.app into Applications. Then remove the Gatekeeper quarantine once and launch the app.
 This step is required for all non-Apple-signed apps and future in-app updates will preserve this state.
 
 ```bash
-xattr -cr /Applications/pi-carplay.app
+xattr -cr /Applications/LIVI.app
 ```
 
 For microphone support, please install Sound eXchange (SoX) via brew.
@@ -102,11 +102,11 @@ brew install sox
 
 ## Build Environment
 
-![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-node.json)
-![npm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-npm.json)
-![electron](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-electron.json)
-![chrome](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-electron-date.json)
-![release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/pi-carplay/version/.github/badges/main-electron-chromium.json)
+![Node](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-node.json)
+![npm](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-npm.json)
+![electron](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron.json)
+![chrome](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron-date.json)
+![release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/livi/version/.github/badges/main-electron-chromium.json)
 
 ### System Requirements (build)
 
@@ -121,8 +121,8 @@ Make sure the following packages and tools are installed on your system before b
 ### Clone & Build
 
 ```bash
-git clone --branch main --single-branch https://github.com/f-io/pi-carplay.git \
-  && cd pi-carplay \
+git clone --branch main --single-branch https://github.com/f-io/livi.git \
+  && cd livi \
   && npm run install:clean \
   && npm run build \
   && npm run build:armLinux
@@ -136,7 +136,7 @@ git clone --branch main --single-branch https://github.com/f-io/pi-carplay.git \
 **How to provision AA on the dongle:**
 
 1. Use the dongle with a regular head unit **or** the vendor’s mobile app to add your phone once.
-2. After the dongle knows your phone, connect the dongle to pi-carplay — it will attach without running provisioning again.
+2. After the dongle knows your phone, connect the dongle to LIVI — it will attach without running provisioning again.
 
 ## Images
 

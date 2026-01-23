@@ -270,7 +270,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         capture: true
       } as AddEventListenerOptions)
     }
-  }, [navVideoOverlayActive, pathname])
+  }, [navVideoOverlayActive, pathname, setNavVideoOverlayActive])
 
   // Overlay offset
   const [overlayY, setOverlayY] = useState(0)
@@ -582,6 +582,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     setDongleConnected,
     setStreaming,
     resetInfo,
+    setNavVideoOverlayActive,
     setReceivingVideo
   ])
 
@@ -640,7 +641,15 @@ const CarplayComponent: React.FC<CarplayProps> = ({
       // @ts-ignore
       window.electron?.ipcRenderer.removeListener('usb-event', usbHandler)
     }
-  }, [setReceivingVideo, setDongleConnected, setStreaming, clearRetryTimeout, navigate, resetInfo])
+  }, [
+    setReceivingVideo,
+    setDongleConnected,
+    setStreaming,
+    clearRetryTimeout,
+    navigate,
+    resetInfo,
+    setDeviceInfo
+  ])
 
   // Settings/events from main
   useEffect(() => {
@@ -833,7 +842,16 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     return () => {
       window.carplay.ipc.offEvent(handler)
     }
-  }, [gotoHostUI, setReceivingVideo, navigate, pathname, navVideoOverlayActive, isStreaming])
+  }, [
+    gotoHostUI,
+    setReceivingVideo,
+    navigate,
+    pathname,
+    navVideoOverlayActive,
+    isStreaming,
+    setNavVideoOverlayActive,
+    applyAttention
+  ])
 
   // Resize observer => inform render worker
   useEffect(() => {

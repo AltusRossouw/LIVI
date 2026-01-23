@@ -24,6 +24,8 @@ linux:
   category: Utility
 
 mac:
+  identity: null
+  notarize: false
   icon: icons/mac/livi.icns
   category: public.app-category.utilities
   extendInfo:

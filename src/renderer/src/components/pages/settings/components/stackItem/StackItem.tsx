@@ -3,6 +3,7 @@ import Paper from '@mui/material/Paper'
 import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined'
 import { StackItemProps } from '../../type'
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 
 const Item = styled(Paper)(({ theme }) => {
   const activeColor = theme.palette.primary.main
@@ -102,6 +103,8 @@ export const StackItem = ({
   withForwardIcon,
   onClick
 }: StackItemProps) => {
+  const { t } = useTranslation()
+
   const viewValue = node?.valueTransform?.toView ? node?.valueTransform.toView(value) : value
 
   let displayValue = node?.valueTransform?.format
@@ -110,7 +113,7 @@ export const StackItem = ({
 
   if (node?.type === 'select') {
     const option = node?.options.find((o) => o.value === value)
-    displayValue = option?.label || ''
+    displayValue = option ? (option.labelKey ? t(option.labelKey, option.label) : option.label) : ''
   }
 
   if (displayValue === 'null' || displayValue === 'undefined') {

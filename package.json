@@ -1,6 +1,6 @@
 {
   "name": "LIVI",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "LIVI - Linux In-Vehicle Infotainment",
   "main": "./out/main/main.js",
   "author": "Lasse Heitgres",

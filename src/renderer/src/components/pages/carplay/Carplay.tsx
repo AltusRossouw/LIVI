@@ -459,23 +459,16 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
       // ACTIVE: switch to CarPlay
       if (p.active) {
-        if (p.kind === 'siri') {
-          clearSiriReleaseTimer()
+        if (p.kind === 'siri') clearSiriReleaseTimer()
 
-          // Already on CarPlay -> nothing to do
-          if (inCarplay) return
-        }
-
-        // Calls: if we are already on CarPlay during a call, nothing to do
-        if (p.kind === 'call' && inCarplay) {
+        // Already on CarPlay -> nothing to do
+        if (inCarplay) {
+          attentionSwitchedByRef.current = null
           return
         }
 
-        if (location.pathname !== '/') {
-          attentionBackPathRef.current = location.pathname
-        }
-
-        // Remember where we came from
+        // Not on CarPlay -> we will switch now, so arm return
+        attentionBackPathRef.current = location.pathname
         attentionSwitchedByRef.current = p.kind
 
         navigate('/', { replace: true })

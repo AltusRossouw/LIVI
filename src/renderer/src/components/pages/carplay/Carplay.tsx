@@ -42,12 +42,14 @@ const pulse = keyframes`
 function StatusOverlay({
   mode,
   show,
+  offsetX = 0,
   offsetY = 0,
   rendererOk,
   rendererError
 }: {
   mode: 'dongle' | 'phone'
   show: boolean
+  offsetX?: number
   offsetY?: number
   rendererOk: boolean
   rendererError: string | null
@@ -134,7 +136,7 @@ function StatusOverlay({
         ref={ringRef}
         sx={{
           position: 'absolute',
-          left: '50%',
+          left: `calc(50% + ${offsetX}px)`,
           top: `calc(50% + ${offsetY}px)`,
           transform: 'translate(-50%, -50%)',
           width: { xs: 72, sm: 88 },
@@ -179,7 +181,7 @@ function StatusOverlay({
       <Box
         sx={{
           position: 'absolute',
-          left: '50%',
+          left: `calc(50% + ${offsetX}px)`,
           top: `calc(50% + ${offsetY}px + ${(ringH || 0) / 2 + GAP_BELOW}px)`,
           transform: 'translateX(-50%)',
           display: 'flex',
@@ -287,24 +289,40 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   }, [navVideoOverlayActive, pathname, setNavVideoOverlayActive])
 
   // Overlay offset
+  const [overlayX, setOverlayX] = useState(0)
   const [overlayY, setOverlayY] = useState(0)
+
   useLayoutEffect(() => {
+    const getAnchor = () => document.getElementById('content-root')
+
     const recalc = () => {
-      const r = mainElem.current?.getBoundingClientRect()
+      const r = getAnchor()?.getBoundingClientRect()
       if (!r) return
+
+      const contentCenterX = r.left + r.width / 2
       const contentCenterY = r.top + r.height / 2
+
+      const windowCenterX = window.innerWidth / 2
       const windowCenterY = window.innerHeight / 2
-      setOverlayY(windowCenterY - contentCenterY)
+
+      setOverlayX(contentCenterX - windowCenterX)
+      setOverlayY(contentCenterY - windowCenterY)
     }
+
     recalc()
+    const raf = requestAnimationFrame(recalc)
+
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(recalc) : null
-    if (ro && mainElem.current) ro.observe(mainElem.current)
+    const anchor = getAnchor()
+    if (ro && anchor) ro.observe(anchor)
+
     window.addEventListener('resize', recalc)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', recalc)
       ro?.disconnect()
     }
-  }, [])
+  }, [settings?.hand])
 
   // MediaPlayStatus handling
   const mediaPlayStatusRef = useRef<number | undefined>(undefined)
@@ -959,6 +977,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         <StatusOverlay
           show={!isDongleConnected || !isStreaming}
           mode={mode}
+          offsetX={overlayX}
           offsetY={overlayY}
           rendererOk={renderReady && !rendererError}
           rendererError={rendererError}

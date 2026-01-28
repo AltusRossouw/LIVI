@@ -22,8 +22,8 @@ export class RendererWorker {
   private selectedRenderer: string | null = null
   private renderScheduled = false
   private lastRenderTime: number = 0
-  private targetFps = 60
-  private frameInterval: number = 1000 / this.targetFps
+  private targetFps: number | null = null
+  private frameInterval: number = 1000 / 60
 
   private rendererHwSupported = false
   private rendererSwSupported = false
@@ -37,6 +37,9 @@ export class RendererWorker {
 
   private setTargetFps(fps?: number) {
     if (!fps || !Number.isFinite(fps)) return
+
+    const isFirst = this.targetFps == null
+    if (!isFirst && fps === this.targetFps) return
 
     this.targetFps = fps
     this.frameInterval = 1000 / fps
@@ -120,8 +123,8 @@ export class RendererWorker {
       return
     }
 
-    self.postMessage({ type: 'render-ready' })
     console.debug('[RENDER.WORKER] render-ready')
+    self.postMessage({ type: 'render-ready' })
   }
 
   private async evaluateRendererCapabilities() {

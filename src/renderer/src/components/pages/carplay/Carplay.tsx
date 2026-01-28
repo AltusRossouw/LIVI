@@ -231,7 +231,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   }, [pathname])
 
   useEffect(() => {
-    console.log('[UI] Dongle connected:', isDongleConnected)
+    console.log('[CARPLAY] Dongle connected:', isDongleConnected)
   }, [isDongleConnected])
 
   // Refs
@@ -332,10 +332,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     w.onerror = (e) => {
       console.error('Worker error:', e)
     }
-
-    console.log('[CARPLAY] Creating CarPlayWorker with port:', {
-      audioPort: audioChannel.port1
-    })
 
     w.postMessage(
       {
@@ -630,7 +626,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
             })
           }
         } catch (e) {
-          console.warn('[UI] usb.getDeviceInfo() failed', e)
+          console.warn('[CARPLAY] usb.getDeviceInfo() failed', e)
         }
 
         setDongleConnected(true)

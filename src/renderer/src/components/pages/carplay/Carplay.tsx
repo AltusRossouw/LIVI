@@ -795,7 +795,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
             break
           }
 
-          const mapsEnabled = Boolean(settings.enableMaps)
+          const mapsEnabled = Boolean(settings.mapsEnabled)
 
           if (value === CommandMapping.naviFocus) {
             if (mapsEnabled) {
@@ -891,7 +891,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     setNavVideoOverlayActive,
     applyAttention,
     rendererError,
-    settings.enableMaps
+    settings.mapsEnabled
   ])
 
   // Resize observer => inform render worker

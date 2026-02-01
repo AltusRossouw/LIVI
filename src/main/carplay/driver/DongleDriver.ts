@@ -51,7 +51,7 @@ export type DongleConfig = {
   callQuality: 0 | 1 | 2
   autoPlay: boolean
   autoConn: boolean
-  naviScreenEnabled: boolean
+  mapsEnabled: boolean
   audioTransferMode: boolean
   wifiType: '2.4ghz' | '5ghz'
   wifiChannel: number
@@ -78,7 +78,7 @@ export const DEFAULT_CONFIG: DongleConfig = {
   callQuality: 1,
   autoPlay: true,
   autoConn: true,
-  naviScreenEnabled: false,
+  mapsEnabled: false,
   audioTransferMode: false,
   wifiType: '5ghz',
   wifiChannel: 36,

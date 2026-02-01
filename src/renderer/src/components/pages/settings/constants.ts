@@ -48,5 +48,5 @@ export const requiresRestartParams: (keyof ExtraConfig)[] = [
   'oemName',
   'mediaSound',
   'hand',
-  'naviScreenEnabled'
+  'mapsEnabled'
 ]

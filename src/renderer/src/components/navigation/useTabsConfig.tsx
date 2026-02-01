@@ -16,8 +16,7 @@ export const useTabsConfig: (receivingVideo: boolean) => TabConfig[] = (receivin
   const isStreaming = useStatusStore((s) => s.isStreaming)
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
   const cameraFound = useStatusStore((s) => s.cameraFound)
-
-  const enableMaps = useCarplayStore((s) => !!s.settings?.enableMaps)
+  const mapsEnabled = useCarplayStore((s) => s.settings?.mapsEnabled ?? false)
 
   return [
     {
@@ -39,7 +38,7 @@ export const useTabsConfig: (receivingVideo: boolean) => TabConfig[] = (receivin
         <PhonelinkOffIcon sx={{ color: theme.palette.text.disabled, fontSize: 30 }} />
       )
     },
-    ...(enableMaps
+    ...(mapsEnabled
       ? [
           {
             label: 'Maps',

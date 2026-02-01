@@ -1,36 +1,46 @@
-import { ExtraConfig } from './Globals'
 import { Server } from 'socket.io'
 import { EventEmitter } from 'events'
-import type { Stream } from 'stream'
 import http from 'http'
 
-export enum MessageNames {
-  Connection = 'connection',
-  GetSettings = 'getSettings',
-  SaveSettings = 'saveSettings',
-  Stream = 'stream'
+export type TelemetryPayload = {
+  ts?: number // unix ms
+  reverse?: boolean
+  lights?: boolean
+  speedKph?: number
+  rpm?: number
+  steeringDeg?: number
+  // raw CAN ??
+  can?: { id: number; data: number[]; bus?: number }
+  // anything else:
+  [key: string]: unknown
 }
 
-export class Socket extends EventEmitter {
-  config: ExtraConfig
-  saveSettings: (settings: ExtraConfig) => void
+export enum TelemetryEvents {
+  Connection = 'connection',
 
+  // external -> main
+  Push = 'telemetry:push',
+
+  // main -> clients
+  Update = 'telemetry:update',
+  Reverse = 'telemetry:reverse',
+  Lights = 'telemetry:lights'
+}
+
+export class TelemetrySocket extends EventEmitter {
   io: Server | null = null
   httpServer: http.Server | null = null
 
-  constructor(config: ExtraConfig, saveSettings: (settings: ExtraConfig) => void) {
+  constructor(private port = 4000) {
     super()
-    this.config = config
-    this.saveSettings = saveSettings
     this.startServer()
   }
 
   private setupListeners() {
-    this.io?.on(MessageNames.Connection, (socket) => {
-      this.sendSettings()
-      socket.on(MessageNames.GetSettings, () => this.sendSettings())
-      socket.on(MessageNames.SaveSettings, (settings: ExtraConfig) => this.saveSettings(settings))
-      socket.on(MessageNames.Stream, (stream: Stream) => this.emit(MessageNames.Stream, stream))
+    this.io?.on(TelemetryEvents.Connection, (socket) => {
+      socket.on(TelemetryEvents.Push, (payload: TelemetryPayload) => {
+        this.emit(TelemetryEvents.Push, payload)
+      })
     })
   }
 
@@ -38,21 +48,17 @@ export class Socket extends EventEmitter {
     this.httpServer = http.createServer()
     this.io = new Server(this.httpServer, { cors: { origin: '*' } })
     this.setupListeners()
-    this.httpServer.listen(4000, () => {
-      console.log('[Socket] Server listening on port 4000')
+    this.httpServer.listen(this.port, () => {
+      console.log(`[TelemetrySocket] Server listening on port ${this.port}`)
     })
   }
 
   async disconnect(): Promise<void> {
     return new Promise((resolve) => {
-      if (this.io) {
-        this.io.close(() => {
-          console.log('[Socket] IO closed')
-        })
-      }
+      if (this.io) this.io.close(() => console.log('[TelemetrySocket] IO closed'))
       if (this.httpServer) {
         this.httpServer.close(() => {
-          console.log('[Socket] HTTP server closed')
+          console.log('[TelemetrySocket] HTTP server closed')
           this.io = null
           this.httpServer = null
           resolve()
@@ -66,18 +72,19 @@ export class Socket extends EventEmitter {
   async connect(): Promise<void> {
     await new Promise((r) => setTimeout(r, 200))
     this.startServer()
-    return Promise.resolve()
   }
 
-  sendSettings() {
-    this.io?.emit('settings', this.config)
+  // main -> all clients
+  publishTelemetry(payload: TelemetryPayload) {
+    const msg = { ts: Date.now(), ...payload }
+    this.io?.emit(TelemetryEvents.Update, msg)
   }
 
-  sendReverse(reverse: boolean) {
-    this.io?.emit('reverse', reverse)
+  publishReverse(reverse: boolean) {
+    this.io?.emit(TelemetryEvents.Reverse, reverse)
   }
 
-  sendLights(lights: boolean) {
-    this.io?.emit('lights', lights)
+  publishLights(lights: boolean) {
+    this.io?.emit(TelemetryEvents.Lights, lights)
   }
 }

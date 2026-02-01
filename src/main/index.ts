@@ -11,7 +11,6 @@ import {
 import { electronApp, is } from '@electron-toolkit/utils'
 import { DEFAULT_CONFIG } from './carplay/driver/DongleDriver'
 import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from './carplay/assets/carIcons'
-import { Socket } from './Socket'
 import { ExtraConfig, DEFAULT_BINDINGS } from './Globals'
 import { USBService } from './usb/USBService'
 import { CarplayService } from './carplay/services/CarplayService'
@@ -184,7 +183,6 @@ function attachKioskStateSync(win: BrowserWindow) {
 
 // Globals
 let mainWindow: BrowserWindow | null
-let socket: Socket
 let config: ExtraConfig
 let usbService: USBService
 let isQuitting = false
@@ -831,7 +829,6 @@ app.whenReady().then(() => {
   })
 
   usbService = new USBService(carplayService)
-  socket = new Socket(config, saveSettings)
 
   ipcMain.handle('quit', () =>
     isMac
@@ -1041,10 +1038,6 @@ function saveSettings(next: Partial<ExtraConfig>) {
   const prev = config
   config = merged
 
-  if (socket) {
-    socket.config = config
-    socket.sendSettings()
-  }
   sendKioskSync(config.kiosk)
 
   if (!mainWindow) return

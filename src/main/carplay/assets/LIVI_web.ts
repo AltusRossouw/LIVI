@@ -29,7 +29,7 @@ export const buildLiviWeb = (): string =>
     '  <h1>LIVI dongle tools</h1>',
     '  <p>This helper page is served directly from the dongle.</p>',
     '  <section>',
-    '    <h2>dvancedFeatures</h2>',
+    '    <h2>AdvancedFeatures</h2>',
     '    <p>Run <code>riddleBoxCfg -s AdvancedFeatures 0|1</code> and inspect the config:</p>',
     '',
     '    <form method="get" action="./cgi-bin/server.cgi" style="margin:8px 0 4px;">',

@@ -173,6 +173,8 @@ export class CarplayService {
         }
       } else if (msg instanceof Unplugged) {
         this.webContents.send('carplay-event', { type: 'unplugged' })
+        this.resetNavigationSnapshot('unplugged')
+
         if (!this.shuttingDown && !this.stopping) {
           this.stop().catch(() => {})
         }
@@ -304,6 +306,7 @@ export class CarplayService {
 
         // Navigation metadata (innerType 200)
         if (inner.kind === 'navigation') {
+          if (!this.started) return
           const navMsg = inner.message
 
           this.webContents.send('carplay-event', { type: 'navigation', payload: navMsg })
@@ -455,6 +458,10 @@ export class CarplayService {
 
     ipcMain.handle('carplay-navigation-read', async () => {
       try {
+        if (!this.started) {
+          return DEFAULT_NAVIGATION_DATA_RESPONSE
+        }
+
         const file = path.join(app.getPath('userData'), 'navigationData.json')
 
         if (!fs.existsSync(file)) {
@@ -871,6 +878,8 @@ export class CarplayService {
         this.lastVideoWidth = undefined
         this.lastVideoHeight = undefined
 
+        this.resetNavigationSnapshot('session-start')
+
         const device = usb
           .getDeviceList()
           .find(
@@ -961,6 +970,7 @@ export class CarplayService {
       this.audio.resetForSessionStop()
 
       this.started = false
+      this.resetNavigationSnapshot('session-stop')
 
       this.dongleFwVersion = undefined
       this.boxInfo = undefined
@@ -974,6 +984,23 @@ export class CarplayService {
     })
 
     return this.stopPromise
+  }
+
+  private resetNavigationSnapshot(reason: string): void {
+    try {
+      const file = path.join(app.getPath('userData'), 'navigationData.json')
+
+      const out = {
+        timestamp: new Date().toISOString(),
+        payload: DEFAULT_NAVIGATION_DATA_RESPONSE.payload
+      }
+
+      fs.writeFileSync(file, JSON.stringify(out, null, 2), 'utf8')
+    } catch (e) {
+      console.warn('[CarplayService] resetNavigationSnapshot failed (ignored)', reason, e)
+    }
+
+    this.webContents?.send('carplay-event', { type: 'navigation-reset', reason })
   }
 
   private clearTimeouts() {

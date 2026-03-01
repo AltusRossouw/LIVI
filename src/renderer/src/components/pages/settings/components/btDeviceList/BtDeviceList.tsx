@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Box, IconButton, Typography } from '@mui/material'
+import { IconButton, Typography } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 
 import { StackItem } from '../stackItem'
@@ -27,35 +27,25 @@ export const BtDeviceList = () => {
     <>
       {list.map((d) => {
         const name = d.name?.trim()
-        const label = name ? `${name} (${d.mac})` : d.mac
+        const label = name && name.length > 0 ? name : 'Unknown device'
         const isConnected = Boolean(connectedMac) && d.mac === connectedMac
 
         return (
           <StackItem key={d.mac}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: 1 }}>
-              <Box
-                sx={{
-                  width: 10,
-                  ml: 'clamp(4px, 0.8vh, 8px)',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  flex: '0 0 auto'
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: isConnected ? 'primary.main' : 'transparent'
-                  }}
-                />
-              </Box>
+            <Typography
+              sx={{
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: isConnected
+                  ? (theme) => `${theme.palette.secondary.main} !important`
+                  : 'text.primary'
+              }}
+            >
+              {label}
+            </Typography>
 
-              <Typography sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {label}
-              </Typography>
-            </Box>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <IconButton sx={btnSx} onClick={() => remove(d.mac)}>
                 <CloseIcon sx={iconSx} />

@@ -116,7 +116,7 @@ export const DEFAULT_CONFIG: DongleConfig = {
   audioTransferMode: false,
   wifiType: '5ghz',
   wifiChannel: 36,
-  micType: MicType.PhoneMic,
+  micType: MicType.CarMic,
   phoneConfig: {
     [PhoneType.CarPlay]: { frameInterval: 5000 },
     [PhoneType.AndroidAuto]: { frameInterval: null }

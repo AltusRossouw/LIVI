@@ -35,12 +35,77 @@ permissions:
   actions: write
 
 jobs:
+  plan:
+    name: Plan build matrix
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      is_empty: ${{ steps.plan.outputs.is_empty }}
+    steps:
+      - id: plan
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IN_LINUX_X86_64: ${{ inputs.linux_x86_64 }}
+          IN_LINUX_ARM64: ${{ inputs.linux_arm64 }}
+          IN_MACOS_ARM64: ${{ inputs.macos_arm64 }}
+          IN_WINDOWS_X64: ${{ inputs.windows_x64 }}
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require('fs');
+
+          const eventName = process.env.EVENT_NAME;
+
+          const isTrue = (v) => String(v).toLowerCase() === 'true';
+
+          const inputs = {
+            linux_x86_64: isTrue(process.env.IN_LINUX_X86_64),
+            linux_arm64:  isTrue(process.env.IN_LINUX_ARM64),
+            macos_arm64:  isTrue(process.env.IN_MACOS_ARM64),
+            windows_x64:  isTrue(process.env.IN_WINDOWS_X64),
+          };
+
+          const include = [];
+          const add = (platform, os, arch, artifact_ext) => {
+            include.push({ platform, os, arch, artifact_ext });
+          };
+
+          if (eventName === 'workflow_run') {
+            // main: always build everything
+            add('x86_64', 'ubuntu-latest',  'native',   'AppImage');
+            add('arm64',  'ubuntu-latest',  'emulated', 'AppImage');
+            add('darwin', 'macos-latest',   'native',   'dmg');
+            add('win-x64','windows-latest', 'native',   'exe');
+          } else {
+            // manual: only selected
+            if (inputs.linux_x86_64) add('x86_64', 'ubuntu-latest',  'native',   'AppImage');
+            if (inputs.linux_arm64)  add('arm64',  'ubuntu-latest',  'emulated', 'AppImage');
+            if (inputs.macos_arm64)  add('darwin', 'macos-latest',   'native',   'dmg');
+            if (inputs.windows_x64)  add('win-x64','windows-latest', 'native',   'exe');
+          }
+
+          const matrixObj = { include };
+          const matrix = JSON.stringify(matrixObj);
+
+          const isEmpty = include.length === 0 ? 'true' : 'false';
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${matrix}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `is_empty=${isEmpty}\n`);
+
+          console.log('Planned matrix:', matrix);
+          console.log('Empty:', isEmpty);
+          NODE
+
   # ------------------------------------------------------------
-  # Manual builds (matrix), only for selected targets
+  # Builds (only planned targets)
   # ------------------------------------------------------------
   build:
-    name: Build ${{ matrix.artifact_ext }} (${{ matrix.platform }}) on ${{ github.event.inputs.branch }}
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    name: Build ${{ matrix.artifact_ext }} (${{ matrix.platform }}) on ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}
+    needs: plan
+    if: ${{ needs.plan.outputs.is_empty != 'true' }}
     runs-on: ${{ matrix.os }}
     env:
       BUILD_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.event.workflow_run.head_branch }}
@@ -50,39 +115,9 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: x86_64
-            os: ubuntu-latest
-            arch: native
-            artifact_ext: AppImage
-            enabled: ${{ github.event_name == 'workflow_run' || github.event.inputs.linux_x86_64 == 'true' }}
-
-          - platform: arm64
-            os: ubuntu-latest
-            arch: emulated
-            artifact_ext: AppImage
-            enabled: ${{ github.event_name == 'workflow_run' || github.event.inputs.linux_arm64 == 'true' }}
-
-          - platform: darwin
-            os: macos-latest
-            arch: native
-            artifact_ext: dmg
-            enabled: ${{ github.event_name == 'workflow_run' || github.event.inputs.macos_arm64 == 'true' }}
-
-          - platform: win-x64
-            os: windows-latest
-            arch: native
-            artifact_ext: exe
-            enabled: ${{ github.event_name == 'workflow_run' || github.event.inputs.windows_x64 == 'true' }}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
-      - name: Skip if not selected
-        if: ${{ !matrix.enabled }}
-        run: |
-          echo "Not selected in workflow_dispatch inputs -> skipping."
-          exit 0
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

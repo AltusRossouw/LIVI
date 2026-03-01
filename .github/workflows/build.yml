@@ -275,7 +275,7 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile
 
-      - name: Fetch ffplay bundle (f-io/ffmpeg-bundles latest) [win-x64]
+      - name: Fetch fftools bundle (f-io/ffmpeg-bundles latest) [win-x64]
         if: matrix.platform == 'win-x64'
         shell: pwsh
         env:
@@ -285,7 +285,7 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path "assets/bin/win" | Out-Null
 
-          $assetName = "ffplay-win-x64.zip"
+          $assetName = "fftools-win-x64.zip"
           $zip = Join-Path $env:RUNNER_TEMP $assetName
 
           $tag = (gh release view --repo f-io/ffmpeg-bundles latest --json tagName -q ".tagName")
@@ -305,9 +305,13 @@ jobs:
           $ffplay = Get-ChildItem -Path $extract -Recurse -Filter "ffplay.exe" | Select-Object -First 1
           if (-not $ffplay) { throw "ffplay.exe not found in $assetName" }
 
+          $ffmpeg = Get-ChildItem -Path $extract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          if (-not $ffmpeg) { throw "ffmpeg.exe not found in $assetName" }
+
           $binDir = Split-Path $ffplay.FullName -Parent
 
           Copy-Item "$binDir\ffplay.exe" "assets/bin/win/ffplay.exe" -Force
+          Copy-Item "$binDir\ffmpeg.exe" "assets/bin/win/ffmpeg.exe" -Force
           Copy-Item "$binDir\*.dll" "assets/bin/win/" -Force -ErrorAction SilentlyContinue
 
           Write-Host "Bundled ffplay files:"

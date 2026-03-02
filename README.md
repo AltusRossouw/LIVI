@@ -22,7 +22,7 @@ It is a standalone cross-platform Electron head unit with hardware-accelerated v
 > [!IMPORTANT]
 > LIVI requires **WebGL2 or WebGPU support**.
 
-### Raspberry Pi OS
+## Raspberry Pi OS
 
 ```bash
 curl -fL -o install.sh https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/pi/install.sh
@@ -42,7 +42,7 @@ The `install.sh` script performs the following tasks:
 
 _This install script is not actively tested on other Linux distributions._
 
-### Linux (x86_64)
+## Linux (x86_64)
 
 This AppImage has been tested on **Debian Trixie (13)** with Wayland. No additional software is required — just download the `-x86_64.AppImage` and make it executable. Depending on your distro and how you run the app, you may need a udev rule to access the USB dongle. It presents as a composite (multi-class) USB device, and unlike single-class devices, its interfaces often require explicit permissions.
 
@@ -68,7 +68,7 @@ sudo bash -c '
 chmod +x LIVI-*-x86_64.AppImage
 ```
 
-### Mac (arm64)
+## Mac (arm64)
 
 Just download the `-arm64.dmg`, open it, and drag LIVI.app into Applications. Then remove the Gatekeeper quarantine once and launch the app.
 This step is required for all non-Apple-signed apps and future in-app updates will preserve this state.
@@ -82,6 +82,35 @@ For audio support, please install Sound eXchange (SoX) via brew.
 ```bash
 brew install sox
 ```
+
+## Windows (x64)
+
+> [!IMPORTANT]
+> The Windows build is provided on a **best-effort basis**.  
+> Windows is **not a primary target platform** of this project and receives limited testing.
+>
+> It is mainly intended for development, experimentation, and desktop testing.
+
+### Audio Backend
+
+On Windows, LIVI uses **FFmpeg / FFplay** for audio input and output:
+
+- `ffmpeg` is used for microphone capture (DirectShow)
+- `ffplay` is used for low-latency audio playback
+
+Both binaries are bundled with the application. No additional audio software is required.
+
+### USB Driver Requirement
+
+The Carlinkit dongle requires a compatible **WinUSB (winusb.sys)** driver on Windows.  
+You can install it using a tool such as **Zadig** (libwdi): https://github.com/pbatard/libwdi/releases
+
+Steps:
+
+1. Plug in the Carlinkit dongle  
+2. Start Zadig  
+3. Select the dongle from the device list  
+4. Install the **WinUSB (winusb.sys)** driver  
 
 ## Build Environment
 

@@ -37,7 +37,7 @@ export class USBService {
 
     const device = getDeviceList().find(this.isDongle)
     if (device) {
-      console.log('[USBService] Dongle was already connected on startup', device)
+      console.log('[USBService] Dongle was already connected on startup')
       this.lastDongleState = true
       this.carplay.markDongleConnected(true)
       this.notifyDeviceChange(device, true)
@@ -50,7 +50,7 @@ export class USBService {
       if (this.stopped || this.resetInProgress || this.shutdownInProgress) return
       this.broadcastGenericUsbEvent({ type: 'attach', device })
       if (this.isDongle(device) && !this.lastDongleState) {
-        console.log('[USBService] Dongle connected:', device)
+        console.log('[USBService] Dongle connected')
         this.lastDongleState = true
         this.carplay.markDongleConnected(true)
         this.notifyDeviceChange(device, true)
@@ -62,7 +62,7 @@ export class USBService {
       if (this.stopped || this.resetInProgress || this.shutdownInProgress) return
       this.broadcastGenericUsbEvent({ type: 'detach', device })
       if (this.isDongle(device) && this.lastDongleState) {
-        console.log('[USBService] Dongle disconnected:', device)
+        console.log('[USBService] Dongle disconnected')
         this.lastDongleState = false
         this.carplay.markDongleConnected(false)
         this.notifyDeviceChange(device, false)

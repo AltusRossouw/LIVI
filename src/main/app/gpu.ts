@@ -15,10 +15,6 @@ if (process.platform === 'darwin') {
   app.commandLine.appendSwitch('enable-dawn-features', 'allow_unsafe_apis')
 }
 
-app.on('gpu-info-update', () => {
-  console.log('GPU Info:', app.getGPUFeatureStatus())
-})
-
 export function commonGpuToggles() {
   app.commandLine.appendSwitch('ignore-gpu-blocklist')
   app.commandLine.appendSwitch('enable-gpu-rasterization')

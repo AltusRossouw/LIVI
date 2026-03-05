@@ -132,10 +132,8 @@ export class Plugged extends Message {
     if (wifiAvail) {
       this.phoneType = data.readUInt32LE(0)
       this.wifi = data.readUInt32LE(4)
-      console.debug('wifi avail, phone type: ', PhoneType[this.phoneType], ' wifi: ', this.wifi)
     } else {
       this.phoneType = data.readUInt32LE(0)
-      console.debug('no wifi avail, phone type: ', PhoneType[this.phoneType])
     }
   }
 }
@@ -260,12 +258,38 @@ export class VideoData extends Message {
 
 export enum MediaType {
   Data = 1,
-  AlbumCover = 3,
+  AlbumCoverPNG = 2, // Android
+  AlbumCover = 3, // Apple
   ControlAutoplayTrigger = 100
 }
 
 export enum NavigationMetaType {
   DashboardInfo = 200
+}
+
+function isPng(buf: Buffer): boolean {
+  // 89 50 4E 47 0D 0A 1A 0A
+  return (
+    buf.length >= 8 &&
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  )
+}
+
+function isAsciiBase64(buf: Buffer): boolean {
+  // allow trailing NUL
+  const s = buf.toString('ascii').replace(/\0+$/g, '').trim()
+  if (!s) return false
+
+  // reject if contains non-base64 chars
+  // (we accept newlines just in case)
+  return /^[A-Za-z0-9+/=\r\n]+$/.test(s)
 }
 
 export class MediaData extends Message {
@@ -289,23 +313,27 @@ export class MediaData extends Message {
     super(header)
     this.mediaType = mediaType
 
+    // Android: innerType=2 => raw PNG bytes
+    if (mediaType === MediaType.AlbumCoverPNG) {
+      if (!isPng(payloadOnly)) return
+      this.payload = { type: MediaType.AlbumCover, base64Image: payloadOnly.toString('base64') }
+      return
+    }
+
+    // Apple: innerType=3 => base64 ASCII text
     if (mediaType === MediaType.AlbumCover) {
-      this.payload = {
-        type: mediaType,
-        base64Image: payloadOnly.toString('base64')
-      }
+      if (!isAsciiBase64(payloadOnly)) return
+      const b64 = payloadOnly.toString('ascii').replace(/\0+$/g, '').trim()
+      this.payload = { type: MediaType.AlbumCover, base64Image: b64 }
       return
     }
 
     if (mediaType === MediaType.Data) {
-      const jsonBytes = payloadOnly.subarray(0, Math.max(0, payloadOnly.length - 1)) // drop trailing NUL-ish byte
+      const jsonBytes = payloadOnly.subarray(0, Math.max(0, payloadOnly.length - 1))
       try {
-        this.payload = {
-          type: mediaType,
-          media: JSON.parse(jsonBytes.toString('utf8'))
-        }
+        this.payload = { type: mediaType, media: JSON.parse(jsonBytes.toString('utf8')) }
       } catch {
-        // keep payload undefined on parse error
+        // ignore
       }
       return
     }
@@ -391,6 +419,7 @@ export class MetaData extends Message {
     // known media types
     if (
       this.innerType === MediaType.Data ||
+      this.innerType === MediaType.AlbumCoverPNG ||
       this.innerType === MediaType.AlbumCover ||
       this.innerType === MediaType.ControlAutoplayTrigger
     ) {
@@ -504,6 +533,84 @@ export class Phase extends Message {
     super(header)
     this.value = data.readUInt32LE(0)
   }
+}
+
+export enum BoxPhase {
+  EVT_ANDROID_PLUG_OUT = 0,
+  EVT_ANDROID_PLUG_IN = 1,
+  EVT_IPHONE_PLUG_OUT = 2,
+  EVT_IPHONE_PLUG_IN = 3,
+
+  EVT_PHONE_PLUG_IN = 4,
+  EVT_WAIT_HOTPOT = 5,
+  EVT_WAIT_AIRPLAY = 6,
+  EVT_PERMMISION_ASKING = 7,
+  EVT_NOT_REGIST = 8,
+  EVT_REG = 9,
+  EVT_SCREEN_ON = 10,
+  EVT_SCREEN_OFF = 11,
+
+  EVT_OTG_PLUG_OUT = 12,
+  EVT_OTG_PLUG_IN = 13,
+
+  EVT_ANDROID_WORKING = 14,
+  EVT_IPHONE_WORKING = 15,
+  EVT_CARLIFE_DOWNLOAD = 16,
+  EVT_SET_PERMISSION = 17,
+
+  EVT_DECODE_CONFIGURE_ERR = 18,
+  EVT_DECODE_OUTPUT_ERR = 19,
+
+  EVT_SETTINGS_PAGE_ENTER = 20,
+  EVT_SETTINGS_PAGE_BACK = 21,
+
+  EVT_FAKE_OTG_PLUG_IN = 22,
+  EVT_FAKE_OTG_PLUG_OUT = 23,
+
+  EVT_BOX_ENTER_U_MODE = 24,
+  EVT_MANUAL_DISCONNECT_PHONE = 25,
+
+  EVT_BOX_READY = 116,
+
+  EVT_BOXMIC_DETECTED = 117,
+  EVT_BOXMIC_CONNECTED = 118,
+  EVT_BOXMIC_DISCONNECTED = 119,
+
+  EVT_BOX_UPDATE = 120,
+  EVT_BOX_UPDATE_SUCCESS = 121,
+  EVT_BOX_UPDATE_FAILED = 122,
+  EVT_BOX_VERSION_ERROR = 123,
+  EVT_BOX_VERSION_SHOW = 124,
+
+  EVT_BOX_OTA_UPDATE = 125,
+  EVT_BOX_OTA_UPDATE_SUCCESS = 126,
+  EVT_BOX_OTA_UPDATE_FAILED = 127,
+
+  EVT_BOX_SUPPORT_AUTO_CONNECT = 200,
+  EVT_BOX_SCANING_DEVICES = 201,
+  EVT_BOX_DEVICE_FOUND = 202,
+  EVT_BOX_DEVICE_NOT_FOUND = 203,
+  EVT_BOX_CONNECT_DEVICE_FAILED = 204,
+
+  EVT_BOX_BLUETOOTH_CONNECTED = 205,
+  EVT_BOX_BLUETOOTH_DISCONNECTED = 206,
+
+  EVT_BOX_WIFI_CONNECTED = 207,
+  EVT_BOX_WIFI_DISCONNECTED = 208,
+
+  EVT_BOX_BLUETOOTH_PAIR_START = 209,
+  EVT_UPDATE_BLUETOOTH_PAIRED_LIST = 210,
+  EVT_UPDATE_BLUETOOTH_ONLINE_LIST = 211,
+
+  EVT_BOX_REQUEST_VIDEO_FOCUS = 212,
+  EVT_BOX_RELEASE_VIDEO_FOCUS = 213,
+
+  EVT_UPDATE_CONNECTION_URL = 214
+}
+
+export function boxPhaseToString(v: number): string {
+  const byValue = BoxPhase as unknown as Record<number, string>
+  return byValue[v] ?? `UNKNOWN_PHASE_${v}`
 }
 
 export enum BoxUpdateStatus {

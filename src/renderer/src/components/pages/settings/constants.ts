@@ -30,17 +30,11 @@ export enum WiFiValues {
   '5ghz' = '5ghz'
 }
 
-export enum MicTypeValues {
-  'box' = 'box',
-  'os' = 'os'
-}
-
 export const requiresRestartParams: (keyof ExtraConfig)[] = [
   'width',
   'height',
   'fps',
   'dpi',
-  'format',
   'mediaDelay',
   'wifiType',
   'audioTransferMode',

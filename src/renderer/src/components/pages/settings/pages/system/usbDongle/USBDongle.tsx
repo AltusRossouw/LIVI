@@ -17,7 +17,7 @@ import {
 import { useCarplayStore, useStatusStore } from '@store/store'
 import { useNetworkStatus } from '@renderer/hooks/useNetworkStatus'
 import { fmt, isDongleFwCheckResponse, normalizeBoxInfo } from './utils'
-import { DongleFwCheckResponse, FwDialogState, Row } from './types'
+import { DongleFwCheckResponse, FwDialogState, Row } from '@renderer/types'
 import { EMPTY_STRING } from '@renderer/constants'
 
 export function USBDongle() {

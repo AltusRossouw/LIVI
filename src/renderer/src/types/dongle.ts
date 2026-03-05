@@ -1,10 +1,3 @@
-export type Row = {
-  label: string
-  value: string | number | null | undefined
-  mono?: boolean
-  tooltip?: string
-}
-
 export type DevListEntry = {
   id?: string
   type?: string
@@ -61,21 +54,4 @@ export type DongleFwCheckResponse = {
   request?: Record<string, unknown> & { local?: LocalFwStatus }
   raw: DongleFwApiRaw
   error?: string
-}
-
-export type FwPhase = 'start' | 'download' | 'ready' | 'error' | 'upload'
-
-export type FwProgress = {
-  percent?: number
-  received?: number
-  total?: number
-}
-
-export type FwDialogState = {
-  open: boolean
-  phase: FwPhase
-  progress: FwProgress
-  error: string
-  message: string
-  inFlight: boolean
 }

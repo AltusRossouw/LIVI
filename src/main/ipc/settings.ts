@@ -4,7 +4,7 @@ import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/carplay
 import { currentKiosk } from '@main/window/utils'
 import { pickAssetForPlatform } from '@main/ipc/update/pickAsset'
 import { GhRelease, runtimeStateProps } from '@main/types'
-import { saveSettings } from '@main/ipc/utils'
+import { configEvents, saveSettings } from '@main/ipc/utils'
 
 export function registerSettingsIpc(runtimeState: runtimeStateProps) {
   ipcMain.handle('settings:get-kiosk', () => currentKiosk(runtimeState.config))
@@ -14,6 +14,10 @@ export function registerSettingsIpc(runtimeState: runtimeStateProps) {
   ipcMain.handle('save-settings', (_evt, settings: Partial<ExtraConfig>) => {
     saveSettings(runtimeState, settings)
     return true
+  })
+
+  configEvents.on('requestSave', (settings: Partial<ExtraConfig>) => {
+    saveSettings(runtimeState, settings)
   })
 
   ipcMain.handle('settings:reset-dongle-icons', () => {

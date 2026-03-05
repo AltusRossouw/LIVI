@@ -3,6 +3,7 @@ import { WebUSBDevice } from 'usb'
 import {
   Plugged,
   Unplugged,
+  PhoneWorkMode,
   BluetoothPairedList,
   VideoData,
   AudioData,
@@ -193,6 +194,16 @@ export class CarplayService {
 
       if (msg instanceof Plugged) {
         this.clearTimeouts()
+
+        const nextPhoneWorkMode =
+          msg.phoneType === 3 ? PhoneWorkMode.CarPlay : PhoneWorkMode.Android
+
+        try {
+          configEvents.emit('requestSave', { lastPhoneWorkMode: nextPhoneWorkMode })
+        } catch (e) {
+          console.warn('[CarplayService] failed to persist lastPhoneWorkMode (ignored)', e)
+        }
+
         const phoneTypeConfig = this.config.phoneConfig?.[msg.phoneType]
         if (phoneTypeConfig?.frameInterval) {
           this.frameInterval = setInterval(() => {

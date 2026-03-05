@@ -24,7 +24,8 @@
       "@main/*": ["main/*"],
       "@worker/*": ["renderer/src/components/worker/*"],
       "@store/*": ["renderer/src/store/*"],
-      "@utils/*": ["renderer/src/utils/*"]
+      "@utils/*": ["renderer/src/utils/*"],
+      "@types/*": ["renderer/src/types/*"]
     }
   },
   "include": ["src/**/*", "src/types"],

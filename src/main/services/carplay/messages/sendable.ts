@@ -1,8 +1,10 @@
-import { DongleConfig } from '../driver/DongleDriver.js'
+import { DongleConfig, PhoneWorkMode } from '../driver/DongleDriver.js'
 import { MessageType, MessageHeader, CommandMapping, CommandValue } from './common.js'
-import { clamp, getCurrentTimeInMs } from './utils.js'
+import { clamp, getCurrentTimeInMs, matchFittingAAResolution } from './utils.js'
 import { buildServerCgiScript } from '../assets/LIVI_cgi.js'
 import { buildLiviWeb } from '../assets/LIVI_web.js'
+
+export type OpenConfig = Pick<DongleConfig, 'width' | 'height' | 'fps'>
 
 export abstract class SendableMessage {
   abstract type: MessageType
@@ -254,30 +256,37 @@ export class HeartBeat extends SendableMessage {
 
 export class SendOpen extends SendableMessageWithPayload {
   type = MessageType.Open
-  config: DongleConfig
 
-  getPayload(): Buffer {
-    const { config } = this
-    const width = Buffer.alloc(4)
-    width.writeUInt32LE(config.width)
-    const height = Buffer.alloc(4)
-    height.writeUInt32LE(config.height)
-    const fps = Buffer.alloc(4)
-    fps.writeUInt32LE(config.fps)
-    const format = Buffer.alloc(4)
-    format.writeUInt32LE(config.format)
-    const packetMax = Buffer.alloc(4)
-    packetMax.writeUInt32LE(config.packetMax)
-    const iBox = Buffer.alloc(4)
-    iBox.writeUInt32LE(config.iBoxVersion)
-    const phoneMode = Buffer.alloc(4)
-    phoneMode.writeUInt32LE(config.phoneWorkMode)
-    return Buffer.concat([width, height, fps, format, packetMax, iBox, phoneMode])
+  constructor(
+    public config: Pick<DongleConfig, 'width' | 'height' | 'fps'>,
+    public phoneWorkMode: PhoneWorkMode.CarPlay | PhoneWorkMode.Android
+  ) {
+    super()
   }
 
-  constructor(config: DongleConfig) {
-    super()
-    this.config = config
+  getPayload(): Buffer {
+    let { width, height } = this.config
+    const { fps } = this.config
+
+    if (this.phoneWorkMode === PhoneWorkMode.Android) {
+      const adjusted = matchFittingAAResolution({ width, height })
+      width = adjusted.width
+      height = adjusted.height
+    }
+
+    const FORMAT = 5
+    const PACKET_MAX = 49152
+    const IBOX_VERSION = 2
+
+    const b = Buffer.alloc(28)
+    b.writeUInt32LE(width, 0)
+    b.writeUInt32LE(height, 4)
+    b.writeUInt32LE(fps, 8)
+    b.writeUInt32LE(FORMAT, 12)
+    b.writeUInt32LE(PACKET_MAX, 16)
+    b.writeUInt32LE(IBOX_VERSION, 20)
+    b.writeUInt32LE(this.phoneWorkMode, 24)
+    return b
   }
 }
 

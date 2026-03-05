@@ -1,4 +1,4 @@
-import { BoxInfoPayload, DongleFwCheckResponse } from './types'
+import type { BoxInfoPayload, DongleFwCheckResponse } from '@renderer/types'
 
 export function normalizeBoxInfo(input: unknown): BoxInfoPayload | null {
   if (!input) return null

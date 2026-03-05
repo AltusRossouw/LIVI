@@ -214,7 +214,6 @@ export class CarplayAudio {
     }
 
     this.volumes[stream] = v
-    console.debug('[CarplayAudio] setStreamVolume', { stream, volume: v })
   }
 
   private getRampMsForTransition(from: number, to: number): number {

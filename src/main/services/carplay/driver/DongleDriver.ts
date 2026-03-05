@@ -6,8 +6,10 @@ import {
   BoxInfo,
   SoftwareVersion,
   VendorCarPlaySessionBlob,
+  BluetoothPeerConnected,
   Plugged,
   Unplugged,
+  Opened,
   type BoxInfoSettings
 } from '../messages/readable.js'
 import {
@@ -21,7 +23,8 @@ import {
   SendCommand,
   SendString,
   SendBluetoothPairedList,
-  HeartBeat
+  HeartBeat,
+  SendDisconnectPhone
 } from '../messages/sendable.js'
 
 const CONFIG_NUMBER = 1
@@ -53,7 +56,8 @@ export enum AndroidWorkMode {
   Off = 0,
   AndroidAuto = 1,
   CarLife = 2,
-  AndroidMirror = 3
+  AndroidMirror = 3,
+  Search = 7
 }
 
 export enum PhoneWorkMode {
@@ -65,16 +69,12 @@ export type PhoneTypeConfig = { frameInterval: number | null }
 type PhoneTypeConfigMap = { [K in PhoneType]: PhoneTypeConfig }
 
 export type DongleConfig = {
-  androidWorkMode: AndroidWorkMode
-  phoneWorkMode: PhoneWorkMode
   width: number
   height: number
   fps: number
   dpi: number
-  format: number
-  iBoxVersion: number
+  lastPhoneWorkMode: number
   apkVer: string
-  packetMax: number
   nightMode: boolean
   carName: string
   oemName: string
@@ -97,12 +97,8 @@ export const DEFAULT_CONFIG: DongleConfig = {
   height: 480,
   fps: 60,
   dpi: 160,
-  format: 5,
-  iBoxVersion: 2,
+  lastPhoneWorkMode: PhoneWorkMode.CarPlay,
   apkVer: '2025.03.19.1126',
-  phoneWorkMode: PhoneWorkMode.CarPlay,
-  androidWorkMode: AndroidWorkMode.Off,
-  packetMax: 49152,
   carName: 'LIVI',
   oemName: 'App',
   nightMode: true,
@@ -142,8 +138,19 @@ export class DongleDriver extends EventEmitter {
   private _boxInfo?: BoxInfoSettings
   private _lastDongleInfoEmitKey = ''
 
+  private _cfg: DongleConfig | null = null
+
+  private _wifiConnectTimer: ReturnType<typeof setTimeout> | null = null
+  private _modeSwitchInFlight: Promise<void> = Promise.resolve()
+  private _lastModeSwitchAt = 0
+
+  // Runtime and initial mode
+  private _androidWorkModeRuntime: AndroidWorkMode = AndroidWorkMode.AndroidAuto
+  private _phoneWorkModeRuntime: PhoneWorkMode = PhoneWorkMode.CarPlay
+
+  // centralised detection signals
   private _lastPluggedPhoneType: PhoneType | null = null
-  private _androidWorkModeRuntime: AndroidWorkMode = AndroidWorkMode.Off
+  private _pendingModeHintFromBoxInfo: PhoneWorkMode | null = null
 
   private async applyAndroidWorkMode(next: AndroidWorkMode) {
     if (next === this._androidWorkModeRuntime) return
@@ -152,27 +159,67 @@ export class DongleDriver extends EventEmitter {
 
     await this.send(new SendNumber(this._androidWorkModeRuntime, FileAddress.ANDROID_WORK_MODE))
     await this.send(new SendCommand('wifiEnable'))
-    setTimeout(() => void this.send(new SendCommand('wifiConnect')), 250)
+    this.scheduleWifiConnect(150)
   }
 
   private resolveAndroidWorkModeOnPlugged(phoneType: PhoneType): AndroidWorkMode {
-    // - CarPlay must always disable Android mode
-    // - Android phone: only auto-promote Off -> AndroidAuto
-    if (phoneType === PhoneType.CarPlay) return AndroidWorkMode.Off
-
     if (phoneType === PhoneType.AndroidAuto) {
       return this._androidWorkModeRuntime === AndroidWorkMode.Off
         ? AndroidWorkMode.AndroidAuto
         : this._androidWorkModeRuntime
     }
-
     return this._androidWorkModeRuntime
+  }
+
+  private resolvePhoneWorkModeOnPlugged(phoneType: PhoneType): PhoneWorkMode {
+    return phoneType === PhoneType.CarPlay ? PhoneWorkMode.CarPlay : PhoneWorkMode.Android
+  }
+
+  private async applyPhoneWorkMode(next: PhoneWorkMode) {
+    const now = Date.now()
+    if (next === this._phoneWorkModeRuntime) return
+    if (now - this._lastModeSwitchAt < 800) return
+
+    this._phoneWorkModeRuntime = next
+    this._lastModeSwitchAt = now
+
+    const cfg = this._cfg
+    if (!cfg) return
+
+    this._modeSwitchInFlight = this._modeSwitchInFlight.then(async () => {
+      if (this._closing || !this._device?.opened) return
+
+      await this.send(new SendDisconnectPhone())
+      await this.sleep(120)
+
+      await this.send(
+        new SendOpen(
+          { width: cfg.width, height: cfg.height, fps: cfg.fps },
+          this._phoneWorkModeRuntime
+        )
+      )
+
+      await this.send(new SendCommand('wifiEnable'))
+      this.scheduleWifiConnect(150)
+    })
+
+    await this._modeSwitchInFlight
   }
 
   static knownDevices = [
     { vendorId: 0x1314, productId: 0x1520 },
     { vendorId: 0x1314, productId: 0x1521 }
   ]
+
+  private scheduleWifiConnect(delayMs: number) {
+    if (this._wifiConnectTimer) {
+      clearTimeout(this._wifiConnectTimer)
+      this._wifiConnectTimer = null
+    }
+    this._wifiConnectTimer = setTimeout(() => {
+      void this.send(new SendCommand('wifiConnect'))
+    }, delayMs)
+  }
 
   private sleep(ms: number) {
     return new Promise<void>((r) => setTimeout(r, ms))
@@ -277,6 +324,7 @@ export class DongleDriver extends EventEmitter {
       this._inEP = alt.endpoints.find((e) => e.direction === 'in') || null
       this._outEP = alt.endpoints.find((e) => e.direction === 'out') || null
       if (!this._inEP || !this._outEP) throw new DriverStateError('Endpoints missing')
+      if (!this._readerActive) void this.readLoop()
     } catch (err) {
       await this.close()
       throw err
@@ -300,10 +348,158 @@ export class DongleDriver extends EventEmitter {
   }
 
   public sendBluetoothPairedList = async (listText: string): Promise<boolean> => {
-    console.log('[DongleDriver] TX BluetoothPairedList.data =', JSON.stringify(listText))
     return this.send(new SendBluetoothPairedList(listText))
   }
 
+  // isolate framing/decoding
+  private async readOneMessage() {
+    const dev = this._device
+    const inEp = this._inEP
+    if (!dev || !inEp) return null
+
+    const headerRes = await dev.transferIn(inEp.endpointNumber, MessageHeader.dataLength)
+    if (this._closing) return null
+
+    const headerData = headerRes?.data
+    if (!headerData) throw new HeaderBuildError('Empty header')
+
+    const headerBuffer = Buffer.from(
+      headerData.buffer,
+      headerData.byteOffset,
+      headerData.byteLength
+    )
+    const header = MessageHeader.fromBuffer(headerBuffer)
+
+    let extra: Buffer | undefined
+    if (header.length) {
+      const extraRes = await dev.transferIn(inEp.endpointNumber, header.length)
+      if (this._closing) return null
+      const extraData = extraRes?.data
+      if (!extraData) throw new Error('Failed to read extra data')
+      extra = Buffer.from(extraData.buffer, extraData.byteOffset, extraData.byteLength)
+    }
+
+    return header.toMessage(extra)
+  }
+
+  // entral message dispatch
+  private async handleMessage(msg: unknown) {
+    // Ignore vendor blobs early
+    if (msg instanceof VendorCarPlaySessionBlob) return
+
+    // Track info
+    if (msg instanceof SoftwareVersion) {
+      this._dongleFwVersion = msg.version
+      this.emitDongleInfoIfChanged()
+    }
+
+    // BoxInfo: store + signal extraction + reconcile
+    if (msg instanceof BoxInfo) {
+      await this.onBoxInfo(msg)
+      this.emit('message', msg)
+      return
+    }
+
+    // Everything else: emit raw first
+    this.emit('message', msg)
+
+    if (msg instanceof BluetoothPeerConnected) {
+      // intentionally no-op
+    }
+
+    if (msg instanceof Opened) this.onOpened()
+    if (msg instanceof Unplugged) this.onUnplugged()
+    if (msg instanceof Plugged) await this.onPlugged(msg)
+  }
+
+  private onOpened() {
+    if (!this._heartbeatInterval) {
+      this._heartbeatInterval = setInterval(() => void this.send(new HeartBeat()), 2000)
+    }
+    this.scheduleWifiConnect(150)
+  }
+
+  private onUnplugged() {
+    this._lastPluggedPhoneType = null
+    this._pendingModeHintFromBoxInfo = null
+
+    if (this._heartbeatInterval) {
+      clearInterval(this._heartbeatInterval)
+      this._heartbeatInterval = null
+    }
+  }
+
+  private async onPlugged(msg: Plugged) {
+    this._lastPluggedPhoneType = msg.phoneType
+    await this.reconcileModes('plugged')
+
+    const cfg = this._cfg
+    if (cfg) {
+      const connectedMode = this.resolvePhoneWorkModeOnPlugged(msg.phoneType)
+      if (cfg.lastPhoneWorkMode !== connectedMode) {
+        cfg.lastPhoneWorkMode = connectedMode
+        this.emit('config-changed', { lastPhoneWorkMode: connectedMode })
+      }
+    }
+
+    console.log('[DongleDriver] Link established')
+  }
+
+  private async onBoxInfo(msg: BoxInfo) {
+    this._boxInfo = msg.settings
+    this.emitDongleInfoIfChanged()
+
+    // IMPORTANT: Do not react to empty MDLinkType (dongle still initializing)
+    const md = String(msg.settings.MDLinkType ?? '')
+
+    // Flip ONLY on the explicit mismatch signal !! WARNING: Chinese TYPO!
+    if (md === 'RiddleLinktype_UNKNOWN?' || md === 'RiddleLinktype_UNKOWN?') {
+      const current = this._phoneWorkModeRuntime
+      const next = current === PhoneWorkMode.Android ? PhoneWorkMode.CarPlay : PhoneWorkMode.Android
+
+      // Only flip if cfg exists
+      if (this._cfg) {
+        console.log(
+          `[DongleDriver] MDLinkType UNKOWN: flipping mode ${PhoneWorkMode[current]} -> ${PhoneWorkMode[next]}`
+        )
+        await this.applyPhoneWorkMode(next)
+      }
+    }
+
+    this.emitDongleInfoIfChanged()
+  }
+
+  private async reconcileModes(reason: 'plugged' | 'boxinfo') {
+    // Decide desired modes from signals
+    let desiredPhone: PhoneWorkMode | null = null
+    let desiredAndroid: AndroidWorkMode | null = null
+
+    if (this._lastPluggedPhoneType != null) {
+      desiredPhone = this.resolvePhoneWorkModeOnPlugged(this._lastPluggedPhoneType)
+      desiredAndroid = this.resolveAndroidWorkModeOnPlugged(this._lastPluggedPhoneType)
+    } else if (this._pendingModeHintFromBoxInfo != null) {
+      desiredPhone = this._pendingModeHintFromBoxInfo
+      desiredAndroid = null // don't touch android work mode
+    }
+
+    // Apply phone mode ONLY via applyPhoneWorkMode (single authority)
+    if (desiredPhone != null && desiredPhone !== this._phoneWorkModeRuntime) {
+      console.log(
+        `[DongleDriver] mode change (${reason}): ${PhoneWorkMode[this._phoneWorkModeRuntime]} -> ${PhoneWorkMode[desiredPhone]}`
+      )
+      await this.applyPhoneWorkMode(desiredPhone)
+    }
+
+    // Apply android work mode ONLY via applyAndroidWorkMode
+    if (desiredAndroid != null && desiredAndroid !== this._androidWorkModeRuntime) {
+      console.log(
+        `[DongleDriver] android work mode change (${reason}): ${AndroidWorkMode[this._androidWorkModeRuntime]} -> ${AndroidWorkMode[desiredAndroid]}`
+      )
+      await this.applyAndroidWorkMode(desiredAndroid)
+    }
+  }
+
+  // --- readLoop rewritten to be simple ---
   private async readLoop() {
     if (this._readerActive) return
     this._readerActive = true
@@ -317,66 +513,12 @@ export class DongleDriver extends EventEmitter {
         }
 
         try {
-          const dev = this._device
-          const inEp = this._inEP
-          if (!dev || !inEp) break
+          const msg = await this.readOneMessage()
+          if (!msg) continue
 
-          const headerRes = await dev.transferIn(inEp.endpointNumber, MessageHeader.dataLength)
-          if (this._closing) break
+          await this.handleMessage(msg)
 
-          const headerData = headerRes?.data
-          if (!headerData) throw new HeaderBuildError('Empty header')
-
-          const headerBuffer = Buffer.from(
-            headerData.buffer,
-            headerData.byteOffset,
-            headerData.byteLength
-          )
-          const header = MessageHeader.fromBuffer(headerBuffer)
-          let extra: Buffer | undefined
-
-          if (header.length) {
-            const extraRes = await dev.transferIn(inEp.endpointNumber, header.length)
-            if (this._closing) break
-            const extraData = extraRes?.data
-            if (!extraData) throw new Error('Failed to read extra data')
-            extra = Buffer.from(extraData.buffer, extraData.byteOffset, extraData.byteLength)
-          }
-
-          const msg = header.toMessage(extra)
-          if (msg) {
-            if (msg instanceof VendorCarPlaySessionBlob) {
-              console.log(
-                `[DongleDriver] vendor blob type=0x${msg.header.type.toString(16)} len=${msg.raw.length}`
-              )
-              continue
-            }
-            this.emit('message', msg)
-
-            if (msg instanceof Plugged) {
-              if (msg.phoneType !== this._lastPluggedPhoneType) {
-                this._lastPluggedPhoneType = msg.phoneType
-
-                const nextAndroidWorkMode = this.resolveAndroidWorkModeOnPlugged(msg.phoneType)
-                await this.applyAndroidWorkMode(nextAndroidWorkMode)
-              }
-            } else if (msg instanceof Unplugged) {
-              this._lastPluggedPhoneType = null
-
-              // Reset to default
-              await this.applyAndroidWorkMode(AndroidWorkMode.Off)
-            }
-
-            if (msg instanceof SoftwareVersion) {
-              this._dongleFwVersion = msg.version
-              this.emitDongleInfoIfChanged()
-            } else if (msg instanceof BoxInfo) {
-              this._boxInfo = msg.settings
-              this.emitDongleInfoIfChanged()
-            }
-
-            if (this.errorCount !== 0) this.errorCount = 0
-          }
+          if (this.errorCount !== 0) this.errorCount = 0
         } catch (err) {
           if (this._closing || !this._device?.opened || this.isBenignUsbShutdownError(err)) {
             break
@@ -398,11 +540,13 @@ export class DongleDriver extends EventEmitter {
 
     this.errorCount = 0
     this._started = true
+    this._cfg = cfg
 
-    this._androidWorkModeRuntime = cfg.androidWorkMode
-    this._lastPluggedPhoneType = null
-
-    if (!this._readerActive) void this.readLoop()
+    this._phoneWorkModeRuntime =
+      cfg.lastPhoneWorkMode === PhoneWorkMode.Android
+        ? PhoneWorkMode.Android
+        : PhoneWorkMode.CarPlay
+    this._androidWorkModeRuntime = AndroidWorkMode.AndroidAuto
 
     const ui = (cfg.oemName ?? '').trim()
     const label = ui.length > 0 ? ui : cfg.carName
@@ -416,28 +560,26 @@ export class DongleDriver extends EventEmitter {
     const messages: SendableMessage[] = [
       new SendString(label, FileAddress.BOX_NAME),
       new SendBoolean(true, FileAddress.CHARGE_MODE),
-      new SendOpen(cfg),
+      new SendCommand(cfg.wifiType === '5ghz' ? 'wifi5g' : 'wifi24g'),
+      new SendCommand('wifiEnable'),
+      new SendOpen(
+        { width: cfg.width, height: cfg.height, fps: cfg.fps },
+        this._phoneWorkModeRuntime
+      ),
       new SendNumber(cfg.dpi, FileAddress.DPI),
       new SendBoolean(cfg.nightMode, FileAddress.NIGHT_MODE),
       new SendNumber(cfg.hand, FileAddress.HAND_DRIVE_MODE),
-      new SendNumber(cfg.androidWorkMode, FileAddress.ANDROID_WORK_MODE),
+      new SendNumber(this._androidWorkModeRuntime, FileAddress.ANDROID_WORK_MODE),
       new SendCommand(cfg.audioTransferMode ? 'audioTransferOn' : 'audioTransferOff'),
       new SendCommand(micCmd),
-      new SendCommand(cfg.wifiType === '5ghz' ? 'wifi5g' : 'wifi24g'),
       new SendIconConfig({ oemName: cfg.oemName }),
-      new SendBoxSettings(cfg),
-      new SendCommand('wifiEnable')
+      new SendBoxSettings(cfg)
     ]
 
     for (const m of messages) {
       await this.send(m)
       await this.sleep(120)
     }
-
-    setTimeout(() => void this.send(new SendCommand('wifiConnect')), 600)
-
-    if (this._heartbeatInterval) clearInterval(this._heartbeatInterval)
-    this._heartbeatInterval = setInterval(() => void this.send(new HeartBeat()), 2000)
   }
 
   close = async (): Promise<void> => {
@@ -449,6 +591,11 @@ export class DongleDriver extends EventEmitter {
       if (!this._device && !this._readerActive && !this._started) return
 
       this._closing = true
+
+      if (this._wifiConnectTimer) {
+        clearTimeout(this._wifiConnectTimer)
+        this._wifiConnectTimer = null
+      }
 
       if (this._heartbeatInterval) {
         clearInterval(this._heartbeatInterval)

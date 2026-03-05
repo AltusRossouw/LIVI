@@ -78,16 +78,27 @@ export const AppLayout: FC<PropsWithChildren<AppLayoutProps>> = ({
       showNavAndArmHide()
     }
 
+    const onFocusIn: EventListener = () => {
+      const navEl = navRef.current
+      const active = document.activeElement as HTMLElement | null
+
+      if (navEl && active && navEl.contains(active)) {
+        showNavAndArmHide()
+      }
+    }
+
     window.addEventListener('keydown', wake, { passive: true })
     document.addEventListener('mousemove', wake, { passive: true })
     document.addEventListener('wheel', wake, { passive: true })
+    document.addEventListener('focusin', onFocusIn)
 
     return () => {
       window.removeEventListener('keydown', wake)
       document.removeEventListener('mousemove', wake)
       document.removeEventListener('wheel', wake)
+      document.removeEventListener('focusin', onFocusIn)
     }
-  }, [inAutoHideNavPage, showNavAndArmHide])
+  }, [inAutoHideNavPage, showNavAndArmHide, navRef])
 
   // Hide nav column while streaming on home screen
   const hideNavHome = isStreaming && pathname === ROUTES.HOME

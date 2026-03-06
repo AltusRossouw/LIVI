@@ -84,7 +84,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
       }
       mainWindow.show()
     }
-
+    mainWindow.webContents.setZoomFactor((runtimeState.config.uiZoomPercent ?? 100) / 100)
     pushSettingsToRenderer(runtimeState, { kiosk: currentKiosk(runtimeState.config) })
 
     if (is.dev) mainWindow.webContents.openDevTools({ mode: 'detach' })

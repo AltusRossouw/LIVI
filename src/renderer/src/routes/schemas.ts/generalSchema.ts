@@ -354,6 +354,27 @@ export const generalSchema: SettingsNode<ExtraConfig> = {
       label: 'Fullscreen',
       labelKey: 'settings.fullscreen',
       path: 'kiosk'
+    },
+    {
+      type: 'number',
+      label: 'UI Zoom',
+      labelKey: 'settings.uiZoom',
+      path: 'uiZoomPercent',
+      displayValue: true,
+      min: 50,
+      max: 200,
+      step: 10,
+      valueTransform: {
+        toView: (v: number) => v,
+        fromView: (v: number) => v,
+        format: (v: number) => `${v}%`
+      },
+      page: {
+        title: 'UI Zoom',
+        labelTitle: 'settings.uiZoom',
+        description: 'Adjust the global UI zoom level of the application window.',
+        labelDescription: 'settings.uiZoomDescription'
+      }
     }
   ]
 }

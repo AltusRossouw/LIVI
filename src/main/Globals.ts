@@ -11,6 +11,7 @@ export type TelemetryDashboardConfig = {
 export type ExtraConfig = DongleConfig & {
   startPage: 'home' | 'media' | 'maps' | 'telemetry' | 'camera' | 'settings'
   kiosk: boolean
+  uiZoomPercent: number
   camera: string
   telemetryEnabled: boolean
   telemetryDashboards?: TelemetryDashboardConfig[]

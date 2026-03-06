@@ -64,6 +64,8 @@
     "ukrainian": "Ukrainian",
     "languageDescription": "Select the application language.",
     "fullscreen": "Fullscreen",
+    "uiZoom": "UI Zoom",
+    "uiZoomDescription": "",
     "audio": "Audio",
     "music": "Music",
     "musicDescription": "",

@@ -64,6 +64,8 @@
     "ukrainian": "Українська",
     "languageDescription": "Виберіть мову застосунку.",
     "fullscreen": "Повноекранний режим",
+    "uiZoom": "Масштаб інтерфейсу",
+    "uiZoomDescription": "",
     "audio": "Аудіо",
     "music": "Музика",
     "musicDescription": "",

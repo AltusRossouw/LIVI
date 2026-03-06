@@ -20,6 +20,7 @@ export function loadConfig(): ExtraConfig {
     ...DEFAULT_CONFIG,
     startPage: 'home',
     kiosk: true,
+    uiZoomPercent: 100,
     camera: '',
     cameraMirror: false,
     nightMode: true,

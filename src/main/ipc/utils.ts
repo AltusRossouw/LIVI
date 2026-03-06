@@ -75,6 +75,8 @@ export function saveSettings(runtimeState: runtimeStateProps, next: Partial<Extr
 
   configEvents.emit('changed', merged, prev)
 
+  mainWindow?.webContents.setZoomFactor((runtimeState.config.uiZoomPercent ?? 100) / 100)
+
   pushSettingsToRenderer(runtimeState)
 
   if (!mainWindow) return

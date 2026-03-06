@@ -245,7 +245,6 @@ export class MessageHeader {
         case MessageType.UiBringToForeground:
           return null
         default:
-          console.debug(`Unknown message type without data: ${type}`)
           return null
       }
     }

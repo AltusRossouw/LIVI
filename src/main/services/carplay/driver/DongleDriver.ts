@@ -152,6 +152,30 @@ export class DongleDriver extends EventEmitter {
   private _lastPluggedPhoneType: PhoneType | null = null
   private _pendingModeHintFromBoxInfo: PhoneWorkMode | null = null
 
+  // Logging PhoneWorkMode
+  private logPhoneWorkModeChange(
+    reason: string,
+    from: PhoneWorkMode,
+    to: PhoneWorkMode,
+    extra?: string
+  ) {
+    console.log(
+      `[DongleDriver] phone work mode change | reason=${reason} | from=${PhoneWorkMode[from]} | to=${PhoneWorkMode[to]}${extra ? ` | ${extra}` : ''}`
+    )
+  }
+
+  // Logging AndroidWorkMode
+  private logAndroidWorkModeChange(
+    reason: string,
+    from: AndroidWorkMode,
+    to: AndroidWorkMode,
+    extra?: string
+  ) {
+    console.log(
+      `[DongleDriver] android work mode change | reason=${reason} | from=${AndroidWorkMode[from]} | to=${AndroidWorkMode[to]}${extra ? ` | ${extra}` : ''}`
+    )
+  }
+
   private async applyAndroidWorkMode(next: AndroidWorkMode) {
     if (next === this._androidWorkModeRuntime) return
 
@@ -459,9 +483,7 @@ export class DongleDriver extends EventEmitter {
 
       // Only flip if cfg exists
       if (this._cfg) {
-        console.log(
-          `[DongleDriver] MDLinkType UNKOWN: flipping mode ${PhoneWorkMode[current]} -> ${PhoneWorkMode[next]}`
-        )
+        this.logPhoneWorkModeChange(md, current, next)
         await this.applyPhoneWorkMode(next)
       }
     }
@@ -484,17 +506,13 @@ export class DongleDriver extends EventEmitter {
 
     // Apply phone mode ONLY via applyPhoneWorkMode (single authority)
     if (desiredPhone != null && desiredPhone !== this._phoneWorkModeRuntime) {
-      console.log(
-        `[DongleDriver] mode change (${reason}): ${PhoneWorkMode[this._phoneWorkModeRuntime]} -> ${PhoneWorkMode[desiredPhone]}`
-      )
+      this.logPhoneWorkModeChange(reason, this._phoneWorkModeRuntime, desiredPhone)
       await this.applyPhoneWorkMode(desiredPhone)
     }
 
     // Apply android work mode ONLY via applyAndroidWorkMode
     if (desiredAndroid != null && desiredAndroid !== this._androidWorkModeRuntime) {
-      console.log(
-        `[DongleDriver] android work mode change (${reason}): ${AndroidWorkMode[this._androidWorkModeRuntime]} -> ${AndroidWorkMode[desiredAndroid]}`
-      )
+      this.logAndroidWorkModeChange(reason, this._androidWorkModeRuntime, desiredAndroid)
       await this.applyAndroidWorkMode(desiredAndroid)
     }
   }

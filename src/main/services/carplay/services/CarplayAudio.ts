@@ -497,6 +497,17 @@ export class CarplayAudio {
     if (msg.command != null) {
       const cmd = msg.command
 
+      console.log('[CarplayAudio] audio command', {
+        cmd,
+        audioType: msg.audioType,
+        decodeType: msg.decodeType,
+        mediaActive: this.mediaActive,
+        audioOpenArmed: this.audioOpenArmed,
+        siriActive: this.siriActive,
+        phonecallActive: this.phonecallActive,
+        navActive: this.navActive
+      })
+
       // UI attention hints (renderer decides what to do)
 
       // Incoming call: pre-accept / ringing

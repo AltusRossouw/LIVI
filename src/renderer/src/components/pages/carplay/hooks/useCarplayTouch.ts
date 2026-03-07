@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react'
+import { useMemo, useRef, useCallback, type RefObject } from 'react'
 import { MultiTouchAction, TouchAction } from '@main/services/carplay/messages/sendable'
 
 type Handlers = {
@@ -14,12 +14,31 @@ type Handlers = {
 type MTPoint = { id: number; x: number; y: number; action: MultiTouchAction }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
-const norm = (el: HTMLElement, cx: number, cy: number) => {
-  const r = el.getBoundingClientRect()
-  return { x: clamp01((cx - r.left) / r.width), y: clamp01((cy - r.top) / r.height) }
+
+const norm = (
+  eventTarget: HTMLElement,
+  videoRef: RefObject<HTMLElement | null>,
+  cx: number,
+  cy: number
+) => {
+  const target = videoRef.current ?? eventTarget
+  const r = target.getBoundingClientRect()
+
+  if (r.width <= 0 || r.height <= 0) {
+    return null
+  }
+
+  if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) {
+    return null
+  }
+
+  return {
+    x: clamp01((cx - r.left) / r.width),
+    y: clamp01((cy - r.top) / r.height)
+  }
 }
 
-export const useCarplayMultiTouch = (): Handlers => {
+export const useCarplayMultiTouch = (videoRef: RefObject<HTMLElement | null>): Handlers => {
   const slotByPointerId = useRef(new Map<number, number>())
   const active = useRef(new Map<number, { x: number; y: number }>())
   const freeSlots = useRef<number[]>([])
@@ -63,7 +82,9 @@ export const useCarplayMultiTouch = (): Handlers => {
   const onPointerDown = useCallback<Handlers['onPointerDown']>(
     (e) => {
       const el = e.currentTarget as HTMLElement
-      const { x, y } = norm(el, e.clientX, e.clientY)
+      const p = norm(el, videoRef, e.clientX, e.clientY)
+      if (!p) return
+      const { x, y } = p
 
       if (e.pointerType === 'mouse') {
         mouseDown.current = true
@@ -78,13 +99,15 @@ export const useCarplayMultiTouch = (): Handlers => {
       overrides.set(id, MultiTouchAction.Down)
       sendFullFrame(overrides)
     },
-    [alloc, sendFullFrame]
+    [alloc, sendFullFrame, videoRef]
   )
 
   const onPointerMove = useCallback<Handlers['onPointerMove']>(
     (e) => {
       const el = e.currentTarget as HTMLElement
-      const { x, y } = norm(el, e.clientX, e.clientY)
+      const p = norm(el, videoRef, e.clientX, e.clientY)
+      if (!p) return
+      const { x, y } = p
 
       if (e.pointerType === 'mouse') {
         if (!mouseDown.current) return
@@ -97,33 +120,49 @@ export const useCarplayMultiTouch = (): Handlers => {
       active.current.set(id, { x, y })
       sendFullFrame()
     },
-    [sendFullFrame]
+    [sendFullFrame, videoRef]
   )
 
   const finishPointer = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const el = e.currentTarget as HTMLElement
-      const { x, y } = norm(el, e.clientX, e.clientY)
+      const p = norm(el, videoRef, e.clientX, e.clientY)
 
       if (e.pointerType === 'mouse') {
         if (!mouseDown.current) return
+        if (!p) {
+          mouseDown.current = false
+          return
+        }
+
+        const { x, y } = p
         mouseDown.current = false
         window.carplay.ipc.sendTouch(x, y, TouchAction.Up)
         return
       }
 
       const id = slotByPointerId.current.get(e.pointerId)
-      if (id !== undefined) {
-        active.current.set(id, { x, y })
-        const overrides = new Map<number, MultiTouchAction>()
-        overrides.set(id, MultiTouchAction.Up)
-        sendFullFrame(overrides)
+      if (id === undefined) return
 
+      const last = active.current.get(id)
+      const x = p?.x ?? last?.x
+      const y = p?.y ?? last?.y
+
+      if (x === undefined || y === undefined) {
         el.releasePointerCapture?.(e.pointerId)
         free(e.pointerId)
+        return
       }
+
+      active.current.set(id, { x, y })
+      const overrides = new Map<number, MultiTouchAction>()
+      overrides.set(id, MultiTouchAction.Up)
+      sendFullFrame(overrides)
+
+      el.releasePointerCapture?.(e.pointerId)
+      free(e.pointerId)
     },
-    [free, sendFullFrame]
+    [free, sendFullFrame, videoRef]
   )
 
   const onPointerUp = useCallback<Handlers['onPointerUp']>((e) => finishPointer(e), [finishPointer])

@@ -591,7 +591,7 @@ export class DongleDriver extends EventEmitter {
       new SendCommand(cfg.audioTransferMode ? 'audioTransferOn' : 'audioTransferOff'),
       new SendCommand(micCmd),
       new SendIconConfig({ oemName: cfg.oemName }),
-      new SendBoxSettings(cfg)
+      new SendBoxSettings(cfg, this._phoneWorkModeRuntime)
     ]
 
     for (const m of messages) {

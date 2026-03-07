@@ -106,6 +106,8 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const setAudioInfo = useCarplayStore((s) => s.setAudioInfo)
   const setPcmData = useCarplayStore((s) => s.setPcmData)
   const setBluetoothPairedList = useCarplayStore((s) => s.setBluetoothPairedList)
+  const negotiatedWidth = useCarplayStore((s) => s.negotiatedWidth)
+  const negotiatedHeight = useCarplayStore((s) => s.negotiatedHeight)
 
   useEffect(() => {
     if (pathname !== '/') return
@@ -396,7 +398,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   }, [])
 
   // Audio + touch hooks
-  const touchHandlers = useCarplayMultiTouch()
+  const touchHandlers = useCarplayMultiTouch(canvasRef)
 
   const clearRetryTimeout = useCallback(() => {
     if (retryTimeoutRef.current) {
@@ -903,6 +905,28 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const inCarplay = pathname === '/'
   const showCarplayOverlay = inCarplay || navVideoOverlayActive
 
+  const resolvedNegotiatedWidth = negotiatedWidth ?? 0
+  const resolvedNegotiatedHeight = negotiatedHeight ?? 0
+
+  const shouldPreserveAspect =
+    resolvedNegotiatedWidth > 0 &&
+    resolvedNegotiatedHeight > 0 &&
+    settings.width > 0 &&
+    settings.height > 0 &&
+    (resolvedNegotiatedWidth !== settings.width || resolvedNegotiatedHeight !== settings.height)
+
+  const streamAspect =
+    resolvedNegotiatedWidth > 0 && resolvedNegotiatedHeight > 0
+      ? resolvedNegotiatedWidth / resolvedNegotiatedHeight
+      : 0
+
+  const viewportWidth = mainElem.current?.clientWidth ?? window.innerWidth
+  const viewportHeight = mainElem.current?.clientHeight ?? window.innerHeight
+  const viewportAspect =
+    viewportWidth > 0 && viewportHeight > 0 ? viewportWidth / viewportHeight : 0
+
+  const fitByHeight = shouldPreserveAspect && streamAspect > 0 && viewportAspect > streamAspect
+
   return (
     <div
       id="carplay-root"
@@ -947,23 +971,51 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           padding: 0,
           margin: 0,
           display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           touchAction: 'none',
           backgroundColor:
-            receivingVideo && !rendererError ? 'transparent' : theme.palette.background.default,
+            receivingVideo && !rendererError
+              ? shouldPreserveAspect
+                ? '#000'
+                : 'transparent'
+              : theme.palette.background.default,
           visibility: receivingVideo && !rendererError ? 'visible' : 'hidden',
           zIndex: receivingVideo && !rendererError ? 1 : -1,
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
         <canvas
           ref={canvasRef}
           id="video"
           style={{
-            width: receivingVideo && !rendererError ? '100%' : '0',
-            height: receivingVideo && !rendererError ? '100%' : '0',
+            width:
+              receivingVideo && !rendererError
+                ? shouldPreserveAspect
+                  ? fitByHeight
+                    ? 'auto'
+                    : '100%'
+                  : '100%'
+                : '0',
+            height:
+              receivingVideo && !rendererError
+                ? shouldPreserveAspect
+                  ? fitByHeight
+                    ? '100%'
+                    : 'auto'
+                  : '100%'
+                : '0',
+            maxWidth: receivingVideo && !rendererError ? '100%' : '0',
+            maxHeight: receivingVideo && !rendererError ? '100%' : '0',
+            aspectRatio:
+              resolvedNegotiatedWidth > 0 && resolvedNegotiatedHeight > 0
+                ? `${resolvedNegotiatedWidth} / ${resolvedNegotiatedHeight}`
+                : undefined,
             touchAction: 'none',
             userSelect: 'none',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            display: 'block'
           }}
         />
       </div>

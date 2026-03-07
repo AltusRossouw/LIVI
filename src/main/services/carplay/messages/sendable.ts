@@ -326,11 +326,16 @@ export class SendBoxSettings extends SendableMessageWithPayload {
         ? 36
         : 1
 
+    const aaAdjusted = matchFittingAAResolution({
+      width: cfg.width,
+      height: cfg.height
+    })
+
     const body: BoxSettingsBody = {
       mediaDelay: cfg.mediaDelay,
       syncTime: this.syncTime ?? getCurrentTimeInMs(),
-      androidAutoSizeW: cfg.width,
-      androidAutoSizeH: cfg.height,
+      androidAutoSizeW: aaAdjusted.width,
+      androidAutoSizeH: aaAdjusted.height,
       wifiChannel: channel,
       mediaSound: cfg.mediaSound,
       callQuality: cfg.callQuality,

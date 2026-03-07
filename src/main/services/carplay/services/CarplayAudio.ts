@@ -274,7 +274,7 @@ export class CarplayAudio {
         // hard-reset the music AudioOutput to flush any buffered state and resync
         if (this.lastMusicDataAt > 0 && now - this.lastMusicDataAt > this.musicGapResetMs) {
           if (this.lastMusicPlayerKey) {
-            this.stopPlayerByKey(this.lastMusicPlayerKey, 'music')
+            this.stopPlayerByKey(this.lastMusicPlayerKey)
             this.lastMusicPlayerKey = null
           }
 
@@ -319,15 +319,6 @@ export class CarplayAudio {
             const rampMs = this.getRampMsForTransition(fade.current, fade.target)
             fade.remainingSamples = Math.max(1, Math.round((rampMs / 1000) * sampleRate * channels))
             this.musicRampActive = true
-
-            console.debug('[CarplayAudio] starting music ramp', {
-              samples: fade.remainingSamples,
-              sampleRate,
-              channels,
-              from: fade.current,
-              to: fade.target,
-              rampMs
-            })
           }
 
           // Debounce semantics:
@@ -352,14 +343,6 @@ export class CarplayAudio {
             fade.target = desiredTarget
             fade.remainingSamples = Math.max(1, Math.round((rampMs / 1000) * sampleRate * channels))
             this.musicRampActive = true
-            console.debug('[CarplayAudio] starting music ramp', {
-              samples: fade.remainingSamples,
-              sampleRate,
-              channels,
-              from: fade.current,
-              to: fade.target,
-              rampMs
-            })
           }
 
           if (
@@ -371,14 +354,6 @@ export class CarplayAudio {
             const rampMs = this.getRampMsForTransition(fade.current, fade.target)
             this.musicRampActive = true
             fade.remainingSamples = Math.max(1, Math.round((rampMs / 1000) * sampleRate * channels))
-            console.debug('[CarplayAudio] starting music ramp', {
-              samples: fade.remainingSamples,
-              sampleRate,
-              channels,
-              from: fade.current,
-              to: fade.target,
-              rampMs
-            })
           }
 
           const navVolume = this.volumes.nav ?? 0.5
@@ -496,17 +471,6 @@ export class CarplayAudio {
     // Command-only messages: Siri / phone / media / nav control
     if (msg.command != null) {
       const cmd = msg.command
-
-      console.log('[CarplayAudio] audio command', {
-        cmd,
-        audioType: msg.audioType,
-        decodeType: msg.decodeType,
-        mediaActive: this.mediaActive,
-        audioOpenArmed: this.audioOpenArmed,
-        siriActive: this.siriActive,
-        phonecallActive: this.phonecallActive,
-        navActive: this.navActive
-      })
 
       // UI attention hints (renderer decides what to do)
 
@@ -647,7 +611,7 @@ export class CarplayAudio {
         this.musicGateMuted = false
 
         if (this.lastMusicPlayerKey) {
-          this.stopPlayerByKey(this.lastMusicPlayerKey, 'music')
+          this.stopPlayerByKey(this.lastMusicPlayerKey)
           this.lastMusicPlayerKey = null
         }
 
@@ -662,7 +626,7 @@ export class CarplayAudio {
         this.navHoldUntil = Date.now() + this.navResumeDelayMs
 
         if (!this.mediaActive && this.lastNavPlayerKey) {
-          this.stopPlayerByKey(this.lastNavPlayerKey, 'nav')
+          this.stopPlayerByKey(this.lastNavPlayerKey)
           this.lastNavPlayerKey = null
         } else {
           // mixing with music -> do not kill shared player, let tail drain
@@ -722,13 +686,13 @@ export class CarplayAudio {
         if (cmd === AudioCommand.AudioSiriStop) {
           this.siriActive = false
           if (this.lastSiriPlayerKey) {
-            this.stopPlayerByKey(this.lastSiriPlayerKey, 'siri')
+            this.stopPlayerByKey(this.lastSiriPlayerKey)
             this.lastSiriPlayerKey = null
           }
         } else if (cmd === AudioCommand.AudioPhonecallStop) {
           this.phonecallActive = false
           if (this.lastCallPlayerKey) {
-            this.stopPlayerByKey(this.lastCallPlayerKey, 'call')
+            this.stopPlayerByKey(this.lastCallPlayerKey)
             this.lastCallPlayerKey = null
           }
         }
@@ -759,7 +723,7 @@ export class CarplayAudio {
     this.lastCallPlayerKey = null
   }
 
-  private stopPlayerByKey(key: PlayerKey | null, label: string) {
+  private stopPlayerByKey(key: PlayerKey | null) {
     if (!key) return
     const player = this.audioPlayers.get(key)
     if (!player) return
@@ -770,11 +734,6 @@ export class CarplayAudio {
       // ignore
     }
     this.audioPlayers.delete(key)
-
-    console.debug('[CarplayAudio] stopped AudioOutput', {
-      label,
-      playerKey: key
-    })
   }
 
   private createAndStartAudioPlayer(sampleRate: number, channels: number): AudioOutput {
@@ -786,12 +745,6 @@ export class CarplayAudio {
     })
     player.start()
     this.audioPlayers.set(key, player)
-
-    console.debug('[CarplayAudio] created AudioOutput', {
-      playerKey: key,
-      sampleRate,
-      channels
-    })
 
     return player
   }
@@ -817,13 +770,6 @@ export class CarplayAudio {
 
     if (this.lastStreamLogKey !== key) {
       this.lastStreamLogKey = key
-      console.debug('[CarplayAudio] using AudioOutput for stream', {
-        key,
-        decodeType: msg.decodeType,
-        audioType: msg.audioType,
-        sampleRate,
-        channels
-      })
     }
 
     return player

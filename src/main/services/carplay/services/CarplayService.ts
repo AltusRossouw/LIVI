@@ -3,6 +3,7 @@ import { WebUSBDevice } from 'usb'
 import {
   Plugged,
   Unplugged,
+  PhoneType,
   PhoneWorkMode,
   BluetoothPairedList,
   VideoData,
@@ -129,6 +130,8 @@ export class CarplayService {
   private lastNaviVideoWidth?: number
   private lastNaviVideoHeight?: number
   private mapsRequested = false
+  private lastPluggedPhoneType?: PhoneType
+  private aaPlaybackInferred: 1 | 2 = 1
 
   private audio: CarplayAudio
 
@@ -194,9 +197,11 @@ export class CarplayService {
 
       if (msg instanceof Plugged) {
         this.clearTimeouts()
+        this.lastPluggedPhoneType = msg.phoneType
+        this.aaPlaybackInferred = 1
 
         const nextPhoneWorkMode =
-          msg.phoneType === 3 ? PhoneWorkMode.CarPlay : PhoneWorkMode.Android
+          msg.phoneType === PhoneType.CarPlay ? PhoneWorkMode.CarPlay : PhoneWorkMode.Android
 
         try {
           configEvents.emit('requestSave', { lastPhoneWorkMode: nextPhoneWorkMode })
@@ -219,6 +224,8 @@ export class CarplayService {
         }
       } else if (msg instanceof Unplugged) {
         this.clearTimeouts()
+        this.lastPluggedPhoneType = undefined
+        this.aaPlaybackInferred = 1
         this.webContents.send('carplay-event', { type: 'unplugged' })
         this.resetNavigationSnapshot('unplugged')
 
@@ -307,6 +314,17 @@ export class CarplayService {
         this.audio.handleAudioData(msg)
 
         if (msg.command != null) {
+          if (this.lastPluggedPhoneType === PhoneType.AndroidAuto) {
+            if (msg.command === 10) {
+              this.aaPlaybackInferred = 1
+              this.patchAaMediaPlayStatus(1)
+            }
+            if (msg.command === 11 || msg.command === 2) {
+              this.aaPlaybackInferred = 2
+              this.patchAaMediaPlayStatus(2)
+            }
+          }
+
           this.webContents.send('carplay-event', {
             type: 'audio',
             payload: {
@@ -350,12 +368,18 @@ export class CarplayService {
           const newPayload: PersistedMediaPayload = { type: mediaMsg.payload.type }
 
           if (mediaMsg.payload.type === MediaType.Data && mediaMsg.payload.media) {
-            newPayload.media = { ...existingPayload.media, ...mediaMsg.payload.media }
+            const mergedMedia = { ...existingPayload.media, ...mediaMsg.payload.media }
+
+            if (
+              this.lastPluggedPhoneType === PhoneType.AndroidAuto &&
+              mergedMedia.MediaPlayStatus === undefined
+            ) {
+              mergedMedia.MediaPlayStatus = this.aaPlaybackInferred
+            }
+
+            newPayload.media = mergedMedia
             if (existingPayload.base64Image) newPayload.base64Image = existingPayload.base64Image
-          } else if (
-            mediaMsg.payload.type === MediaType.AlbumCover &&
-            mediaMsg.payload.base64Image
-          ) {
+          } else if ('base64Image' in mediaMsg.payload && mediaMsg.payload.base64Image) {
             newPayload.base64Image = mediaMsg.payload.base64Image
             if (existingPayload.media) newPayload.media = existingPayload.media
           } else {
@@ -953,6 +977,8 @@ export class CarplayService {
         this.lastDongleInfoEmitKey = ''
         this.lastVideoWidth = undefined
         this.lastVideoHeight = undefined
+        this.lastPluggedPhoneType = undefined
+        this.aaPlaybackInferred = 1
 
         this.resetMediaSnapshot('session-start')
         this.resetNavigationSnapshot('session-start')
@@ -1055,6 +1081,8 @@ export class CarplayService {
       this.lastDongleInfoEmitKey = ''
       this.lastVideoWidth = undefined
       this.lastVideoHeight = undefined
+      this.lastPluggedPhoneType = undefined
+      this.aaPlaybackInferred = 2
     })().finally(() => {
       this.stopping = false
       this.isStopping = false
@@ -1062,6 +1090,44 @@ export class CarplayService {
     })
 
     return this.stopPromise
+  }
+
+  private patchAaMediaPlayStatus(status: 1 | 2): void {
+    try {
+      const file = path.join(app.getPath('userData'), 'mediaData.json')
+      const existing = readMediaFile(file)
+
+      const nextPayload: PersistedMediaPayload = {
+        ...existing.payload,
+        type: MediaType.Data,
+        media: {
+          ...existing.payload.media,
+          MediaPlayStatus: status
+        }
+      }
+
+      const out = {
+        timestamp: new Date().toISOString(),
+        payload: nextPayload
+      }
+
+      fs.writeFileSync(file, JSON.stringify(out, null, 2), 'utf8')
+
+      this.webContents?.send('carplay-event', {
+        type: 'media',
+        payload: {
+          mediaType: MediaType.Data,
+          payload: {
+            type: MediaType.Data,
+            media: {
+              MediaPlayStatus: status
+            }
+          }
+        }
+      })
+    } catch (e) {
+      console.warn('[CarplayService] patchAaMediaPlayStatus failed (ignored)', e)
+    }
   }
 
   private resetMediaSnapshot(reason: string): void {

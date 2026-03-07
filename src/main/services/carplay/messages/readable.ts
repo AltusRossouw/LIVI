@@ -258,28 +258,13 @@ export class VideoData extends Message {
 
 export enum MediaType {
   Data = 1,
-  AlbumCoverPNG = 2, // Android
-  AlbumCover = 3, // Apple
+  AlbumCover = 2,
+  AlbumCoverAlt = 3,
   ControlAutoplayTrigger = 100
 }
 
 export enum NavigationMetaType {
   DashboardInfo = 200
-}
-
-function isPng(buf: Buffer): boolean {
-  // 89 50 4E 47 0D 0A 1A 0A
-  return (
-    buf.length >= 8 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47 &&
-    buf[4] === 0x0d &&
-    buf[5] === 0x0a &&
-    buf[6] === 0x1a &&
-    buf[7] === 0x0a
-  )
 }
 
 function isAsciiBase64(buf: Buffer): boolean {
@@ -304,27 +289,30 @@ export class MediaData extends Message {
           MediaAPPName?: string
           MediaSongDuration?: number
           MediaSongPlayTime?: number
+          MediaPlayStatus?: number
         }
       }
-    | { type: MediaType.AlbumCover; base64Image: string }
+    | { type: MediaType.AlbumCoverAlt; base64Image: string }
     | { type: MediaType.ControlAutoplayTrigger }
 
   constructor(header: MessageHeader, mediaType: MediaType, payloadOnly: Buffer) {
     super(header)
     this.mediaType = mediaType
 
-    // Android: innerType=2 => raw PNG bytes
-    if (mediaType === MediaType.AlbumCoverPNG) {
-      if (!isPng(payloadOnly)) return
-      this.payload = { type: MediaType.AlbumCover, base64Image: payloadOnly.toString('base64') }
-      return
-    }
+    // innerType=2 and innerType=3 are both treated as album art.
+    // If payload is ASCII base64, keep it as-is.
+    // Otherwise encode raw binary as base64.
+    if (mediaType === MediaType.AlbumCover || mediaType === MediaType.AlbumCoverAlt) {
+      if (isAsciiBase64(payloadOnly)) {
+        const b64 = payloadOnly.toString('ascii').replace(/\0+$/g, '').trim()
+        this.payload = { type: MediaType.AlbumCoverAlt, base64Image: b64 }
+        return
+      }
 
-    // Apple: innerType=3 => base64 ASCII text
-    if (mediaType === MediaType.AlbumCover) {
-      if (!isAsciiBase64(payloadOnly)) return
-      const b64 = payloadOnly.toString('ascii').replace(/\0+$/g, '').trim()
-      this.payload = { type: MediaType.AlbumCover, base64Image: b64 }
+      this.payload = {
+        type: MediaType.AlbumCoverAlt,
+        base64Image: payloadOnly.toString('base64')
+      }
       return
     }
 
@@ -419,8 +407,8 @@ export class MetaData extends Message {
     // known media types
     if (
       this.innerType === MediaType.Data ||
-      this.innerType === MediaType.AlbumCoverPNG ||
       this.innerType === MediaType.AlbumCover ||
+      this.innerType === MediaType.AlbumCoverAlt ||
       this.innerType === MediaType.ControlAutoplayTrigger
     ) {
       const msg = new MediaData(header, this.innerType as MediaType, payloadOnly)

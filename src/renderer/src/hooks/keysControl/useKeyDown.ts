@@ -98,9 +98,23 @@ export const useKeyDown = ({
       const navRoot = readRefCurrent<HTMLElement>(navRef) ?? document.getElementById('nav-root')
       const mainRoot =
         readRefCurrent<HTMLElement>(mainRef) ?? document.getElementById('content-root')
+      const dialogRoot = document.querySelector<HTMLElement>('[role="dialog"]')
+      const dialogContainer = document.querySelector<HTMLElement>('.MuiDialog-container')
 
       const inNav = inContainer(navRoot, active) || !!active?.closest?.('#nav-root')
-      const inMain = inContainer(mainRoot, active) || !!active?.closest?.('#content-root')
+      let inMain = inContainer(mainRoot, active) || !!active?.closest?.('#content-root')
+
+      if (
+        !inMain &&
+        dialogRoot &&
+        active &&
+        (dialogRoot === active ||
+          dialogRoot.contains(active) ||
+          dialogContainer === active ||
+          !!dialogContainer?.contains(active))
+      ) {
+        inMain = true
+      }
 
       const pager = appContext?.telemetryPager
       const isTelemetryRoute = currentRoute.startsWith('/telemetry')
@@ -259,7 +273,11 @@ export const useKeyDown = ({
         const wantEnterMainFromNothing =
           nothing && (isLeft || isRight || isUp || isDown || isEnter || isSelectDown)
 
-        if (currentRoute !== ROUTES.HOME && (wantEnterMainFromNav || wantEnterMainFromNothing)) {
+        if (
+          !dialogRoot &&
+          currentRoute !== ROUTES.HOME &&
+          (wantEnterMainFromNav || wantEnterMainFromNothing)
+        ) {
           const okMain = focusFirstInMain()
           if (okMain) {
             event.preventDefault()

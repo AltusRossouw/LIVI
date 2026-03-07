@@ -39,6 +39,16 @@ export const useFocus = () => {
     return false
   }, [])
 
+  const getMainRoot = useCallback(() => {
+    const dialogRoot = document.querySelector<HTMLElement>('[role="dialog"]')
+
+    if (dialogRoot && !dialogRoot.closest('[aria-hidden="true"], [inert]')) {
+      return dialogRoot
+    }
+
+    return readRefCurrent<HTMLElement>(mainRef) ?? document.getElementById('content-root')
+  }, [mainRef])
+
   const getFocusableList = useCallback(
     (root?: HTMLElement | null): HTMLElement[] => {
       if (!root) return []
@@ -84,7 +94,7 @@ export const useFocus = () => {
   }, [getFirstFocusable, navRef])
 
   const focusFirstInMain = useCallback(() => {
-    const mainRoot = readRefCurrent<HTMLElement>(mainRef) ?? document.getElementById('content-root')
+    const mainRoot = getMainRoot()
 
     if (!mainRoot) return false
 
@@ -94,12 +104,11 @@ export const useFocus = () => {
     target.focus({ preventScroll: true })
 
     return document.activeElement === target
-  }, [getFirstFocusable, mainRef])
+  }, [getFirstFocusable, getMainRoot])
 
   const moveFocusLinear = useCallback(
     (delta: -1 | 1) => {
-      const mainRoot =
-        readRefCurrent<HTMLElement>(mainRef) ?? document.getElementById('content-root')
+      const mainRoot = getMainRoot()
 
       const list = getFocusableList(mainRoot)
 
@@ -151,7 +160,7 @@ export const useFocus = () => {
 
       return false
     },
-    [appContext, getFocusableList, mainRef]
+    [appContext, getFocusableList, getMainRoot]
   )
 
   return {

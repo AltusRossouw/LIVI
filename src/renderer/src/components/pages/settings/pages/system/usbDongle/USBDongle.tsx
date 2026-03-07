@@ -751,6 +751,82 @@ export function USBDongle() {
     [resolution, audioLine]
   )
 
+  const renderDeviceList = () => {
+    if (devList.length === 0) {
+      return renderRows([{ label: 'Device List', value: '—' }])
+    }
+
+    return (
+      <Stack spacing={1}>
+        {devList.map((d, i) => {
+          const idx = fmt(d.index) ?? String(i + 1)
+          const name = fmt(d.name) ?? '—'
+          const type = fmt(d.type) ?? '—'
+          const id = fmt(d.id) ?? '—'
+          const time = fmt(d.time) ?? '—'
+          const rfcomm = fmt(d.rfcomm) ?? '—'
+
+          return (
+            <Box
+              key={`${idx}-${id}-${i}`}
+              tabIndex={0}
+              role="group"
+              aria-label={`Device ${idx}`}
+              sx={{
+                px: 1,
+                py: 0.75,
+                borderRadius: 1.25,
+                outline: 'none',
+                '&:focus-visible': {
+                  bgcolor: 'action.selected'
+                }
+              }}
+            >
+              <Typography sx={{ mb: 0.5 }}>Device {idx}:</Typography>
+
+              <Stack spacing={0.5} sx={{ pl: 2 }}>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography sx={{ minWidth: 120 }} color="text.secondary">
+                    Name:
+                  </Typography>
+                  <Typography sx={{ ...Mono }}>{name}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography sx={{ minWidth: 120 }} color="text.secondary">
+                    Type:
+                  </Typography>
+                  <Typography sx={{ ...Mono }}>{type}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography sx={{ minWidth: 120 }} color="text.secondary">
+                    ID:
+                  </Typography>
+                  <Typography sx={{ ...Mono }}>{id}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography sx={{ minWidth: 120 }} color="text.secondary">
+                    Time:
+                  </Typography>
+                  <Typography sx={{ ...Mono }}>{time}</Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Typography sx={{ minWidth: 120 }} color="text.secondary">
+                    RFCOMM:
+                  </Typography>
+                  <Typography sx={{ ...Mono }}>{rfcomm}</Typography>
+                </Box>
+              </Stack>
+            </Box>
+          )
+        })}
+      </Stack>
+    )
+  }
+
   const renderRows = (rows: Row[]) => (
     <Stack spacing={0.5}>
       {rows.map((r) => {
@@ -800,6 +876,47 @@ export function USBDongle() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Typography variant="subtitle2" color="text.secondary">
+        Status
+      </Typography>
+      {renderRows(rowsTop)}
+
+      <Divider />
+
+      <Typography variant="subtitle2" color="text.secondary">
+        Streams
+      </Typography>
+      {renderRows(rowsStreams)}
+
+      <Divider />
+
+      <Typography variant="subtitle2" color="text.secondary">
+        USB Descriptor
+      </Typography>
+      {renderRows(rowsUsb)}
+
+      <Divider />
+
+      <Typography variant="subtitle2" color="text.secondary">
+        Dongle Info
+      </Typography>
+
+      {renderRows(rowsDongleInfo)}
+
+      <Divider sx={{ my: 1.5 }} />
+
+      <Typography variant="subtitle2" color="text.secondary">
+        Phone
+      </Typography>
+
+      {renderRows(rowsPhoneInfo)}
+
+      <Divider />
+
+      {renderDeviceList()}
+
+      <Divider />
+
       <Typography variant="subtitle2" color="text.secondary">
         Firmware
       </Typography>
@@ -941,7 +1058,11 @@ export function USBDongle() {
         Dev Tools
       </Typography>
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', flexWrap: 'wrap', px: 1, mb: 1 }}
+      >
         <Button
           variant="outlined"
           size="small"
@@ -958,11 +1079,6 @@ export function USBDongle() {
           )}
         </Button>
       </Stack>
-
-      <Typography variant="caption" color="text.secondary" sx={{ px: 1.25, mt: 0.25 }}>
-        Temporarily replaces the dongle’s default Web UI.
-      </Typography>
-
       {devError ? (
         <Alert severity="error" sx={{ mt: 1 }}>
           {devError}
@@ -974,86 +1090,6 @@ export function USBDongle() {
             : `Partial result (cgiOk=${String(devOk.cgiOk)}, webOk=${String(devOk.webOk)})`}
         </Alert>
       ) : null}
-
-      <Divider />
-
-      {renderRows(rowsTop)}
-
-      <Divider />
-
-      <Typography variant="subtitle2" color="text.secondary">
-        Streams
-      </Typography>
-      {renderRows(rowsStreams)}
-
-      <Divider />
-
-      <Typography variant="subtitle2" color="text.secondary">
-        USB Descriptor
-      </Typography>
-      {renderRows(rowsUsb)}
-
-      <Divider />
-
-      <Typography variant="subtitle2" color="text.secondary">
-        Dongle Info
-      </Typography>
-
-      {renderRows(rowsDongleInfo)}
-
-      <Divider sx={{ my: 1.5 }} />
-
-      <Typography variant="subtitle2" color="text.secondary">
-        Phone
-      </Typography>
-
-      {renderRows(rowsPhoneInfo)}
-
-      <Typography variant="subtitle2" color="text.secondary">
-        Paired / Connected Devices
-      </Typography>
-
-      {devList.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">
-          — (no devices reported)
-        </Typography>
-      ) : (
-        <Stack spacing={1}>
-          {devList.map((d, i) => {
-            const idx = fmt(d.index) ?? String(i + 1)
-            const name = fmt(d.name) ?? '—'
-            const type = fmt(d.type) ?? '—'
-            const id = fmt(d.id) ?? '—'
-            const time = fmt(d.time) ?? '—'
-            const rfcomm = fmt(d.rfcomm) ?? '—'
-
-            return (
-              <Box
-                key={`${idx}-${id}-${i}`}
-                sx={{
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1.5,
-                  px: 1.25,
-                  py: 0.75
-                }}
-              >
-                <Typography sx={{ ...Mono }}>
-                  #{idx} • {name}
-                </Typography>
-
-                <Typography variant="body2" color="text.secondary" sx={{ ...Mono }}>
-                  {type} • {id}
-                </Typography>
-
-                <Typography variant="body2" color="text.secondary" sx={{ ...Mono }}>
-                  time={time} • rfcomm={rfcomm}
-                </Typography>
-              </Box>
-            )
-          })}
-        </Stack>
-      )}
     </Box>
   )
 }

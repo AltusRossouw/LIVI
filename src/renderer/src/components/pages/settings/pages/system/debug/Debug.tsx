@@ -35,7 +35,7 @@ export function Debug() {
   const [frozenEvents, setFrozenEvents] = React.useState<CarplayEventMsg[] | null>(null)
 
   const [selectedType, setSelectedType] = React.useState<string>('__all__') // DEFAULT: ALL
-  const [autoScroll, setAutoScroll] = React.useState(true)
+  const [autoScroll, setAutoScroll] = React.useState(false)
   const [autoUpdateLive, setAutoUpdateLive] = React.useState(true)
 
   const bottomRef = React.useRef<HTMLDivElement | null>(null)
@@ -147,34 +147,21 @@ export function Debug() {
               justifyContent: 'space-between'
             }}
           >
-            <Typography variant="subtitle2" sx={{ opacity: 0.8, flex: 1 }}>
-              Live events ({visible.length} / {events.length})
+            <Typography
+              variant="subtitle2"
+              sx={{
+                opacity: 0.8,
+                flex: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {visible.length} / {events.length}
             </Typography>
 
-            <FormControl size="small" sx={{ minWidth: 220 }}>
-              <InputLabel id="debug-type-label">Type</InputLabel>
-              <Select
-                labelId="debug-type-label"
-                label="Type"
-                value={selectedType}
-                onChange={(e) => setSelectedType(String(e.target.value))}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MenuItem value="__all__">All</MenuItem>
-                <MenuItem value="navigation">navigation</MenuItem>
-                <MenuItem value="media">media</MenuItem>
-                {typeOptions
-                  .filter((t) => t !== 'navigation' && t !== 'media')
-                  .map((t) => (
-                    <MenuItem key={t} value={t}>
-                      {t}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
-
             <FormControlLabel
-              label="Auto-scroll"
+              label="Scroll"
               control={
                 <Switch
                   checked={autoScroll}
@@ -202,12 +189,44 @@ export function Debug() {
               onClick={(e) => e.stopPropagation()}
               onFocus={(e) => e.stopPropagation()}
             />
+          </Box>
+        </AccordionSummary>
+
+        <AccordionDetails>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              mb: 1,
+              gap: 2
+            }}
+          >
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id="debug-type-label">Type</InputLabel>
+              <Select
+                labelId="debug-type-label"
+                label="Type"
+                value={selectedType}
+                onChange={(e) => setSelectedType(String(e.target.value))}
+              >
+                <MenuItem value="__all__">All</MenuItem>
+                <MenuItem value="navigation">navigation</MenuItem>
+                <MenuItem value="media">media</MenuItem>
+                {typeOptions
+                  .filter((t) => t !== 'navigation' && t !== 'media')
+                  .map((t) => (
+                    <MenuItem key={t} value={t}>
+                      {t}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
 
             <Button
               size="small"
               variant="outlined"
-              onClick={(e) => {
-                e.stopPropagation()
+              onClick={() => {
                 setEvents([])
                 setFrozenEvents(null)
                 setSelectedType('__all__')
@@ -216,9 +235,7 @@ export function Debug() {
               Clear
             </Button>
           </Box>
-        </AccordionSummary>
 
-        <AccordionDetails>
           <Paper
             variant="outlined"
             sx={{

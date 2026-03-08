@@ -1,4 +1,4 @@
-import type { NaviBag } from '../types'
+import type { NaviBag } from '@shared/types'
 
 export type NavLocale = 'en' | 'de' | 'ua'
 

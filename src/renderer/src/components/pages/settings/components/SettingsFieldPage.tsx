@@ -1,7 +1,7 @@
 import { Typography } from '@mui/material'
 import { SettingsFieldControl } from './SettingsFieldControl'
 import { SettingsNode } from '../../../../routes'
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { useTranslation } from 'react-i18next'
 
 type Props<T> = {

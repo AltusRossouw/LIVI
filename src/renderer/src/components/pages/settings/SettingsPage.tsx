@@ -1,5 +1,5 @@
 import { useCarplayStore, useStatusStore } from '@store/store'
-import type { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { SettingsLayout } from '../../layouts'
 import { useSmartSettingsFromSchema } from './hooks/useSmartSettingsFromSchema'
 import { settingsSchema } from '../../../routes/schemas.ts/schema'

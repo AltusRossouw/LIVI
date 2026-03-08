@@ -1,8 +1,8 @@
 /// <reference types="@webgpu/types" />
 
 import type { ElectronAPI } from '@electron-toolkit/preload'
-import type { ExtraConfig } from '../../main/Globals'
-import type { MultiTouchPoint } from '../../main/services/carplay/messages/sendable'
+import type { ExtraConfig } from '@shared/types'
+import type { MultiTouchPoint } from '@shared/types/TouchTypes'
 
 // Should move to src/types/usb.ts
 interface USBDevice {

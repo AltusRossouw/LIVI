@@ -1,5 +1,5 @@
 import type { SettingsCustomPageProps } from '../../type'
-import type { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { updateCameras as detectCameras } from '@utils/cameraDetection'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStatusStore } from '@store/store'

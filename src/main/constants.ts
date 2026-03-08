@@ -1,4 +1,6 @@
-import { ExtraConfig } from './Globals'
+import type { ExtraConfig } from '@shared/types'
+
+export const DEBUG = process.env.DEBUG === '1'
 
 export const MIN_WIDTH = 300
 export const MIN_HEIGHT = 200

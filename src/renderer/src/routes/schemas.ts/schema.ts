@@ -4,7 +4,7 @@ import { audioSchema } from './audioSchema'
 import { videoSchema } from './videoSchema'
 import { appearanceSchema } from './appearanceSchema'
 import { SettingsNode } from '../types'
-import { ExtraConfig } from '../../../../main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { systemSchema } from './systemSchema'
 
 export const settingsSchema: SettingsNode<ExtraConfig> = {

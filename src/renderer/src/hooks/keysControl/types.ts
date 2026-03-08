@@ -1,5 +1,4 @@
 import { KeyCommand } from '../../components/worker/types'
-// import { ExtraConfig } from '@main/Globals'
 
 export type BindKey =
   | 'left'

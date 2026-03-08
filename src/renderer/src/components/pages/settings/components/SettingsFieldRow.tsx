@@ -6,7 +6,7 @@ import { PosSensitiveList } from './posSensitiveList/PosSensitiveList'
 import { BtDeviceList } from './btDeviceList/BtDeviceList'
 import { SettingsNode } from '../../../../routes'
 import { getValueByPath } from '../utils'
-import { ExtraConfig } from '../../../../../../main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { useTranslation } from 'react-i18next'
 
 type Props<T, K> = {

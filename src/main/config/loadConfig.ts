@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { CONFIG_PATH } from './paths'
-import { DEFAULT_BINDINGS, ExtraConfig } from '@main/Globals'
+import { DEFAULT_BINDINGS } from '@shared/types'
+import type { ExtraConfig } from '@shared/types'
 import { DEFAULT_CONFIG } from '@main/services/carplay'
 import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/carplay/assets/carIcons'
 

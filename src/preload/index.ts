@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import type { ExtraConfig } from '../main/Globals'
-import type { MultiTouchPoint } from '../main/services/carplay/messages/sendable'
+import type { ExtraConfig } from '@shared/types'
+import type { MultiTouchPoint } from '@shared/types/TouchTypes'
 
 type ApiCallback<TArgs extends unknown[] = unknown[]> = (
   event: IpcRendererEvent,

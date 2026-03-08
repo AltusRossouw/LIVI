@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { StackItem } from '../stackItem'
 import type { PosListNode } from '@renderer/routes/types'
-import type { TelemetryDashboardConfig, TelemetryDashboardId } from '@main/Globals'
+import type { TelemetryDashboardConfig, TelemetryDashboardId } from '@shared/types'
 
 type Props<T> = {
   node: PosListNode

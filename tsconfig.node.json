@@ -20,8 +20,11 @@
     "baseUrl": "./src",
     "paths": {
       "@main/*": ["main/*"],
-      "@carplay/*": ["main/carplay/*"],
-      "@carplay/node": ["main/carplay/node"],
+      "@shared/*": ["main/shared/*"],
+      "@carplay/messages": ["main/services/carplay/messages/index.ts"],
+      "@carplay/messages/*": ["main/services/carplay/messages/*"],
+      "@carplay/node": ["main/services/carplay/node"],
+      "@carplay/*": ["main/services/carplay/*"],
       "@audio": ["main/audio/index.ts"]
     }
   }

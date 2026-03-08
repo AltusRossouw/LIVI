@@ -4,7 +4,6 @@ import {
   Plugged,
   Unplugged,
   PhoneType,
-  PhoneWorkMode,
   BluetoothPairedList,
   VideoData,
   AudioData,
@@ -30,7 +29,8 @@ import {
   decodeTypeMap,
   DEFAULT_CONFIG
 } from '../messages'
-import { ExtraConfig } from '@main/Globals'
+import { PhoneWorkMode } from '@shared/types'
+import type { ExtraConfig } from '@shared/types'
 import fs from 'fs'
 import path from 'path'
 import usb from 'usb'
@@ -43,8 +43,8 @@ import {
 import { readMediaFile } from './utils/readMediaFile'
 import { readNavigationFile } from './utils/readNavigationFile'
 import { normalizeNavigationPayload } from './utils/normalizeNavigation'
-import { translateNavigation } from './utils/translateNavigation'
-import type { NavLocale } from './utils/translateNavigation'
+import { translateNavigation } from '@shared/utils'
+import type { NavLocale } from '@shared/utils'
 import { asDomUSBDevice } from './utils/asDomUSBDevice'
 import { CarplayAudio, LogicalStreamKey } from './CarplayAudio'
 import { FirmwareUpdateService, FirmwareCheckResult } from './FirmwareUpdateService'

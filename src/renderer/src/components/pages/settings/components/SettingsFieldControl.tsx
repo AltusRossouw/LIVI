@@ -2,7 +2,7 @@ import { MenuItem, Select, Slider, Switch, TextField, IconButton } from '@mui/ma
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined'
 import NumberSpinner from './numberSpinner/numberSpinner'
 import { SettingsNode } from '../../../../routes'
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { themeColors } from '@renderer/themeColors'
 import { useTranslation } from 'react-i18next'
 

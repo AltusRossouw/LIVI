@@ -1,5 +1,5 @@
 import { SettingsNode } from '../types'
-import { ExtraConfig } from '../../../../main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { IconUploader } from '../../components/pages/settings/pages/system/iconUploader/IconUploader'
 
 export const appearanceSchema: SettingsNode<ExtraConfig> = {

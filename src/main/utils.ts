@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { NULL_DELETES } from './constants'
-import { ExtraConfig } from './Globals'
+import type { ExtraConfig } from '@shared/types'
 import { NullDeleteKey, runtimeStateProps } from '@main/types'
 import { getMainWindow } from '@main/window/createWindow'
 

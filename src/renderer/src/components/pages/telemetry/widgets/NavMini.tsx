@@ -24,11 +24,8 @@ import FlagIcon from '@mui/icons-material/Flag'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 
 import { useCarplayStore } from '@store/store'
-import { NaviBag } from '@main/services/carplay/services/types'
-import {
-  NavLocale,
-  translateNavigation
-} from '@main/services/carplay/services/utils/translateNavigation'
+import type { NaviBag } from '@shared/types'
+import { NavLocale, translateNavigation } from '@shared/utils/translateNavigation'
 
 type CarplayEventMsg = { type: string; payload?: unknown }
 

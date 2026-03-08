@@ -1,4 +1,4 @@
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { TelemetrySocket } from '@main/services/Socket'
 import { NULL_DELETES } from '@main/constants'
 import { CarplayService } from '@main/services/carplay/services/CarplayService'

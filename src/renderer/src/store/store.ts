@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { ExtraConfig } from '../../../main/Globals'
-import type { MicType } from '../../../main/services/carplay/messages'
+import type { ExtraConfig } from '@shared/types'
+import type { MicType } from '@shared/types'
 
 type VolumeStreamKey = 'music' | 'nav' | 'siri' | 'call'
 

@@ -1,5 +1,5 @@
 import { SettingsNode } from '../types'
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { Camera } from '../../components/pages/settings/pages/camera'
 import {
   MIN_WIDTH,

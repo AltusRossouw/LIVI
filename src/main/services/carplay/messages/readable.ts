@@ -1,29 +1,17 @@
-import { MessageHeader, CommandMapping } from './common.js'
-
-export enum AudioCommand {
-  AudioOutputStart = 1,
-  AudioOutputStop = 2,
-  AudioInputConfig = 3,
-  AudioPhonecallStart = 4,
-  AudioPhonecallStop = 5,
-  AudioNaviStart = 6,
-  AudioNaviStop = 7,
-  AudioSiriStart = 8,
-  AudioSiriStop = 9,
-  AudioMediaStart = 10,
-  AudioMediaStop = 11,
-  AudioAttentionStart = 12,
-  AudioAttentionStop = 13,
-  AudioAttentionRinging = 14,
-  AudioTurnByTurnStart = 15,
-  AudioTurnByTurnStop = 16
-}
+import { MessageHeader } from './common.js'
+import { AudioCommand, CommandMapping } from '@shared/types/ProjectionEnums'
 
 export abstract class Message {
   header: MessageHeader
 
   constructor(header: MessageHeader) {
     this.header = header
+  }
+}
+
+export class DongleReady extends Message {
+  constructor(header: MessageHeader) {
+    super(header)
   }
 }
 
@@ -141,70 +129,6 @@ export class Plugged extends Message {
 export class Unplugged extends Message {
   constructor(header: MessageHeader) {
     super(header)
-  }
-}
-
-export type AudioFormat = {
-  frequency: 48000 | 44100 | 24000 | 16000 | 8000
-  channel: 1 | 2
-  bitDepth: number
-  format?: string
-  mimeType?: string
-}
-
-type DecodeTypeMapping = {
-  [key: number]: AudioFormat
-}
-
-export const decodeTypeMap: DecodeTypeMapping = {
-  1: {
-    frequency: 44100,
-    channel: 2,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=44100; channels=2'
-  },
-  2: {
-    frequency: 44100,
-    channel: 2,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=44100; channels=2'
-  },
-  3: {
-    frequency: 8000,
-    channel: 1,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=8000; channels=1'
-  },
-  4: {
-    frequency: 48000,
-    channel: 2,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=48000; channels=2'
-  },
-  5: {
-    frequency: 16000,
-    channel: 1,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=16000; channels=1'
-  },
-  6: {
-    frequency: 24000,
-    channel: 1,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=24000; channels=1'
-  },
-  7: {
-    frequency: 16000,
-    channel: 2,
-    bitDepth: 16,
-    format: 'S16LE',
-    mimeType: 'audio/L16; rate=16000; channels=2'
   }
 }
 
@@ -505,7 +429,7 @@ export class BoxInfo extends Message {
   }
 }
 
-export class VendorCarPlaySessionBlob extends Message {
+export class VendorSessionInfo extends Message {
   public readonly raw: Buffer
 
   public constructor(header: MessageHeader, data: Buffer) {

@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { useSmartSettings } from './useSmartSettings'
 import { getValueByPath } from '../utils'
 import type { SettingsNode } from '../../../../routes'
-import type { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 
 type FlatSettings = Record<string, unknown>
 

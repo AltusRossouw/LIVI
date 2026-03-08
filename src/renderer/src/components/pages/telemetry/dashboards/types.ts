@@ -1,4 +1,4 @@
-import type { TelemetryDashboardId } from '@main/Globals'
+import type { TelemetryDashboardId } from '@shared/types'
 
 export type DashboardDef = {
   id: TelemetryDashboardId

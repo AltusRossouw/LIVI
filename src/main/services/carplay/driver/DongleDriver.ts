@@ -1,17 +1,22 @@
 import EventEmitter from 'events'
-import { MessageHeader, HeaderBuildError } from '../messages/common.js'
-import type { CommandValue } from '../messages/common.js'
+import { MessageHeader, HeaderBuildError } from '@carplay/messages/common'
+import { decryptVendorSessionText } from '@main/helpers/vendorSessionInfo'
+import type { CommandValue } from '@shared/types/ProjectionEnums'
+import { HandDriveType, MicType, PhoneWorkMode } from '@shared/types'
+import type { DongleConfig } from '@shared/types'
+import { DEBUG } from '@main/constants'
 import {
   PhoneType,
   BoxInfo,
   SoftwareVersion,
-  VendorCarPlaySessionBlob,
+  VendorSessionInfo,
   BluetoothPeerConnected,
   Plugged,
   Unplugged,
+  DongleReady,
   Opened,
   type BoxInfoSettings
-} from '../messages/readable.js'
+} from '@carplay/messages/readable'
 import {
   SendableMessage,
   SendNumber,
@@ -25,7 +30,7 @@ import {
   SendBluetoothPairedList,
   HeartBeat,
   SendDisconnectPhone
-} from '../messages/sendable.js'
+} from '@carplay/messages/sendable'
 
 const CONFIG_NUMBER = 1
 const MAX_ERROR_COUNT = 5
@@ -41,55 +46,12 @@ function readProp<T = unknown>(obj: unknown, key: string): T | undefined {
   return obj[key] as T
 }
 
-export enum HandDriveType {
-  LHD = 0,
-  RHD = 1
-}
-
-export enum MicType {
-  CarMic = 0,
-  DongleMic = 1,
-  PhoneMic = 2
-}
-
 export enum AndroidWorkMode {
   Off = 0,
   AndroidAuto = 1,
   CarLife = 2,
   AndroidMirror = 3,
   Search = 7
-}
-
-export enum PhoneWorkMode {
-  CarPlay = 2,
-  Android = 4
-}
-
-export type PhoneTypeConfig = { frameInterval: number | null }
-type PhoneTypeConfigMap = { [K in PhoneType]: PhoneTypeConfig }
-
-export type DongleConfig = {
-  width: number
-  height: number
-  fps: number
-  dpi: number
-  lastPhoneWorkMode: number
-  apkVer: string
-  nightMode: boolean
-  carName: string
-  oemName: string
-  hand: HandDriveType
-  mediaDelay: number
-  mediaSound: 0 | 1
-  callQuality: 0 | 1 | 2
-  autoPlay: boolean
-  autoConn: boolean
-  mapsEnabled: boolean
-  audioTransferMode: boolean
-  wifiType: '2.4ghz' | '5ghz'
-  wifiChannel: number
-  micType: MicType
-  phoneConfig: Partial<PhoneTypeConfigMap>
 }
 
 export const DEFAULT_CONFIG: DongleConfig = {
@@ -408,8 +370,26 @@ export class DongleDriver extends EventEmitter {
 
   // entral message dispatch
   private async handleMessage(msg: unknown) {
-    // Ignore vendor blobs early
-    if (msg instanceof VendorCarPlaySessionBlob) return
+    if (msg instanceof VendorSessionInfo) {
+      try {
+        const decrypted = await decryptVendorSessionText(msg.raw)
+
+        if (DEBUG) {
+          console.log(`[DongleDriver] VendorSessionInfo ${decrypted}`)
+        }
+      } catch (e) {
+        console.warn('[DongleDriver] VendorSessionInfo decrypt failed', e)
+      }
+
+      this.emit('message', msg)
+      return
+    }
+
+    if (msg instanceof DongleReady) {
+      console.log('[DongleDriver] Dongle ready')
+      this.emit('message', msg)
+      return
+    }
 
     // Track info
     if (msg instanceof SoftwareVersion) {

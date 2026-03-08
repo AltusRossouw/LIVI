@@ -11,12 +11,12 @@ import {
   SendTouch,
   Unplugged,
   VideoData,
-  CommandValue,
-  Command,
-  AudioCommand
+  Command
 } from '../messages'
 
-import { DongleDriver, DongleConfig, DEFAULT_CONFIG } from '../driver/DongleDriver'
+import { AudioCommand, type CommandValue } from '@shared/types/ProjectionEnums'
+import { DongleDriver, DEFAULT_CONFIG } from '../driver/DongleDriver'
+import type { DongleConfig } from '@shared/types'
 
 export type CarplayMessage =
   | { type: 'plugged'; message?: undefined }

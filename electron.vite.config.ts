@@ -8,17 +8,20 @@ const BUILD_RUN = process.env.GITHUB_RUN_NUMBER || process.env.BUILD_RUN || ''
 const BUILD_BRANCH = process.env.BUILD_BRANCH || ''
 
 const alias = {
-  '@renderer': resolve(__dirname, 'src/renderer/src'),
   '@carplay/web': resolve(__dirname, 'src/renderer/components/web/CarplayWeb.ts'),
-  '@carplay/messages': resolve(__dirname, 'src/main/carplay/messages'),
-  '@carplay': resolve(__dirname, 'src/main/carplay'),
+  '@carplay/messages': resolve(__dirname, 'src/main/services/carplay/messages'),
+  '@carplay': resolve(__dirname, 'src/main/services/carplay'),
   '@main': path.resolve(__dirname, 'src/main'),
+  '@shared': path.resolve(__dirname, 'src/main/shared'),
+  '@audio': path.resolve(__dirname, 'src/main/audio')
+}
+
+const rendererAlias = {
+  '@renderer': resolve(__dirname, 'src/renderer/src'),
   '@worker': path.resolve(__dirname, 'src/renderer/src/components/worker'),
   '@store': path.resolve(__dirname, 'src/renderer/src/store'),
   '@utils': path.resolve(__dirname, 'src/renderer/src/utils'),
-  '@audio': path.resolve(__dirname, 'src/main/audio'),
-  stream: 'stream-browserify',
-  Buffer: 'buffer'
+  '@shared': path.resolve(__dirname, 'src/main/shared')
 }
 
 export default defineConfig({
@@ -64,7 +67,7 @@ export default defineConfig({
         }
       }
     },
-    resolve: { alias },
+    resolve: { alias: rendererAlias },
     plugins: [react({})],
     server: {
       headers: {

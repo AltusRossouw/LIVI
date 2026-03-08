@@ -1,5 +1,5 @@
 import { useMemo, useRef, useCallback, type RefObject } from 'react'
-import { MultiTouchAction, TouchAction } from '@main/services/carplay/messages/sendable'
+import { MultiTouchAction, TouchAction } from '@shared/types/ProjectionEnums'
 
 type Handlers = {
   onPointerDown: React.PointerEventHandler<HTMLDivElement>

@@ -1,8 +1,8 @@
 import { MediaType, NavigationMetaType } from '../messages'
-import type { NavLocale } from './utils/translateNavigation'
+import type { NavLocale } from '@shared/utils'
+import type { NaviBag } from '@shared/types'
 
 export type MediaBag = Record<string, unknown>
-export type NaviBag = Record<string, unknown>
 
 export interface PersistedMediaPayload {
   type: MediaType

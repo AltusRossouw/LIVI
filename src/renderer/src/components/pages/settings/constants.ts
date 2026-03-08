@@ -1,4 +1,4 @@
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 
 export const MEDIA_DELAY_MIN = 300
 export const MEDIA_DELAY_MAX = 2000

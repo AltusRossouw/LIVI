@@ -1,5 +1,13 @@
-import { DongleConfig, PhoneWorkMode } from '../driver/DongleDriver.js'
-import { MessageType, MessageHeader, CommandMapping, CommandValue } from './common.js'
+import { PhoneWorkMode } from '@shared/types'
+import type { DongleConfig } from '@shared/types'
+import type { MultiTouchPoint } from '@shared/types/TouchTypes'
+import { MessageType, MessageHeader } from './common.js'
+import {
+  CommandMapping,
+  type CommandValue,
+  TouchAction,
+  MultiTouchAction
+} from '@shared/types/ProjectionEnums'
 import { clamp, getCurrentTimeInMs, matchFittingAAResolution } from './utils.js'
 import { buildServerCgiScript } from '../assets/LIVI_cgi.js'
 import { buildLiviWeb } from '../assets/LIVI_web.js'
@@ -58,12 +66,6 @@ export class SendBluetoothPairedList extends SendableMessageWithPayload {
   }
 }
 
-export enum TouchAction {
-  Down = 14,
-  Move = 15,
-  Up = 16
-}
-
 export class SendTouch extends SendableMessageWithPayload {
   type = MessageType.Touch
   x: number
@@ -95,12 +97,6 @@ export class SendTouch extends SendableMessageWithPayload {
   }
 }
 
-export enum MultiTouchAction {
-  Down = 1,
-  Move = 2,
-  Up = 0
-}
-
 class TouchItem {
   x: number
   y: number
@@ -127,13 +123,6 @@ class TouchItem {
 
     return Buffer.concat([xB, yB, actionB, idB])
   }
-}
-
-export type MultiTouchPoint = {
-  id: number
-  x: number
-  y: number
-  action: MultiTouchAction
 }
 
 export class SendMultiTouch extends SendableMessageWithPayload {

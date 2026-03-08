@@ -1,5 +1,6 @@
-import { AudioData, AudioCommand, decodeTypeMap } from '../messages'
-import { ExtraConfig } from '@main/Globals'
+import { AudioData, decodeTypeMap } from '../messages'
+import { AudioCommand } from '@shared/types/ProjectionEnums'
+import type { ExtraConfig } from '@shared/types'
 import { Microphone, AudioOutput, downsampleToMono } from '@main/services/audio'
 
 export type PlayerKey = string

@@ -1,4 +1,4 @@
-import { DongleConfig } from '@main/services/carplay/messages'
+import type { DongleConfig } from './DongleConfig'
 
 export type TelemetryDashboardId = 'dash1' | 'dash2' | 'dash3' | 'dash4'
 

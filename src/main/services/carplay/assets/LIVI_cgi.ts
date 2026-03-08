@@ -62,7 +62,7 @@ export const buildServerCgiScript = (): string =>
     '  fi',
     '',
     '  case "$c" in',
-    '    *"rm -rf /"*|*"rm -rf/"*|*"mkfs"*|*"dd if="*|*"dd of="*|*"flash"*|*"ubiformat"*|*"nandwrite"*|*"mtd"*|*"reboot"*|*"poweroff"*|*"halt"*)',
+    '    *"rm -rf /"*|*"rm -rf/"*|*"mkfs"*|*"dd if="*|*"dd of="*|*"flash"*|*"ubiformat"*|*"nandwrite"*|*"mtd"*)',
     '      echo "Blocked command."',
     '      echo ""',
     '      echo "$c"',

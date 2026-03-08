@@ -1,7 +1,7 @@
 import { MIN_HEIGHT, MIN_WIDTH } from '@main/constants'
 import { isMacPlatform, pushSettingsToRenderer } from '@main/utils'
 import { BrowserWindow, screen } from 'electron'
-import { ExtraConfig } from '@main/Globals'
+import type { ExtraConfig } from '@shared/types'
 import { getMainWindow } from '@main/window/createWindow'
 import { saveSettings } from '@main/ipc/utils'
 import { runtimeStateProps } from '@main/types'

@@ -3,7 +3,7 @@ import { IconButton, Typography } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 
 import { StackItem } from '../stackItem'
-import { useCarplayStore } from '@renderer/store/store'
+import { useLiviStore } from '@renderer/store/store'
 import type { BoxInfoPayload, DevListEntry } from '@renderer/types'
 
 const iconSx = { fontSize: 'clamp(22px, 4.2vh, 34px)' } as const
@@ -14,9 +14,9 @@ const getConnectedMacFromBoxInfo = (boxInfo?: BoxInfoPayload): string => {
 }
 
 export const BtDeviceList = () => {
-  const devices = useCarplayStore((s) => s.bluetoothPairedDevices)
-  const remove = useCarplayStore((s) => s.removeBluetoothPairedDeviceLocal)
-  const boxInfo = useCarplayStore((s) => s.boxInfo) as BoxInfoPayload | undefined
+  const devices = useLiviStore((s) => s.bluetoothPairedDevices)
+  const remove = useLiviStore((s) => s.removeBluetoothPairedDeviceLocal)
+  const boxInfo = useLiviStore((s) => s.boxInfo) as BoxInfoPayload | undefined
 
   const connectedMac = useMemo(() => getConnectedMacFromBoxInfo(boxInfo), [boxInfo])
 

@@ -3,7 +3,7 @@ import { Box, IconButton, Modal, Paper, Typography } from '@mui/material'
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined'
 import type { ExtraConfig } from '@shared/types'
 import { DEFAULT_BINDINGS } from '@shared/types'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 import { StackItem } from './stackItem'
 import type { KeyBindingNode } from '@renderer/routes/types'
 import { useTranslation } from 'react-i18next'
@@ -40,8 +40,8 @@ function normalize(v: unknown) {
 
 export function KeyBindingRow({ node }: { node: KeyBindingNode }) {
   const { t } = useTranslation()
-  const saveSettings = useCarplayStore((s) => s.saveSettings)
-  const settings = useCarplayStore((s) => s.settings) as ExtraConfig | null
+  const saveSettings = useLiviStore((s) => s.saveSettings)
+  const settings = useLiviStore((s) => s.settings) as ExtraConfig | null
 
   const [capturing, setCapturing] = useState(false)
 

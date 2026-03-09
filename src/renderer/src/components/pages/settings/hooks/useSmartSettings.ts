@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { requiresRestartParams } from '../constants'
 import { getValueByPath, setValueByPath } from '../utils'
-import { useCarplayStore, useStatusStore } from '@store/store'
+import { useLiviStore, useStatusStore } from '@store/store'
 
 type OverrideConfig = {
   transform?: (value: unknown, prev: unknown) => unknown
@@ -24,9 +24,9 @@ export function useSmartSettings<T extends Record<string, unknown>>(
   const [state, setState] = useState<T>(() => ({ ...initial }))
   const [restartRequested, setRestartRequested] = useState(false)
 
-  const saveSettings = useCarplayStore((s) => s.saveSettings)
-  const restartBaseline = useCarplayStore((s) => s.restartBaseline)
-  const markRestartBaseline = useCarplayStore((s) => s.markRestartBaseline)
+  const saveSettings = useLiviStore((s) => s.saveSettings)
+  const restartBaseline = useLiviStore((s) => s.restartBaseline)
+  const markRestartBaseline = useLiviStore((s) => s.markRestartBaseline)
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export function useSmartSettings<T extends Record<string, unknown>>(
     if (!needsRestart) return false
     if (!isDongleConnected) return false
 
-    await window.carplay.usb.forceReset()
+    await window.projection.usb.forceReset()
 
     markRestartBaseline()
     setRestartRequested(false)

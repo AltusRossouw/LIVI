@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material'
 import type { ExtraConfig } from '@shared/types'
 import type { SettingsCustomPageProps } from '@renderer/routes/types'
-import { useCarplayStore, useStatusStore } from '@store/store'
+import { useLiviStore, useStatusStore } from '@store/store'
 import { loadImageFromFile, resizeImageToBase64Png } from './utils'
 import { ResetDongleIconsResult } from './types'
 import { useTranslation } from 'react-i18next'
@@ -28,8 +28,8 @@ export function IconUploader(props: SettingsCustomPageProps<ExtraConfig, unknown
 
   const { t } = useTranslation()
 
-  const settings = useCarplayStore((s) => s.settings)
-  const saveSettings = useCarplayStore((s) => s.saveSettings)
+  const settings = useLiviStore((s) => s.settings)
+  const saveSettings = useLiviStore((s) => s.saveSettings)
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
 
   const [isImporting, setIsImporting] = useState(false)
@@ -90,7 +90,7 @@ export function IconUploader(props: SettingsCustomPageProps<ExtraConfig, unknown
       setIsUploading(true)
       setMessage('')
 
-      await window.carplay.usb.uploadIcons()
+      await window.projection.usb.uploadIcons()
 
       requestRestart?.()
 

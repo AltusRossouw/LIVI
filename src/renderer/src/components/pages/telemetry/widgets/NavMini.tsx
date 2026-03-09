@@ -23,11 +23,11 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp'
 import FlagIcon from '@mui/icons-material/Flag'
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 import type { NaviBag } from '@shared/types'
 import { NavLocale, translateNavigation } from '@shared/utils/translateNavigation'
 
-type CarplayEventMsg = { type: string; payload?: unknown }
+type ProjectionEventMsg = { type: string; payload?: unknown }
 
 function navLocaleFromSettings(v: unknown): NavLocale {
   if (v === 'de' || v === 'ua' || v === 'en') return v
@@ -171,14 +171,14 @@ export type NavMiniProps = {
  */
 export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
   const theme = useTheme()
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
   const locale = navLocaleFromSettings(settings?.language)
 
   const [navi, setNavi] = React.useState<NaviBag | null>(null)
 
   const hydrate = React.useCallback(async () => {
     try {
-      const snap = await window.carplay.ipc.readNavigation()
+      const snap = await window.projection.ipc.readNavigation()
       const patch = unwrapNaviPatch(snap)
       setNavi((prev) => mergeNavi(prev, patch))
     } catch {
@@ -190,7 +190,7 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
     void hydrate()
 
     const handler = (_event: unknown, ...args: unknown[]) => {
-      const msg = (args[0] ?? {}) as CarplayEventMsg
+      const msg = (args[0] ?? {}) as ProjectionEventMsg
       if (msg.type !== 'navigation') return
 
       const patch = unwrapNaviPatch(msg)
@@ -198,8 +198,8 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
       else void hydrate()
     }
 
-    window.carplay.ipc.onEvent(handler)
-    return () => window.carplay.ipc.offEvent(handler)
+    window.projection.ipc.onEvent(handler)
+    return () => window.projection.ipc.offEvent(handler)
   }, [hydrate])
 
   const t = React.useMemo(() => translateNavigation(navi, locale), [navi, locale])

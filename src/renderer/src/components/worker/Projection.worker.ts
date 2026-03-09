@@ -22,7 +22,7 @@ function toInt16(msg: unknown): Int16Array | undefined {
     if (a.buffer instanceof ArrayBuffer) return new Int16Array(a.buffer)
     if (a.chunk instanceof ArrayBuffer) return new Int16Array(a.chunk)
   }
-  console.error('[CARPLAY.WORKER] PCM - cannot interpret PCM data:', msg)
+  console.error('[PROJECTION.WORKER] PCM - cannot interpret PCM data:', msg)
   return undefined
 }
 
@@ -57,12 +57,12 @@ function setupPorts(port: MessagePort) {
           processAudioData(data)
         }
       } catch (e) {
-        console.error('[CARPLAY.WORKER] error processing audio message:', e)
+        console.error('[PROJECTION.WORKER] error processing audio message:', e)
       }
     }
     port.start?.()
   } catch (e) {
-    console.error('[CARPLAY.WORKER] port setup failed:', e)
+    console.error('[PROJECTION.WORKER] port setup failed:', e)
     ;(self as unknown as Worker).postMessage({ type: 'failure', error: 'Port setup failed' })
   }
 }
@@ -88,7 +88,7 @@ type Command = InitialiseCommand | StopCommand | { type: string; payload?: unkno
       if (port) {
         setupPorts(port)
       } else {
-        console.error('[CARPLAY.WORKER] missing audioPort in initialise payload')
+        console.error('[PROJECTION.WORKER] missing audioPort in initialise payload')
       }
       break
     }

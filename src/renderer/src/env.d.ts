@@ -104,7 +104,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
 
-    carplay: {
+    projection: {
       quit(): Promise<void>
       onUSBResetStatus(callback: (event: unknown, ...args: unknown[]) => void): void
 

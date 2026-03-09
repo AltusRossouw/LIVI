@@ -2,8 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { CONFIG_PATH } from './paths'
 import { DEFAULT_BINDINGS } from '@shared/types'
 import type { ExtraConfig } from '@shared/types'
-import { DEFAULT_CONFIG } from '@main/services/carplay'
-import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/carplay/assets/carIcons'
+import { DEFAULT_CONFIG } from '@main/services/projection'
+import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/projection/assets/carIcons'
 
 export function loadConfig(): ExtraConfig {
   let fileConfig: Partial<ExtraConfig> = {}

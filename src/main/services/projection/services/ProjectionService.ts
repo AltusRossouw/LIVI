@@ -46,7 +46,7 @@ import { normalizeNavigationPayload } from './utils/normalizeNavigation'
 import { translateNavigation } from '@shared/utils'
 import type { NavLocale } from '@shared/utils'
 import { asDomUSBDevice } from './utils/asDomUSBDevice'
-import { CarplayAudio, LogicalStreamKey } from './CarplayAudio'
+import { ProjectionAudio, LogicalStreamKey } from './ProjectionAudio'
 import { FirmwareUpdateService, FirmwareCheckResult } from './FirmwareUpdateService'
 import { configEvents } from '@main/ipc/utils'
 
@@ -103,7 +103,7 @@ function pickStringOrNumber(o: Record<string, unknown>, key: string): string | n
   return typeof v === 'string' || typeof v === 'number' ? v : undefined
 }
 
-export class CarplayService {
+export class ProjectionService {
   private driver = new DongleDriver()
   private webUsbDevice: WebUSBDevice | null = null
   private webContents: WebContents | null = null
@@ -133,7 +133,7 @@ export class CarplayService {
   private lastPluggedPhoneType?: PhoneType
   private aaPlaybackInferred: 1 | 2 = 1
 
-  private audio: CarplayAudio
+  private audio: ProjectionAudio
 
   private readonly onConfigChanged = (next: ExtraConfig) => {
     if (this.shuttingDown) return
@@ -154,10 +154,10 @@ export class CarplayService {
   }
 
   constructor() {
-    this.audio = new CarplayAudio(
+    this.audio = new ProjectionAudio(
       () => this.config,
       (payload) => {
-        this.webContents?.send('carplay-event', payload)
+        this.webContents?.send('projection-event', payload)
       },
       (channel, data, chunkSize, extra) => {
         this.sendChunked(channel, data, chunkSize, extra)
@@ -166,7 +166,7 @@ export class CarplayService {
         try {
           this.driver.send(new SendAudio(pcm))
         } catch (e) {
-          console.error('[CarplayService] failed to send mic audio', e)
+          console.error('[ProjectionService] failed to send mic audio', e)
         }
       }
     )
@@ -188,7 +188,7 @@ export class CarplayService {
       if (!this.webContents) return
 
       if (msg instanceof BluetoothPairedList) {
-        this.webContents.send('carplay-event', {
+        this.webContents.send('projection-event', {
           type: 'bluetoothPairedList',
           payload: msg.data
         })
@@ -206,7 +206,7 @@ export class CarplayService {
         try {
           configEvents.emit('requestSave', { lastPhoneWorkMode: nextPhoneWorkMode })
         } catch (e) {
-          console.warn('[CarplayService] failed to persist lastPhoneWorkMode (ignored)', e)
+          console.warn('[ProjectionService] failed to persist lastPhoneWorkMode (ignored)', e)
         }
 
         const phoneTypeConfig = this.config.phoneConfig?.[msg.phoneType]
@@ -218,7 +218,7 @@ export class CarplayService {
             } catch {}
           }, phoneTypeConfig.frameInterval)
         }
-        this.webContents.send('carplay-event', { type: 'plugged' })
+        this.webContents.send('projection-event', { type: 'plugged' })
         if (!this.started && !this.isStarting) {
           this.start().catch(() => {})
         }
@@ -226,7 +226,7 @@ export class CarplayService {
         this.clearTimeouts()
         this.lastPluggedPhoneType = undefined
         this.aaPlaybackInferred = 1
-        this.webContents.send('carplay-event', { type: 'unplugged' })
+        this.webContents.send('projection-event', { type: 'unplugged' })
         this.resetNavigationSnapshot('unplugged')
 
         if (!this.shuttingDown && !this.stopping) {
@@ -234,14 +234,14 @@ export class CarplayService {
         }
       } else if (msg instanceof BoxUpdateProgress) {
         // 0xb1 payload: int32 progress
-        this.webContents.send('carplay-event', {
+        this.webContents.send('projection-event', {
           type: 'fwUpdate',
           stage: 'upload:progress',
           progress: msg.progress
         })
       } else if (msg instanceof BoxUpdateState) {
         // 0xbb payload: int32 status (start/success/fail, ota variants)
-        this.webContents.send('carplay-event', {
+        this.webContents.send('projection-event', {
           type: 'fwUpdate',
           stage: 'upload:state',
           status: msg.status,
@@ -253,7 +253,7 @@ export class CarplayService {
 
         if (msg.isTerminal) {
           // Terminal state decides done vs error
-          this.webContents.send('carplay-event', {
+          this.webContents.send('projection-event', {
             type: 'fwUpdate',
             stage: msg.ok ? 'upload:done' : 'upload:error',
             message: msg.statusText || (msg.ok ? 'Update finished' : 'Update failed'),
@@ -303,13 +303,13 @@ export class CarplayService {
           this.lastVideoWidth = w
           this.lastVideoHeight = h
 
-          this.webContents.send('carplay-event', {
+          this.webContents.send('projection-event', {
             type: 'resolution',
             payload: { width: w, height: h }
           })
         }
 
-        this.sendChunked('carplay-video-chunk', msg.data?.buffer as ArrayBuffer, 512 * 1024)
+        this.sendChunked('projection-video-chunk', msg.data?.buffer as ArrayBuffer, 512 * 1024)
       } else if (msg instanceof AudioData) {
         this.audio.handleAudioData(msg)
 
@@ -325,7 +325,7 @@ export class CarplayService {
             }
           }
 
-          this.webContents.send('carplay-event', {
+          this.webContents.send('projection-event', {
             type: 'audio',
             payload: {
               command: msg.command,
@@ -343,7 +343,7 @@ export class CarplayService {
         if (key === this.lastAudioMetaEmitKey) return
         this.lastAudioMetaEmitKey = key
 
-        this.webContents.send('carplay-event', {
+        this.webContents.send('projection-event', {
           type: 'audioInfo',
           payload: {
             codec: fmt.format ?? msg.decodeType ?? 'unknown',
@@ -360,7 +360,7 @@ export class CarplayService {
           const mediaMsg = inner.message
           if (!mediaMsg.payload) return
 
-          this.webContents.send('carplay-event', { type: 'media', payload: mediaMsg })
+          this.webContents.send('projection-event', { type: 'media', payload: mediaMsg })
 
           const file = path.join(app.getPath('userData'), 'mediaData.json')
           const existing = readMediaFile(file)
@@ -397,7 +397,7 @@ export class CarplayService {
           if (!this.started) return
           const navMsg = inner.message
 
-          this.webContents.send('carplay-event', { type: 'navigation', payload: navMsg })
+          this.webContents.send('projection-event', { type: 'navigation', payload: navMsg })
 
           const file = path.join(app.getPath('userData'), 'navigationData.json')
           const existing = readNavigationFile(file)
@@ -435,7 +435,7 @@ export class CarplayService {
         }
         // Unknown meta
       } else if (msg instanceof Command) {
-        this.webContents.send('carplay-event', { type: 'command', message: msg })
+        this.webContents.send('projection-event', { type: 'command', message: msg })
         if (typeof msg.value === 'number' && msg.value === 508 && this.mapsRequested) {
           try {
             this.driver.send(new SendCommand('requestNaviScreenFocus'))
@@ -447,30 +447,30 @@ export class CarplayService {
     })
 
     this.driver.on('failure', () => {
-      this.webContents?.send('carplay-event', { type: 'failure' })
+      this.webContents?.send('projection-event', { type: 'failure' })
     })
 
     // TODO all ipcMain should me moved to a separate file (registerIpc) and imported, this is just for quick iteration
-    ipcMain.handle('carplay-start', async () => this.start())
-    ipcMain.handle('carplay-stop', async () => this.stop())
-    ipcMain.handle('carplay-sendframe', async () => this.driver.send(new SendCommand('frame')))
+    ipcMain.handle('projection-start', async () => this.start())
+    ipcMain.handle('projection-stop', async () => this.stop())
+    ipcMain.handle('projection-sendframe', async () => this.driver.send(new SendCommand('frame')))
 
-    ipcMain.handle('carplay-bt-pairedlist-set', async (_evt, listText: string) => {
+    ipcMain.handle('projection-bt-pairedlist-set', async (_evt, listText: string) => {
       if (!this.started) return { ok: false }
       const ok = await this.driver.sendBluetoothPairedList(String(listText ?? ''))
       return { ok }
     })
 
-    ipcMain.handle('carplay-upload-icons', async () => {
+    ipcMain.handle('projection-upload-icons', async () => {
       if (!this.started || !this.webUsbDevice) {
-        throw new Error('[CarplayService] CarPlay is not started or dongle not connected')
+        throw new Error('[ProjectionService] Projection is not started or dongle not connected')
       }
       this.uploadIcons()
     })
 
-    ipcMain.handle('carplay-upload-livi-scripts', async () => {
+    ipcMain.handle('projection-upload-livi-scripts', async () => {
       if (!this.started || !this.webUsbDevice) {
-        throw new Error('[CarplayService] CarPlay is not started or dongle not connected')
+        throw new Error('[ProjectionService] Projection is not started or dongle not connected')
       }
 
       const cgiOk = await this.driver.send(new SendServerCgiScript())
@@ -483,7 +483,7 @@ export class CarplayService {
       }
     })
 
-    ipcMain.on('carplay-touch', (_evt, data: { x: number; y: number; action: number }) => {
+    ipcMain.on('projection-touch', (_evt, data: { x: number; y: number; action: number }) => {
       try {
         this.driver.send(new SendTouch(data.x, data.y, data.action))
       } catch {
@@ -516,7 +516,7 @@ export class CarplayService {
     }
     const ONE_BASED_IDS = false
 
-    ipcMain.on('carplay-multi-touch', (_evt, points: MultiTouchPoint[]) => {
+    ipcMain.on('projection-multi-touch', (_evt, points: MultiTouchPoint[]) => {
       try {
         if (!Array.isArray(points) || points.length === 0) return
         const safe = points.map((p) => ({
@@ -531,27 +531,27 @@ export class CarplayService {
       }
     })
 
-    ipcMain.on('carplay-command', (_evt, command) => {
+    ipcMain.on('projection-command', (_evt, command) => {
       this.driver.send(new SendCommand(command))
     })
 
-    ipcMain.handle('carplay-media-read', async () => {
+    ipcMain.handle('projection-media-read', async () => {
       try {
         const file = path.join(app.getPath('userData'), 'mediaData.json')
 
         if (!fs.existsSync(file)) {
-          console.log('[carplay-media-read] Error: ENOENT: no such file or directory')
+          console.log('[projection-media-read] Error: ENOENT: no such file or directory')
           return DEFAULT_MEDIA_DATA_RESPONSE
         }
 
         return readMediaFile(file)
       } catch (error) {
-        console.log('[carplay-media-read]', error)
+        console.log('[projection-media-read]', error)
         return DEFAULT_MEDIA_DATA_RESPONSE
       }
     })
 
-    ipcMain.handle('carplay-navigation-read', async () => {
+    ipcMain.handle('projection-navigation-read', async () => {
       try {
         if (!this.started) {
           return DEFAULT_NAVIGATION_DATA_RESPONSE
@@ -560,13 +560,13 @@ export class CarplayService {
         const file = path.join(app.getPath('userData'), 'navigationData.json')
 
         if (!fs.existsSync(file)) {
-          console.log('[carplay-navigation-read] Error: ENOENT: no such file or directory')
+          console.log('[projection-navigation-read] Error: ENOENT: no such file or directory')
           return DEFAULT_NAVIGATION_DATA_RESPONSE
         }
 
         return readNavigationFile(file)
       } catch (error) {
-        console.log('[carplay-navigation-read]', error)
+        console.log('[projection-navigation-read]', error)
         return DEFAULT_NAVIGATION_DATA_RESPONSE
       }
     })
@@ -622,7 +622,7 @@ export class CarplayService {
         const action = req?.action
 
         if (action === 'check') {
-          this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'check:start' })
+          this.webContents?.send('projection-event', { type: 'fwUpdate', stage: 'check:start' })
 
           const result = await this.firmware.checkForUpdate({
             appVer: this.getApkVer(),
@@ -632,7 +632,7 @@ export class CarplayService {
 
           const shaped = toRendererShape(result)
 
-          this.webContents?.send('carplay-event', {
+          this.webContents?.send('projection-event', {
             type: 'fwUpdate',
             stage: 'check:done',
             result: shaped
@@ -643,7 +643,10 @@ export class CarplayService {
 
         if (action === 'download') {
           try {
-            this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'download:start' })
+            this.webContents?.send('projection-event', {
+              type: 'fwUpdate',
+              stage: 'download:start'
+            })
 
             const check = await this.firmware.checkForUpdate({
               appVer: this.getApkVer(),
@@ -655,7 +658,7 @@ export class CarplayService {
 
             if (!check.ok) {
               const msg = check.error || 'checkForUpdate failed'
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'download:error',
                 message: msg
@@ -664,7 +667,7 @@ export class CarplayService {
             }
 
             if (!check.hasUpdate) {
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'download:done',
                 path: null,
@@ -676,7 +679,7 @@ export class CarplayService {
             const dl = await this.firmware.downloadFirmwareToHost(check, {
               overwrite: true,
               onProgress: (p) => {
-                this.webContents?.send('carplay-event', {
+                this.webContents?.send('projection-event', {
                   type: 'fwUpdate',
                   stage: 'download:progress',
                   received: p.received,
@@ -688,7 +691,7 @@ export class CarplayService {
 
             if (!dl.ok) {
               const msg = dl.error || 'download failed'
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'download:error',
                 message: msg
@@ -696,7 +699,7 @@ export class CarplayService {
               return asError(msg)
             }
 
-            this.webContents?.send('carplay-event', {
+            this.webContents?.send('projection-event', {
               type: 'fwUpdate',
               stage: 'download:done',
               path: dl.path,
@@ -706,7 +709,7 @@ export class CarplayService {
             return shapedCheck
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
-            this.webContents?.send('carplay-event', {
+            this.webContents?.send('projection-event', {
               type: 'fwUpdate',
               stage: 'download:error',
               message: msg
@@ -717,9 +720,9 @@ export class CarplayService {
 
         if (action === 'upload') {
           try {
-            if (!this.started) return asError('CarPlay not started / dongle not connected')
+            if (!this.started) return asError('Projection not started / dongle not connected')
 
-            this.webContents?.send('carplay-event', { type: 'fwUpdate', stage: 'upload:start' })
+            this.webContents?.send('projection-event', { type: 'fwUpdate', stage: 'upload:start' })
 
             const st = await this.firmware.getLocalFirmwareStatus({
               appVer: this.getApkVer(),
@@ -729,7 +732,7 @@ export class CarplayService {
 
             if (!st || st.ok !== true) {
               const msg = String(st?.error || 'Local firmware status failed')
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'upload:error',
                 message: msg
@@ -739,7 +742,7 @@ export class CarplayService {
 
             if (!st.ready) {
               const msg = String(st.reason || 'No firmware ready to upload')
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'upload:error',
                 message: msg
@@ -753,7 +756,7 @@ export class CarplayService {
             const ok = await this.driver.send(new SendFile(fwBuf, remotePath))
             if (!ok) {
               const msg = 'Dongle upload failed (SendFile returned false)'
-              this.webContents?.send('carplay-event', {
+              this.webContents?.send('projection-event', {
                 type: 'fwUpdate',
                 stage: 'upload:error',
                 message: msg
@@ -761,7 +764,7 @@ export class CarplayService {
               return asError(msg)
             }
 
-            this.webContents?.send('carplay-event', {
+            this.webContents?.send('projection-event', {
               type: 'fwUpdate',
               stage: 'upload:file-sent',
               path: remotePath,
@@ -777,7 +780,7 @@ export class CarplayService {
             }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
-            this.webContents?.send('carplay-event', {
+            this.webContents?.send('projection-event', {
               type: 'fwUpdate',
               stage: 'upload:error',
               message: msg
@@ -838,7 +841,7 @@ export class CarplayService {
     )
 
     ipcMain.on(
-      'carplay-set-volume',
+      'projection-set-volume',
       (_evt, payload: { stream: LogicalStreamKey; volume: number }) => {
         const { stream, volume } = payload || {}
         this.audio.setStreamVolume(stream, volume)
@@ -846,7 +849,7 @@ export class CarplayService {
     )
 
     // visualizer / FFT toggle from renderer
-    ipcMain.on('carplay-set-visualizer-enabled', (_evt, enabled: boolean) => {
+    ipcMain.on('projection-set-visualizer-enabled', (_evt, enabled: boolean) => {
       this.audio.setVisualizerEnabled(Boolean(enabled))
     })
     this.subscribeConfigEvents()
@@ -881,7 +884,7 @@ export class CarplayService {
         }
       } catch (err) {
         console.warn(
-          '[CarplayService] failed to reload config.json before icon upload, using in-memory config',
+          '[ProjectionService] failed to reload config.json before icon upload, using in-memory config',
           err
         )
       }
@@ -891,7 +894,7 @@ export class CarplayService {
       const b256 = cfg.dongleIcon256 ? cfg.dongleIcon256.trim() : ''
 
       if (!b120 || !b180 || !b256) {
-        console.error('[CarplayService] Icon fields missing in config.json — upload cancelled')
+        console.error('[ProjectionService] Icon fields missing in config.json — upload cancelled')
         return
       }
 
@@ -903,9 +906,9 @@ export class CarplayService {
       this.driver.send(new SendFile(buf180, FileAddress.ICON_180))
       this.driver.send(new SendFile(buf256, FileAddress.ICON_256))
 
-      console.debug('[CarplayService] uploaded icons from fresh config.json')
+      console.debug('[ProjectionService] uploaded icons from fresh config.json')
     } catch (err) {
-      console.error('[CarplayService] failed to upload icons', err)
+      console.error('[ProjectionService] failed to upload icons', err)
     }
   }
 
@@ -933,7 +936,7 @@ export class CarplayService {
     if (key === this.lastDongleInfoEmitKey) return
     this.lastDongleInfoEmitKey = key
 
-    this.webContents.send('carplay-event', {
+    this.webContents.send('projection-event', {
       type: 'dongleInfo',
       payload: {
         dongleFwVersion: this.dongleFwVersion,
@@ -1028,13 +1031,13 @@ export class CarplayService {
     try {
       ok = (await this.driver.send(new SendDisconnectPhone())) || ok
     } catch (e) {
-      console.warn('[CarplayService] SendDisconnectPhone failed', e)
+      console.warn('[ProjectionService] SendDisconnectPhone failed', e)
     }
 
     try {
       ok = (await this.driver.send(new SendCloseDongle())) || ok
     } catch (e) {
-      console.warn('[CarplayService] SendCloseDongle failed', e)
+      console.warn('[ProjectionService] SendCloseDongle failed', e)
     }
 
     if (ok) await new Promise((r) => setTimeout(r, 150))
@@ -1060,13 +1063,13 @@ export class CarplayService {
           await this.webUsbDevice.reset()
         }
       } catch (e) {
-        console.warn('[CarplayService] webUsbDevice.reset() failed (ignored)', e)
+        console.warn('[ProjectionService] webUsbDevice.reset() failed (ignored)', e)
       }
 
       try {
         await this.driver.close()
       } catch (e) {
-        console.warn('[CarplayService] driver.close() failed (ignored)', e)
+        console.warn('[ProjectionService] driver.close() failed (ignored)', e)
       }
 
       this.webUsbDevice = null
@@ -1113,7 +1116,7 @@ export class CarplayService {
 
       fs.writeFileSync(file, JSON.stringify(out, null, 2), 'utf8')
 
-      this.webContents?.send('carplay-event', {
+      this.webContents?.send('projection-event', {
         type: 'media',
         payload: {
           mediaType: MediaType.Data,
@@ -1126,7 +1129,7 @@ export class CarplayService {
         }
       })
     } catch (e) {
-      console.warn('[CarplayService] patchAaMediaPlayStatus failed (ignored)', e)
+      console.warn('[ProjectionService] patchAaMediaPlayStatus failed (ignored)', e)
     }
   }
 
@@ -1141,10 +1144,10 @@ export class CarplayService {
 
       fs.writeFileSync(file, JSON.stringify(out, null, 2), 'utf8')
     } catch (e) {
-      console.warn('[CarplayService] resetMediaSnapshot failed (ignored)', reason, e)
+      console.warn('[ProjectionService] resetMediaSnapshot failed (ignored)', reason, e)
     }
 
-    this.webContents?.send('carplay-event', { type: 'media-reset', reason })
+    this.webContents?.send('projection-event', { type: 'media-reset', reason })
   }
 
   private resetNavigationSnapshot(reason: string): void {
@@ -1158,10 +1161,10 @@ export class CarplayService {
 
       fs.writeFileSync(file, JSON.stringify(out, null, 2), 'utf8')
     } catch (e) {
-      console.warn('[CarplayService] resetNavigationSnapshot failed (ignored)', reason, e)
+      console.warn('[ProjectionService] resetNavigationSnapshot failed (ignored)', reason, e)
     }
 
-    this.webContents?.send('carplay-event', { type: 'navigation-reset', reason })
+    this.webContents?.send('projection-event', { type: 'navigation-reset', reason })
   }
 
   private clearTimeouts() {

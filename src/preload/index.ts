@@ -33,11 +33,11 @@ type TelemetryHandler = (payload: unknown) => void
 let telemetryQueue: unknown[] = []
 let telemetryHandler: TelemetryHandler | null = null
 
-ipcRenderer.on('carplay-video-chunk', (_event, payload: unknown) => {
+ipcRenderer.on('projection-video-chunk', (_event, payload: unknown) => {
   if (videoChunkHandler) videoChunkHandler(payload)
   else videoChunkQueue.push(payload)
 })
-ipcRenderer.on('carplay-audio-chunk', (_event, payload: unknown) => {
+ipcRenderer.on('projection-audio-chunk', (_event, payload: unknown) => {
   if (audioChunkHandler) audioChunkHandler(payload)
   else audioChunkQueue.push(payload)
 })
@@ -82,11 +82,11 @@ const api = {
   usb: {
     forceReset: (): Promise<boolean> => ipcRenderer.invoke('usb-force-reset'),
     detectDongle: (): Promise<boolean> => ipcRenderer.invoke('usb-detect-dongle'),
-    getDeviceInfo: (): Promise<UsbDeviceInfo> => ipcRenderer.invoke('carplay:usbDevice'),
+    getDeviceInfo: (): Promise<UsbDeviceInfo> => ipcRenderer.invoke('projection:usbDevice'),
     getLastEvent: (): Promise<UsbLastEvent> => ipcRenderer.invoke('usb-last-event'),
     getSysdefaultPrettyName: (): Promise<string> => ipcRenderer.invoke('get-sysdefault-mic-label'),
-    uploadIcons: () => ipcRenderer.invoke('carplay-upload-icons'),
-    uploadLiviScripts: () => ipcRenderer.invoke('carplay-upload-livi-scripts'),
+    uploadIcons: () => ipcRenderer.invoke('projection-upload-icons'),
+    uploadLiviScripts: () => ipcRenderer.invoke('projection-upload-livi-scripts'),
     listenForEvents: (callback: ApiCallback): void => {
       usbEventHandlers.push(callback)
       usbEventQueue.forEach(([evt, ...args]) => callback(evt, ...args))
@@ -109,26 +109,26 @@ const api = {
   },
 
   ipc: {
-    start: (): Promise<void> => ipcRenderer.invoke('carplay-start'),
-    stop: (): Promise<void> => ipcRenderer.invoke('carplay-stop'),
-    sendFrame: (): Promise<void> => ipcRenderer.invoke('carplay-sendframe'),
+    start: (): Promise<void> => ipcRenderer.invoke('projection-start'),
+    stop: (): Promise<void> => ipcRenderer.invoke('projection-stop'),
+    sendFrame: (): Promise<void> => ipcRenderer.invoke('projection-sendframe'),
     setBluetoothPairedList: (listText: string): Promise<{ ok: boolean }> =>
-      ipcRenderer.invoke('carplay-bt-pairedlist-set', listText),
+      ipcRenderer.invoke('projection-bt-pairedlist-set', listText),
     dongleFirmware: (action: 'check' | 'download' | 'upload' | 'status'): Promise<unknown> =>
       ipcRenderer.invoke('dongle-fw', { action }),
     sendTouch: (x: number, y: number, action: number): void =>
-      ipcRenderer.send('carplay-touch', { x, y, action }),
+      ipcRenderer.send('projection-touch', { x, y, action }),
     sendMultiTouch: (points: MultiTouchPoint[]): void =>
-      ipcRenderer.send('carplay-multi-touch', points),
-    sendCommand: (key: string): void => ipcRenderer.send('carplay-command', key),
+      ipcRenderer.send('projection-multi-touch', points),
+    sendCommand: (key: string): void => ipcRenderer.send('projection-command', key),
     onEvent: (callback: ApiCallback): void => {
-      ipcRenderer.on('carplay-event', callback)
+      ipcRenderer.on('projection-event', callback)
     },
     offEvent: (callback: ApiCallback): void => {
-      ipcRenderer.removeListener('carplay-event', callback)
+      ipcRenderer.removeListener('projection-event', callback)
     },
-    readMedia: (): Promise<unknown> => ipcRenderer.invoke('carplay-media-read'),
-    readNavigation: (): Promise<unknown> => ipcRenderer.invoke('carplay-navigation-read'),
+    readMedia: (): Promise<unknown> => ipcRenderer.invoke('projection-media-read'),
+    readNavigation: (): Promise<unknown> => ipcRenderer.invoke('projection-navigation-read'),
     onVideoChunk: (handler: ChunkHandler): void => {
       videoChunkHandler = handler
       videoChunkQueue.forEach((chunk) => handler(chunk))
@@ -140,10 +140,10 @@ const api = {
       audioChunkQueue = []
     },
     setVolume: (stream: 'music' | 'nav' | 'siri' | 'call', volume: number): void => {
-      ipcRenderer.send('carplay-set-volume', { stream, volume })
+      ipcRenderer.send('projection-set-volume', { stream, volume })
     },
     setVisualizerEnabled: (enabled: boolean): void => {
-      ipcRenderer.send('carplay-set-visualizer-enabled', !!enabled)
+      ipcRenderer.send('projection-set-visualizer-enabled', !!enabled)
     },
     requestMaps: (enabled: boolean): Promise<{ ok: boolean; enabled: boolean }> =>
       ipcRenderer.invoke('maps:request', enabled),
@@ -169,7 +169,7 @@ const api = {
   }
 }
 
-contextBridge.exposeInMainWorld('carplay', api)
+contextBridge.exposeInMainWorld('projection', api)
 
 type UpdateEvent = { phase: string; message?: string }
 type UpdateProgress = { phase?: string; percent?: number; received?: number; total?: number }

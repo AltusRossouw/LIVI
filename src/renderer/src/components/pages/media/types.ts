@@ -15,14 +15,14 @@ export type MediaPayload = {
   error?: boolean
 }
 
-// USB/carplay event shape
+// USB/projection event shape
 export type UsbEvent = { type?: string } & Record<string, unknown>
 
 export type MediaEventPayload = { type: 'media'; payload: { payload: MediaPayload } }
 
 // Typed view of the pieces we use on window (no `any`)
 export type Bridge = {
-  carplay?: {
+  projection?: {
     ipc?: { onEvent?: (cb: (e: unknown, ...a: unknown[]) => void) => void | (() => void) }
   }
   electron?: {

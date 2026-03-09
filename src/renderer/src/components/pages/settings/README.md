@@ -234,7 +234,7 @@ URL will be:
 
 # How state works
 
-- All values come from useCarplayStore
+- All values come from useLiviStore
 - Local state:
 - - initialized from the schema
 - - tracks dirty state

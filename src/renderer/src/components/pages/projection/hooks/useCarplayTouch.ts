@@ -76,7 +76,7 @@ export const useCarplayMultiTouch = (videoRef: RefObject<HTMLElement | null>): H
       })
     }
     if (!pts.length) return
-    window.carplay.ipc.sendMultiTouch(pts)
+    window.projection.ipc.sendMultiTouch(pts)
   }, [])
 
   const onPointerDown = useCallback<Handlers['onPointerDown']>(
@@ -88,7 +88,7 @@ export const useCarplayMultiTouch = (videoRef: RefObject<HTMLElement | null>): H
 
       if (e.pointerType === 'mouse') {
         mouseDown.current = true
-        window.carplay.ipc.sendTouch(x, y, TouchAction.Down)
+        window.projection.ipc.sendTouch(x, y, TouchAction.Down)
         return
       }
 
@@ -111,7 +111,7 @@ export const useCarplayMultiTouch = (videoRef: RefObject<HTMLElement | null>): H
 
       if (e.pointerType === 'mouse') {
         if (!mouseDown.current) return
-        window.carplay.ipc.sendTouch(x, y, TouchAction.Move)
+        window.projection.ipc.sendTouch(x, y, TouchAction.Move)
         return
       }
 
@@ -137,7 +137,7 @@ export const useCarplayMultiTouch = (videoRef: RefObject<HTMLElement | null>): H
 
         const { x, y } = p
         mouseDown.current = false
-        window.carplay.ipc.sendTouch(x, y, TouchAction.Up)
+        window.projection.ipc.sendTouch(x, y, TouchAction.Up)
         return
       }
 

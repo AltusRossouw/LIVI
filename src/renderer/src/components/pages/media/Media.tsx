@@ -91,8 +91,8 @@ export const Media = () => {
   // Enable visualizer only when FFT is visible (and streaming)
   useEffect(() => {
     const enabled = !!showFft && !!isStreaming
-    window.carplay?.ipc?.setVisualizerEnabled?.(enabled)
-    return () => window.carplay?.ipc?.setVisualizerEnabled?.(false)
+    window.projection?.ipc?.setVisualizerEnabled?.(enabled)
+    return () => window.projection?.ipc?.setVisualizerEnabled?.(false)
   }, [showFft, isStreaming])
 
   // Per-button focus
@@ -170,10 +170,10 @@ export const Media = () => {
     }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    window.carplay.usb.listenForEvents(usbHandler)
+    window.projection.usb.listenForEvents(usbHandler)
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    return () => window.carplay.usb.unlistenForEvents(usbHandler)
+    return () => window.projection.usb.unlistenForEvents(usbHandler)
   }, [clearOverride, resetPress])
 
   // Progress from elapsed/total

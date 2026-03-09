@@ -1,5 +1,5 @@
 export * from './camera'
-export * from './carplay'
+export * from './projection'
 export * from './home'
 export * from './maps'
 export * from './media'

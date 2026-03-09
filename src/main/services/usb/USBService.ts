@@ -1,6 +1,6 @@
 import type { Device } from 'usb'
 import { ipcMain, BrowserWindow } from 'electron'
-import { CarplayService } from '../carplay/services/CarplayService'
+import { ProjectionService } from '../projection/services/ProjectionService'
 import { findDongle } from './helpers'
 import { Microphone } from '@main/services/audio'
 
@@ -28,7 +28,7 @@ export class USBService {
     } catch {}
   }
 
-  constructor(private carplay: CarplayService) {
+  constructor(private projection: ProjectionService) {
     this.registerIpcHandlers()
     this.listenToUsbEvents()
     try {
@@ -39,9 +39,9 @@ export class USBService {
     if (device) {
       console.log('[USBService] Dongle was already connected on startup')
       this.lastDongleState = true
-      this.carplay.markDongleConnected(true)
+      this.projection.markDongleConnected(true)
       this.notifyDeviceChange(device, true)
-      this.carplay.autoStartIfNeeded().catch(console.error)
+      this.projection.autoStartIfNeeded().catch(console.error)
     }
   }
 
@@ -52,9 +52,9 @@ export class USBService {
       if (this.isDongle(device) && !this.lastDongleState) {
         console.log('[USBService] Dongle connected')
         this.lastDongleState = true
-        this.carplay.markDongleConnected(true)
+        this.projection.markDongleConnected(true)
         this.notifyDeviceChange(device, true)
-        this.carplay.autoStartIfNeeded().catch(console.error)
+        this.projection.autoStartIfNeeded().catch(console.error)
       }
     })
 
@@ -64,7 +64,7 @@ export class USBService {
       if (this.isDongle(device) && this.lastDongleState) {
         console.log('[USBService] Dongle disconnected')
         this.lastDongleState = false
-        this.carplay.markDongleConnected(false)
+        this.projection.markDongleConnected(false)
         this.notifyDeviceChange(device, false)
       }
     })
@@ -79,7 +79,7 @@ export class USBService {
     }
     BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send('usb-event', payload)
-      win.webContents.send('carplay-event', payload)
+      win.webContents.send('projection-event', payload)
     })
   }
 
@@ -108,7 +108,7 @@ export class USBService {
     }
     BrowserWindow.getAllWindows().forEach((win) => {
       win.webContents.send('usb-event', payload)
-      win.webContents.send('carplay-event', payload)
+      win.webContents.send('projection-event', payload)
     })
   }
 
@@ -121,7 +121,7 @@ export class USBService {
       return devices.some(this.isDongle)
     })
 
-    ipcMain.handle('carplay:usbDevice', async () => {
+    ipcMain.handle('projection:usbDevice', async () => {
       if (this.shutdownInProgress || this.resetInProgress) {
         return {
           device: false,
@@ -233,11 +233,11 @@ export class USBService {
 
     let ok = false
     try {
-      // Stop CarPlay first (clears pending transfers)
+      // Stop projection first (clears pending transfers)
       try {
-        await this.carplay.stop()
+        await this.projection.stop()
       } catch (e) {
-        console.warn('[USB] carplay.stop() failed before reset', e)
+        console.warn('[USB] projection.stop() failed before reset', e)
       }
 
       if (this.shutdownInProgress) return false
@@ -274,8 +274,8 @@ export class USBService {
 
     this.resetInProgress = true
     try {
-      console.log('[USB] Graceful disconnect: stopping CarPlay')
-      await this.carplay.stop()
+      console.log('[USB] Graceful disconnect: stopping projection')
+      await this.projection.stop()
 
       this.lastDongleState = false
       this.broadcastGenericUsbEventNoDevice('detach')

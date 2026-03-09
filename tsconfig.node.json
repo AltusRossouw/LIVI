@@ -21,10 +21,10 @@
     "paths": {
       "@main/*": ["main/*"],
       "@shared/*": ["main/shared/*"],
-      "@carplay/messages": ["main/services/carplay/messages/index.ts"],
-      "@carplay/messages/*": ["main/services/carplay/messages/*"],
-      "@carplay/node": ["main/services/carplay/node"],
-      "@carplay/*": ["main/services/carplay/*"],
+      "@projection/messages": ["main/services/projection/messages/index.ts"],
+      "@projection/messages/*": ["main/services/projection/messages/*"],
+      "@projection/node": ["main/services/projection/node"],
+      "@projection/*": ["main/services/projection/*"],
       "@audio": ["main/audio/index.ts"]
     }
   }

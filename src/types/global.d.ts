@@ -2,7 +2,7 @@ export {}
 
 declare global {
   interface Window {
-    carplay: {
+    projection: {
       ipc: {
         sendCommand: (cmd: string) => void
       }

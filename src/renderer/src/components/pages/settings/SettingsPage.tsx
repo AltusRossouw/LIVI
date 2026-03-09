@@ -1,4 +1,4 @@
-import { useCarplayStore, useStatusStore } from '@store/store'
+import { useLiviStore, useStatusStore } from '@store/store'
 import type { ExtraConfig } from '@shared/types'
 import { SettingsLayout } from '../../layouts'
 import { useSmartSettingsFromSchema } from './hooks/useSmartSettingsFromSchema'
@@ -23,13 +23,13 @@ export function SettingsPage() {
   const path = splat ? splat.split('/') : []
   const node = getNodeByPath(settingsSchema, path)
 
-  const settings = useCarplayStore((s) => s.settings) as ExtraConfig
+  const settings = useLiviStore((s) => s.settings) as ExtraConfig
 
   const { state, handleFieldChange, needsRestart, restart, requestRestart } =
     useSmartSettingsFromSchema(settingsSchema, settings)
 
-  const btDirty = useCarplayStore((s) => s.bluetoothPairedDirty)
-  const applyBtList = useCarplayStore((s) => s.applyBluetoothPairedList)
+  const btDirty = useLiviStore((s) => s.bluetoothPairedDirty)
+  const applyBtList = useLiviStore((s) => s.applyBluetoothPairedList)
 
   const handleRestart = async () => {
     if (!isDongleConnected) return

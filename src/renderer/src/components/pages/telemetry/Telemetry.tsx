@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Box, useTheme } from '@mui/material'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 import { AppContext } from '@renderer/context'
 import { DashboardConfig } from '@renderer/components/pages/telemetry/config'
 import { normalizeDashComponents } from '@renderer/components/pages/telemetry/utils'
@@ -13,7 +13,7 @@ import { useNavbarHidden } from '@renderer/hooks/useNavbarHidden'
 
 export const Telemetry: FC = () => {
   const theme = useTheme()
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
   const { onSetAppContext } = useContext(AppContext)
   const [index, setIndex] = useState(0)
 

@@ -1,6 +1,6 @@
 import { app, ipcMain } from 'electron'
 import type { ExtraConfig } from '@shared/types'
-import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/carplay/assets/carIcons'
+import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@main/services/projection/assets/carIcons'
 import { currentKiosk } from '@main/window/utils'
 import { pickAssetForPlatform } from '@main/ipc/update/pickAsset'
 import { GhRelease, runtimeStateProps } from '@main/types'

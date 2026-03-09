@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Typography, useTheme } from '@mui/material'
 import { InitEvent } from '@worker/render/RenderEvents'
-import { useStatusStore, useCarplayStore } from '../../../store/store'
+import { useStatusStore, useLiviStore } from '../../../store/store'
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
 
 type BoxInfo = { supportFeatures?: unknown }
@@ -30,8 +30,8 @@ function parseBoxInfo(raw: unknown): BoxInfo | null {
 export const Maps: React.FC = () => {
   const theme = useTheme()
 
-  const settings = useCarplayStore((s) => s.settings)
-  const boxInfoRaw = useCarplayStore((s) => s.boxInfo)
+  const settings = useLiviStore((s) => s.settings)
+  const boxInfoRaw = useLiviStore((s) => s.boxInfo)
   const isStreaming = useStatusStore((s) => s.isStreaming)
   const fps = settings?.fps
 
@@ -104,7 +104,7 @@ export const Maps: React.FC = () => {
     const apply = async () => {
       try {
         const enabled = Boolean(isStreaming)
-        await window.carplay.ipc.requestMaps(enabled)
+        await window.projection.ipc.requestMaps(enabled)
         if (cancelled) return
       } catch {
         // ignore
@@ -115,7 +115,7 @@ export const Maps: React.FC = () => {
 
     return () => {
       cancelled = true
-      void window.carplay.ipc.requestMaps(false).catch(() => {})
+      void window.projection.ipc.requestMaps(false).catch(() => {})
     }
   }, [isStreaming])
 
@@ -213,7 +213,7 @@ export const Maps: React.FC = () => {
       mapsVideoChannel.port1.postMessage(buf, [buf])
     }
 
-    window.carplay.ipc.onMapsVideoChunk(handleVideo)
+    window.projection.ipc.onMapsVideoChunk(handleVideo)
     return () => {}
   }, [mapsVideoChannel, renderReady, rendererError])
 

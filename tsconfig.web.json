@@ -29,8 +29,8 @@
     "baseUrl": "./src",
     "paths": {
       "@renderer/*": ["renderer/src/*"],
-      "@carplay/messages": ["main/services/carplay/messages/index.ts"],
-      "@carplay/messages/*": ["main/services/carplay/messages/*"],
+      "@projection/messages": ["main/services/projection/messages/index.ts"],
+      "@projection/messages/*": ["main/services/projection/messages/*"],
       "@main/*": ["main/*"],
       "@shared/*": ["main/shared/*"],
       "@worker/*": ["renderer/src/components/worker/*"],

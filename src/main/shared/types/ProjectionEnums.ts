@@ -2,7 +2,7 @@ export enum CommandMapping {
   invalid = 0, // 'invalid'
   startRecordAudio = 1,
   stopRecordAudio = 2,
-  requestHostUI = 3, // 'Carplay Interface My Car button clicked'
+  requestHostUI = 3, // 'Projection interface My Car button clicked'
   siri = 5, // 'Siri Button'
   mic = 7, // 'Car Microphone'
   frame = 12,

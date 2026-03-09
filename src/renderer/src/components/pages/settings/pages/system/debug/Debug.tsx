@@ -14,7 +14,7 @@ import AccordionDetails from '@mui/material/AccordionDetails'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import Button from '@mui/material/Button'
 
-type CarplayEventMsg = { type: string; payload?: unknown }
+type ProjectionEventMsg = { type: string; payload?: unknown }
 
 function safeJson(value: unknown): string {
   try {
@@ -31,8 +31,8 @@ export function Debug() {
   const [autoUpdateNavSnapshot, setAutoUpdateNavSnapshot] = React.useState(true)
   const [autoUpdateMediaSnapshot, setAutoUpdateMediaSnapshot] = React.useState(true)
 
-  const [events, setEvents] = React.useState<CarplayEventMsg[]>([])
-  const [frozenEvents, setFrozenEvents] = React.useState<CarplayEventMsg[] | null>(null)
+  const [events, setEvents] = React.useState<ProjectionEventMsg[]>([])
+  const [frozenEvents, setFrozenEvents] = React.useState<ProjectionEventMsg[] | null>(null)
 
   const [selectedType, setSelectedType] = React.useState<string>('__all__') // DEFAULT: ALL
   const [autoScroll, setAutoScroll] = React.useState(false)
@@ -44,7 +44,7 @@ export function Debug() {
   const autoUpdateNavSnapshotRef = React.useRef(autoUpdateNavSnapshot)
   const autoUpdateMediaSnapshotRef = React.useRef(autoUpdateMediaSnapshot)
 
-  const eventsRef = React.useRef<CarplayEventMsg[]>(events)
+  const eventsRef = React.useRef<ProjectionEventMsg[]>(events)
   React.useEffect(() => {
     eventsRef.current = events
   }, [events])
@@ -59,7 +59,7 @@ export function Debug() {
 
   const readNavigationSnapshot = React.useCallback(async () => {
     try {
-      const snap = await window.carplay.ipc.readNavigation()
+      const snap = await window.projection.ipc.readNavigation()
       setNavigationSnapshot(snap ?? null)
     } catch {
       setNavigationSnapshot(null)
@@ -68,7 +68,7 @@ export function Debug() {
 
   const readMediaSnapshot = React.useCallback(async () => {
     try {
-      const snap = await window.carplay.ipc.readMedia()
+      const snap = await window.projection.ipc.readMedia()
       setMediaSnapshot(snap ?? null)
     } catch {
       setMediaSnapshot(null)
@@ -87,7 +87,7 @@ export function Debug() {
     }
 
     const handler = (_event: unknown, ...args: unknown[]) => {
-      const msg = (args[0] ?? {}) as CarplayEventMsg
+      const msg = (args[0] ?? {}) as ProjectionEventMsg
 
       // LIVE (always log)
       setEvents((prev) => {
@@ -101,8 +101,8 @@ export function Debug() {
       if (msg.type === 'media' && autoUpdateMediaSnapshotRef.current) void readMediaSnapshot()
     }
 
-    window.carplay.ipc.onEvent(handler)
-    return () => window.carplay.ipc.offEvent(handler)
+    window.projection.ipc.onEvent(handler)
+    return () => window.projection.ipc.offEvent(handler)
   }, [readAllSnapshots, readNavigationSnapshot, readMediaSnapshot])
 
   const sourceEvents = React.useMemo(

@@ -1,5 +1,5 @@
 import { electronApp } from '@electron-toolkit/utils'
 
 export function setupAppIdentity() {
-  electronApp.setAppUserModelId('com.electron.carplay')
+  electronApp.setAppUserModelId('com.livi.app')
 }

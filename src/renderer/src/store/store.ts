@@ -25,32 +25,32 @@ type CarplayIpcApi = {
   sendCommand?: (command: string) => void
 }
 
-type CarplayApi = {
+type ProjectionApi = {
   settings?: CarplaySettingsApi
   usb?: CarplayUsbApi
   ipc?: CarplayIpcApi
 }
 
-const getCarplayApi = () => {
+const getProjectionApi = () => {
   if (typeof window === 'undefined') return null
-  const w = window as unknown as { carplay?: CarplayApi }
-  return w.carplay ?? null
+  const w = window as unknown as { projection?: ProjectionApi }
+  return w.projection ?? null
 }
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 const sendCarplayVolume = (stream: VolumeStreamKey, volume: number) => {
-  const api = getCarplayApi()
+  const api = getProjectionApi()
   if (!api?.ipc?.setVolume) return
   try {
     api.ipc.setVolume(stream, clamp01(volume))
   } catch (err) {
-    console.warn('carplay-set-volume IPC failed', err)
+    console.warn('projection-set-volume IPC failed', err)
   }
 }
 
 const sendCarplayMicType = (micType: MicType) => {
-  const api = getCarplayApi()
+  const api = getProjectionApi()
   if (!api?.ipc?.sendCommand) return
 
   let cmd: string
@@ -69,12 +69,12 @@ const sendCarplayMicType = (micType: MicType) => {
   try {
     api.ipc.sendCommand(cmd)
   } catch (err) {
-    console.warn('carplay-set-mic IPC failed', err)
+    console.warn('projection-set-mic IPC failed', err)
   }
 }
 
 const saveSettingsIpc = async (patch: Partial<ExtraConfig>) => {
-  const api = getCarplayApi()
+  const api = getProjectionApi()
   if (!api?.settings?.save) return
   try {
     await api.settings.save(patch)
@@ -84,7 +84,7 @@ const saveSettingsIpc = async (patch: Partial<ExtraConfig>) => {
 }
 
 const getSettingsIpc = async (): Promise<ExtraConfig | null> => {
-  const api = getCarplayApi()
+  const api = getProjectionApi()
   if (!api?.settings?.get) return null
   try {
     return await api.settings.get()
@@ -110,7 +110,7 @@ const deriveTelemetryEnabled = (cfg: ExtraConfig): boolean => {
   return d.some((x) => x.enabled)
 }
 
-// Carplay Store
+// Projection Store
 export interface CarplayStore {
   // Full app config (from main, includes defaults)
   settings: ExtraConfig | null
@@ -191,7 +191,7 @@ export interface CarplayStore {
   resetInfo: () => void
 }
 
-export const useCarplayStore = create<CarplayStore>((set, get) => {
+export const useLiviStore = create<CarplayStore>((set, get) => {
   // Prevent double init (strict mode / hot reload)
   let didInit = false
 
@@ -290,7 +290,7 @@ export const useCarplayStore = create<CarplayStore>((set, get) => {
     },
 
     applyBluetoothPairedList: async () => {
-      const api = getCarplayApi()
+      const api = getProjectionApi()
       if (!api?.ipc?.setBluetoothPairedList) return false
 
       try {
@@ -333,7 +333,7 @@ export const useCarplayStore = create<CarplayStore>((set, get) => {
       void refreshFromMain()
 
       // live sync: main -> renderer
-      const api = getCarplayApi()
+      const api = getProjectionApi()
       if (api?.settings?.onUpdate) {
         api.settings.onUpdate((_evt, s) => {
           const derived = applyDerivedFromSettings(s)
@@ -491,7 +491,7 @@ export const useCarplayStore = create<CarplayStore>((set, get) => {
 })
 
 // Auto-init
-useCarplayStore.getState().init()
+useLiviStore.getState().init()
 
 // Status store
 export interface StatusStore {

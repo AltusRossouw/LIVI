@@ -26,10 +26,10 @@ export function useVehicleTelemetry() {
       setTelemetry((prev) => ({ ...(prev ?? {}), ...msg, ts }))
     }
 
-    window.carplay?.ipc?.onTelemetry?.(onMsg)
+    window.projection?.ipc?.onTelemetry?.(onMsg)
 
     return () => {
-      window.carplay?.ipc?.offTelemetry?.()
+      window.projection?.ipc?.offTelemetry?.()
     }
   }, [])
 

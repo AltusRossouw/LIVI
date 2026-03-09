@@ -16,7 +16,7 @@ import { runtimeStateProps, ServicesProps } from '@main/types'
 let mainWindow: BrowserWindow | null = null
 
 export function createMainWindow(runtimeState: runtimeStateProps, services: ServicesProps) {
-  const { carplayService } = services
+  const { projectionService } = services
   const isMac = isMacPlatform()
 
   mainWindow = new BrowserWindow({
@@ -88,7 +88,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
     pushSettingsToRenderer(runtimeState, { kiosk: currentKiosk(runtimeState.config) })
 
     if (is.dev) mainWindow.webContents.openDevTools({ mode: 'detach' })
-    carplayService.attachRenderer(mainWindow.webContents)
+    projectionService.attachRenderer(mainWindow.webContents)
   })
 
   if (isMac) {

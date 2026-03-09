@@ -31,14 +31,14 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import NavigationOutlinedIcon from '@mui/icons-material/NavigationOutlined'
 
 import { NavLocale, translateNavigation } from '@shared/utils/translateNavigation'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 import type { NaviBag } from '@shared/types'
 
 export type NavFullProps = {
   className?: string
 }
 
-type CarplayEventMsg = { type: string; payload?: unknown }
+type ProjectionEventMsg = { type: string; payload?: unknown }
 
 function navLocaleFromSettings(v: unknown): NavLocale {
   if (v === 'de' || v === 'ua' || v === 'en') return v
@@ -70,7 +70,7 @@ function unwrapNaviPatch(raw: unknown): Partial<NaviBag> | null {
     }
   }
 
-  // carplay-event message wrapper
+  // projection-event message wrapper
   if (isRecord(raw) && isRecord(raw.payload)) {
     const p = raw.payload as Record<string, unknown>
 
@@ -235,14 +235,14 @@ function ManeuverVisual({
 }
 
 export function NavFull({ className }: NavFullProps) {
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
   const locale = navLocaleFromSettings(settings?.language)
 
   const [navi, setNavi] = React.useState<NaviBag | null>(null)
 
   const hydrate = React.useCallback(async () => {
     try {
-      const snap = await window.carplay.ipc.readNavigation()
+      const snap = await window.projection.ipc.readNavigation()
       const patch = unwrapNaviPatch(snap)
       setNavi((prev) => mergeNavi(prev, patch))
     } catch {
@@ -254,7 +254,7 @@ export function NavFull({ className }: NavFullProps) {
     void hydrate()
 
     const handler = (_event: unknown, ...args: unknown[]) => {
-      const msg = (args[0] ?? {}) as CarplayEventMsg
+      const msg = (args[0] ?? {}) as ProjectionEventMsg
       if (msg.type !== 'navigation') return
 
       const patch = unwrapNaviPatch(msg)
@@ -265,8 +265,8 @@ export function NavFull({ className }: NavFullProps) {
       }
     }
 
-    window.carplay.ipc.onEvent(handler)
-    return () => window.carplay.ipc.offEvent(handler)
+    window.projection.ipc.onEvent(handler)
+    return () => window.projection.ipc.offEvent(handler)
   }, [hydrate])
 
   const t = React.useMemo(() => translateNavigation(navi, locale), [navi, locale])

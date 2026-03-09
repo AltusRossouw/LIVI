@@ -11,7 +11,7 @@ export type AudioPlayerKey = string & { __brand: 'AudioPlayerKey' }
 export type VideoPortMessage = { type: 'video'; buffer: ArrayBuffer }
 export type AudioPortMessage = { type: 'audio'; buffer: ArrayBuffer; decodeType: number }
 
-/** Payload to initialise the CarPlay worker */
+/** Payload to initialise the Projection worker */
 export type InitialisePayload = {
   videoPort?: MessagePort
   audioPort: MessagePort
@@ -103,7 +103,7 @@ export type KeyCommand =
   | 'rejectPhone'
   | 'siri'
 
-/** Commands the UI can post to the CarPlay worker */
+/** Commands the UI can post to the Projection worker */
 export type Command =
   | { type: 'stop' }
   | { type: 'start'; payload: StartPayload }
@@ -115,7 +115,7 @@ export type Command =
   | { type: 'frame' }
   | { type: 'keyCommand'; command: KeyCommand }
 
-/** Messages the CarPlay worker sends back to the UI thread */
+/** Messages the Projection worker sends back to the UI thread */
 export type WorkerToUI =
   | { type: 'plugged' }
   | { type: 'unplugged' }
@@ -135,10 +135,10 @@ export type WorkerToUI =
   | { type: 'resolution'; payload: { width: number; height: number } }
 
 /** Back-compat alias */
-export type CarplayWorkerMessage = WorkerToUI
+export type ProjectionWorkerMessage = WorkerToUI
 
 /** Typed worker instance — do not override onmessage, use addEventListener instead */
-export type CarPlayWorker = Worker & {
+export type ProjectionWorker = Worker & {
   postMessage(message: Command, transfer?: Transferable[]): void
 }
 

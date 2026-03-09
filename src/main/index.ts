@@ -7,14 +7,14 @@ import { registerAppProtocol } from '@main/protocol/appProtocol'
 import { registerIpc } from '@main/ipc'
 import { runtimeStateProps } from '@main/types'
 import { setupAppIdentity } from '@main/app/init'
-import { CarplayService } from '@main/services/carplay/services/CarplayService'
+import { ProjectionService } from '@main/services/projection/services/ProjectionService'
 import { USBService } from './services/usb/USBService'
 import { TelemetrySocket } from '@main/services/Socket'
 import { setupTelemetry } from '@main/services/telemetry/setupTelemetry'
 
 app.whenReady().then(() => {
-  const carplayService = new CarplayService()
-  const usbService = new USBService(carplayService)
+  const projectionService = new ProjectionService()
+  const usbService = new USBService(projectionService)
   const telemetrySocket = new TelemetrySocket(4000)
   const runtimeState: runtimeStateProps = {
     config: loadConfig(),
@@ -27,7 +27,7 @@ app.whenReady().then(() => {
   runtimeState.telemetrySocket = telemetrySocket
 
   const services = {
-    carplayService,
+    projectionService,
     usbService,
     telemetrySocket
   }

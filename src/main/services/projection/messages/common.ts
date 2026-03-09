@@ -62,18 +62,18 @@ export enum MessageType {
   NaviFocusRelease = 0x6f
 }
 
-export type CarplayMessageTapPayload = {
+export type ProjectionyMessageTapPayload = {
   type: number
   length: number
   dataLength: number
   data?: Buffer
 }
 
-type CarplayMessageTap = (p: CarplayMessageTapPayload) => void
-let carplayMessageTap: CarplayMessageTap | null = null
+type ProjectionyMessageTap = (p: ProjectionyMessageTapPayload) => void
+let projectionMessageTap: ProjectionyMessageTap | null = null
 
-export function setCarplayMessageTap(tap: CarplayMessageTap | null) {
-  carplayMessageTap = tap
+export function setProjectionyMessageTap(tap: ProjectionyMessageTap | null) {
+  projectionMessageTap = tap
 }
 
 export class HeaderBuildError extends Error {}
@@ -119,9 +119,9 @@ export class MessageHeader {
   toMessage(data?: Buffer): Message | null {
     const { type } = this
 
-    if (carplayMessageTap) {
+    if (projectionMessageTap) {
       try {
-        carplayMessageTap({
+        projectionMessageTap({
           type,
           length: this.length,
           dataLength: data?.length ?? 0,

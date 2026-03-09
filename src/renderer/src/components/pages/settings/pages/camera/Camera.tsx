@@ -41,8 +41,8 @@ export const Camera: React.FC<SettingsCustomPageProps<ExtraConfig, string>> = ({
         detectCameras(setCameraFound, safeCameraPersist, state).then(setCameras)
       }
     }
-    window.carplay.usb.listenForEvents(usbHandler)
-    return () => window.carplay.usb.unlistenForEvents(usbHandler)
+    window.projection.usb.listenForEvents(usbHandler)
+    return () => window.projection.usb.unlistenForEvents(usbHandler)
   }, [safeCameraPersist, setCameraFound, state])
 
   const cameraOptions = useMemo<readonly { deviceId: string; label: string }[]>(

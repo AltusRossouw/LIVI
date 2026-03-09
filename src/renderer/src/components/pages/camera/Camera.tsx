@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Typography } from '@mui/material'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 
 type CameraId = string
 
@@ -25,7 +25,7 @@ export const Camera: React.FC<CameraProps> = ({
   showFallbackNotice = true,
   withAudio = false
 }) => {
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const currentStreamRef = useRef<MediaStream | null>(null)

@@ -44,8 +44,8 @@ export function useMediaState(allowInitialHydrate: boolean) {
     const w = window as unknown as Bridge
 
     let unsubscribe: (() => void) | undefined
-    if (typeof w.carplay?.ipc?.onEvent === 'function') {
-      const maybe = w.carplay.ipc.onEvent(handler)
+    if (typeof w.projection?.ipc?.onEvent === 'function') {
+      const maybe = w.projection.ipc.onEvent(handler)
       if (typeof maybe === 'function') unsubscribe = maybe
     }
 
@@ -59,7 +59,7 @@ export function useMediaState(allowInitialHydrate: boolean) {
       const remove = w.electron?.ipcRenderer?.removeListener
       if (typeof remove === 'function') {
         try {
-          remove('carplay-event', handler as (...a: unknown[]) => void)
+          remove('projection-event', handler as (...a: unknown[]) => void)
         } catch {}
       }
     }
@@ -72,7 +72,7 @@ export function useMediaState(allowInitialHydrate: boolean) {
       try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
-        const initial = await window.carplay.ipc.readMedia()
+        const initial = await window.projection.ipc.readMedia()
         if (!cancelled && initial) {
           hydratedOnceRef.current = true
           setSnap(initial)

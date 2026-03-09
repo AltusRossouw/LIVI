@@ -3,7 +3,7 @@ import { runtimeStateProps, ServicesProps } from '@main/types'
 import { createMainWindow, getMainWindow } from '@main/window/createWindow'
 
 export function setupLifecycle(runtimeState: runtimeStateProps, services: ServicesProps) {
-  const { carplayService, usbService, telemetrySocket } = services
+  const { projectionService, usbService, telemetrySocket } = services
   const mainWindow = getMainWindow()
 
   app.on('window-all-closed', () => {
@@ -67,7 +67,7 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
     }, watchdogMs)
 
     try {
-      carplayService.beginShutdown()
+      projectionService.beginShutdown()
 
       // Block hotplug callbacks ASAP
       usbService?.beginShutdown()
@@ -76,10 +76,10 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
         await withTimeout('usbService.stop()', usbService?.stop?.() ?? Promise.resolve(), tUsbStop)
       })
 
-      await measureStep('carplay.disconnectPhone()', async () => {
+      await measureStep('projection.disconnectPhone()', async () => {
         await withTimeout(
-          'carplay.disconnectPhone()',
-          carplayService.disconnectPhone(),
+          'projection.disconnectPhone()',
+          projectionService.disconnectPhone(),
           tDisconnect
         )
         await sleep(75)
@@ -93,8 +93,8 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
         )
       })
 
-      await measureStep('carplay.stop()', async () => {
-        await withTimeout('carplay.stop()', carplayService.stop(), tCarplayStop)
+      await measureStep('projection.stop()', async () => {
+        await withTimeout('projection.stop()', projectionService.stop(), tCarplayStop)
       })
     } catch (err) {
       console.warn('[MAIN] Error while quitting:', err)

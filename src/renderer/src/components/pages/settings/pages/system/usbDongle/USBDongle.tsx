@@ -14,7 +14,7 @@ import {
   Stack,
   Typography
 } from '@mui/material'
-import { useCarplayStore, useStatusStore } from '@store/store'
+import { useLiviStore, useStatusStore } from '@store/store'
 import { useNetworkStatus } from '@renderer/hooks/useNetworkStatus'
 import { fmt, isDongleFwCheckResponse, normalizeBoxInfo } from './utils'
 import { DongleFwCheckResponse, FwDialogState, Row } from '@renderer/types'
@@ -29,23 +29,23 @@ export function USBDongle() {
   const isOnline = network.online
 
   // USB descriptor
-  const vendorId = useCarplayStore((s) => s.vendorId)
-  const productId = useCarplayStore((s) => s.productId)
-  const usbFwVersion = useCarplayStore((s) => s.usbFwVersion)
+  const vendorId = useLiviStore((s) => s.vendorId)
+  const productId = useLiviStore((s) => s.productId)
+  const usbFwVersion = useLiviStore((s) => s.usbFwVersion)
 
   // Dongle Info
-  const dongleFwVersion = useCarplayStore((s) => s.dongleFwVersion)
-  const boxInfoRaw = useCarplayStore((s) => s.boxInfo)
+  const dongleFwVersion = useLiviStore((s) => s.dongleFwVersion)
+  const boxInfoRaw = useLiviStore((s) => s.boxInfo)
 
   // Video stream (negotiated)
-  const negotiatedWidth = useCarplayStore((s) => s.negotiatedWidth)
-  const negotiatedHeight = useCarplayStore((s) => s.negotiatedHeight)
+  const negotiatedWidth = useLiviStore((s) => s.negotiatedWidth)
+  const negotiatedHeight = useLiviStore((s) => s.negotiatedHeight)
 
   // Audio stream
-  const audioCodec = useCarplayStore((s) => s.audioCodec)
-  const audioSampleRate = useCarplayStore((s) => s.audioSampleRate)
-  const audioChannels = useCarplayStore((s) => s.audioChannels)
-  const audioBitDepth = useCarplayStore((s) => s.audioBitDepth)
+  const audioCodec = useLiviStore((s) => s.audioCodec)
+  const audioSampleRate = useLiviStore((s) => s.audioSampleRate)
+  const audioChannels = useLiviStore((s) => s.audioChannels)
+  const audioBitDepth = useLiviStore((s) => s.audioBitDepth)
 
   // Auto-close dialog
   const autoCloseTimerRef = useRef<number | null>(null)
@@ -215,7 +215,7 @@ export function USBDongle() {
 
     try {
       setDevBusy(true)
-      const res = await window.carplay.usb.uploadLiviScripts()
+      const res = await window.projection.usb.uploadLiviScripts()
       setDevOk(res)
 
       if (!res.ok) {
@@ -432,9 +432,9 @@ export function USBDongle() {
       }
     }
 
-    window.carplay?.ipc?.onEvent?.(handler)
+    window.projection?.ipc?.onEvent?.(handler)
     return () => {
-      window.carplay?.ipc?.offEvent?.(handler)
+      window.projection?.ipc?.offEvent?.(handler)
     }
   }, [])
 
@@ -509,7 +509,7 @@ export function USBDongle() {
         // Preflight for download: if already localReady -> just show dialog message and exit
         if (action === 'download') {
           try {
-            const st = await window.carplay.ipc.dongleFirmware('status')
+            const st = await window.projection.ipc.dongleFirmware('status')
             if (isDongleFwCheckResponse(st)) {
               setFwResult((prev) => {
                 if (!prev) return st
@@ -576,7 +576,7 @@ export function USBDongle() {
         }
 
         // Call preload -> main IPC
-        const raw = await window.carplay.ipc.dongleFirmware(action)
+        const raw = await window.projection.ipc.dongleFirmware(action)
 
         if (!isDongleFwCheckResponse(raw)) {
           setFwResult(null)

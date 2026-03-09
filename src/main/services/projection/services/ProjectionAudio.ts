@@ -14,7 +14,7 @@ type MusicFadeState = {
   remainingSamples: number
 }
 
-type SendCarplayEvent = (payload: unknown) => void
+type SendProjectionEvent = (payload: unknown) => void
 
 type SendChunked = (
   channel: string,
@@ -25,7 +25,7 @@ type SendChunked = (
 
 type SendMicPcm = (pcm: Int16Array) => void
 
-export class CarplayAudio {
+export class ProjectionAudio {
   // One AudioOutput per (sampleRate, channels)
   private audioPlayers = new Map<PlayerKey, AudioOutput>()
   private lastStreamLogKey: PlayerKey | null = null
@@ -105,7 +105,7 @@ export class CarplayAudio {
 
   constructor(
     private readonly getConfig: () => ExtraConfig,
-    private readonly sendCarplayEvent: SendCarplayEvent,
+    private readonly sendProjectionEvent: SendProjectionEvent,
     private readonly sendChunked: SendChunked,
     private readonly sendMicPcm: SendMicPcm
   ) {}
@@ -119,7 +119,7 @@ export class CarplayAudio {
     active: boolean,
     extra?: Record<string, unknown>
   ) {
-    this.sendCarplayEvent({
+    this.sendProjectionEvent({
       type: 'attention',
       payload: {
         kind,
@@ -129,7 +129,7 @@ export class CarplayAudio {
     })
   }
 
-  // Called from CarplayService when a new CarPlay session starts
+  // Called from ProjectionService when a new projection session starts
   public resetForSessionStart() {
     this.stopAllAudioPlayers()
     this.clearNavMix()
@@ -161,7 +161,7 @@ export class CarplayAudio {
     this.uiNavHintActive = false
   }
 
-  // Called from CarplayService when a CarPlay session stops
+  // Called from ProjectionService when a projection session stops
   public resetForSessionStop() {
     this.stopAllAudioPlayers()
     this.clearNavMix()
@@ -193,7 +193,7 @@ export class CarplayAudio {
     this.uiNavHintActive = false
   }
 
-  // Called from CarplayService.start() after config is loaded.
+  // Called from ProjectionService.start() after config is loaded.
   public setInitialVolumes(volumes: Partial<VolumeState>) {
     const next: VolumeState = {
       music: typeof volumes.music === 'number' ? volumes.music : this.volumes.music,
@@ -221,7 +221,7 @@ export class CarplayAudio {
     return from > to ? this.musicRampDownMs : this.musicRampUpMs
   }
 
-  // Main entrypoint from CarplayService for audio messages.
+  // Main entrypoint from ProjectionService for audio messages.
   public handleAudioData(msg: AudioData) {
     const meta = msg.decodeType != null ? this.safeDecodeType(msg.decodeType) : null
 
@@ -446,7 +446,7 @@ export class CarplayAudio {
         })
 
         if (mono.length > 0) {
-          this.sendChunked('carplay-audio-chunk', mono.buffer as ArrayBuffer, 64 * 1024, {
+          this.sendChunked('projection-audio-chunk', mono.buffer as ArrayBuffer, 64 * 1024, {
             sampleRate: inSampleRate,
             channels: 1
           })
@@ -454,7 +454,7 @@ export class CarplayAudio {
       }
 
       if (!this.audioInfoSent && meta) {
-        this.sendCarplayEvent({
+        this.sendProjectionEvent({
           type: 'audioInfo',
           payload: {
             codec: meta.format ?? meta.mimeType,
@@ -674,7 +674,7 @@ export class CarplayAudio {
             try {
               this.sendMicPcm(pcm16)
             } catch (e) {
-              console.error('[CarplayAudio] failed to send mic audio', e)
+              console.error('[ProjectionAudio] failed to send mic audio', e)
             }
           })
         }
@@ -753,7 +753,7 @@ export class CarplayAudio {
   private getAudioOutputForStream(msg: AudioData): AudioOutput | null {
     const meta = msg.decodeType != null ? this.safeDecodeType(msg.decodeType) : null
     if (!meta) {
-      console.warn('[CarplayAudio] unknown decodeType in AudioData', {
+      console.warn('[ProjectionAudio] unknown decodeType in AudioData', {
         decodeType: msg.decodeType,
         audioType: msg.audioType
       })

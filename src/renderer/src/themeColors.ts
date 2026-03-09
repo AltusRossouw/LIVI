@@ -18,7 +18,7 @@ export const themeColors = {
   highlightColorLight: '#000000',
   highlightColorDark: '#ffffff',
 
-  // Highlight active carplay stream
+  // Highlight active projection stream
   successLight: '#81c784',
   successMain: '#4caf50',
   successDark: '#388e3c',

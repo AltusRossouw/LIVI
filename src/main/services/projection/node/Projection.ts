@@ -18,7 +18,7 @@ import { AudioCommand, type CommandValue } from '@shared/types/ProjectionEnums'
 import { DongleDriver, DEFAULT_CONFIG } from '../driver/DongleDriver'
 import type { DongleConfig } from '@shared/types'
 
-export type CarplayMessage =
+export type ProjectionMessage =
   | { type: 'plugged'; message?: undefined }
   | { type: 'dongleInfo'; message: { dongleFwVersion?: string; boxInfo?: unknown } }
   | { type: 'unplugged'; message?: undefined }
@@ -28,13 +28,13 @@ export type CarplayMessage =
   | { type: 'media'; message: MediaData }
   | { type: 'command'; message: Command }
 
-export default class Carplay {
+export default class Projection {
   private _pairTimeout: NodeJS.Timeout | null = null
   private _frameInterval: ReturnType<typeof setInterval> | null = null
   private _config: DongleConfig
   public dongleDriver: DongleDriver
 
-  public onmessage: ((ev: CarplayMessage) => void) | null = null
+  public onmessage: ((ev: ProjectionMessage) => void) | null = null
   public onReconnectReady: (() => void) | null = null
 
   constructor(config: Partial<DongleConfig>) {
@@ -112,7 +112,7 @@ export default class Carplay {
     await device.open()
     await device.reset()
     await device.close()
-    console.log('[Carplay] Dongle has been reset, waiting for reconnect...')
+    console.log('[Projection] Dongle has been reset, waiting for reconnect...')
   }
 
   public async initialiseAfterReconnect() {

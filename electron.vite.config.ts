@@ -8,9 +8,9 @@ const BUILD_RUN = process.env.GITHUB_RUN_NUMBER || process.env.BUILD_RUN || ''
 const BUILD_BRANCH = process.env.BUILD_BRANCH || ''
 
 const alias = {
-  '@carplay/web': resolve(__dirname, 'src/renderer/components/web/CarplayWeb.ts'),
-  '@carplay/messages': resolve(__dirname, 'src/main/services/carplay/messages'),
-  '@carplay': resolve(__dirname, 'src/main/services/carplay'),
+  '@projection/web': resolve(__dirname, 'src/renderer/components/web/CarplayWeb.ts'),
+  '@projection/messages': resolve(__dirname, 'src/main/services/projection/messages'),
+  '@projection': resolve(__dirname, 'src/main/services/projection'),
   '@main': path.resolve(__dirname, 'src/main'),
   '@shared': path.resolve(__dirname, 'src/main/shared'),
   '@audio': path.resolve(__dirname, 'src/main/audio')

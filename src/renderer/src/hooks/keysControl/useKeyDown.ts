@@ -5,7 +5,7 @@ import { KeyCommand } from '../../components/worker/types'
 import { useLocation } from 'react-router'
 import { ROUTES } from '../../constants'
 import { AppContext } from '../../context'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 
 type RefLike<T> = { current: T | null }
 
@@ -40,7 +40,7 @@ export const useKeyDown = ({
   }, [location.hash, location.pathname])
 
   const appContext = useContext(AppContext)
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
 
   const navRef = appContext?.navEl
   const mainRef = appContext?.contentEl

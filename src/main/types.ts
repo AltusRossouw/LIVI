@@ -1,9 +1,8 @@
 import type { ExtraConfig } from '@shared/types'
 import { TelemetrySocket } from '@main/services/Socket'
 import { NULL_DELETES } from '@main/constants'
-import { CarplayService } from '@main/services/carplay/services/CarplayService'
+import { ProjectionService } from '@main/services/projection/services/ProjectionService'
 import { USBService } from '@main/services/usb/USBService'
-// import { Socket } from '@main/services/Socket'
 
 export type UpdateSessionState = 'idle' | 'downloading' | 'ready' | 'installing'
 
@@ -26,7 +25,7 @@ export interface GhRelease {
 }
 
 export interface ServicesProps {
-  carplayService: CarplayService
+  projectionService: ProjectionService
   usbService: USBService
   telemetrySocket: TelemetrySocket
 }

@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ThemeProvider, CssBaseline } from '@mui/material'
-import { useCarplayStore } from './store/store'
+import { useLiviStore } from './store/store'
 import {
   darkTheme,
   lightTheme,
@@ -22,7 +22,7 @@ initUiBreatheClock()
 initCursorHider()
 
 const Root = () => {
-  const settings = useCarplayStore((s) => s.settings)
+  const settings = useLiviStore((s) => s.settings)
 
   // detect touch, stylus and mouse
   const isTouchDevice =

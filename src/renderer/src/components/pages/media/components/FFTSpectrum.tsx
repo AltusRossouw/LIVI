@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Box } from '@mui/material'
-import { useCarplayStore } from '@store/store'
+import { useLiviStore } from '@store/store'
 import { useTheme, alpha } from '@mui/material/styles'
 
 // Configuration
@@ -29,8 +29,8 @@ export const FFTSpectrum = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bgCanvasRef = useRef<HTMLCanvasElement>(null)
 
-  const sampleRate = useCarplayStore((s) => s.audioSampleRate) ?? 48000
-  const visualAudioDelayMs = useCarplayStore((s) => s.visualAudioDelayMs) ?? 120
+  const sampleRate = useLiviStore((s) => s.audioSampleRate) ?? 48000
+  const visualAudioDelayMs = useLiviStore((s) => s.visualAudioDelayMs) ?? 120
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const workerRef = useRef<Worker | null>(null)
@@ -59,7 +59,7 @@ export const FFTSpectrum = () => {
   }, [sampleRate])
 
   useEffect(() => {
-    const unsubscribe = useCarplayStore.subscribe((state) => {
+    const unsubscribe = useLiviStore.subscribe((state) => {
       const pcm = state.audioPcmData
       const worker = workerRef.current
       if (!worker || !pcm || pcm.length === 0) return

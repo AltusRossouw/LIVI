@@ -26,7 +26,7 @@ beforeEach(() => {
   jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-expect-error
-  ;(window as never).carplay = {
+  ;(window as never).projection = {
     ipc: {
       readMedia: mockReadMedia,
       onEvent: mockOnEvent
@@ -80,7 +80,7 @@ describe('useMediaState', () => {
     expect(result.current.livePlayMs).toBe(123)
   })
 
-  it('subscribes to carplay events and unsubscribes on unmount', () => {
+  it('subscribes to projection events and unsubscribes on unmount', () => {
     const unsubscribe = jest.fn()
     mockOnEvent.mockReturnValueOnce(unsubscribe)
 
@@ -97,7 +97,7 @@ describe('useMediaState', () => {
     const { unmount } = renderHook(() => useMediaState(false))
     unmount()
 
-    expect(mockRemoveListener).toHaveBeenCalledWith('carplay-event', expect.any(Function))
+    expect(mockRemoveListener).toHaveBeenCalledWith('projection-event', expect.any(Function))
   })
 
   it('handles unplugged event correctly', () => {

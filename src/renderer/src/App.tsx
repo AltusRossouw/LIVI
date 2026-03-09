@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef, useCallback, useContext, useLayoutEffect } from 'react'
 import { HashRouter as Router, useLocation, useRoutes, useNavigate } from 'react-router'
-import { Carplay } from './components/pages'
+import { Projection } from './components/pages'
 import { Box } from '@mui/material'
-import { useCarplayStore, useStatusStore } from './store/store'
+import { useLiviStore, useStatusStore } from './store/store'
 import type { KeyCommand } from '@worker/types'
 import { updateCameras } from './utils/cameraDetection'
 import { useActiveControl, useFocus, useKeyDown } from './hooks'
@@ -33,8 +33,8 @@ function AppInner() {
   const navigate = useNavigate()
   const didApplyStartPageRef = useRef(false)
 
-  const settings = useCarplayStore((s) => s.settings)
-  const saveSettings = useCarplayStore((s) => s.saveSettings)
+  const settings = useLiviStore((s) => s.settings)
+  const saveSettings = useLiviStore((s) => s.saveSettings)
   const setCameraFound = useStatusStore((s) => s.setCameraFound)
 
   const navRef = useRef<HTMLDivElement | null>(null)
@@ -201,14 +201,14 @@ function AppInner() {
         updateCameras(setCameraFound, saveSettings, settings)
       }
     }
-    window.carplay.usb.listenForEvents(usbHandler)
-    return () => window.carplay.usb.unlistenForEvents(usbHandler)
+    window.projection.usb.listenForEvents(usbHandler)
+    return () => window.projection.usb.unlistenForEvents(usbHandler)
   }, [settings, saveSettings, setCameraFound])
 
   return (
     <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={receivingVideo}>
       {settings && (
-        <Carplay
+        <Projection
           receivingVideo={receivingVideo}
           setReceivingVideo={setReceivingVideo}
           settings={settings}

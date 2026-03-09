@@ -1,5 +1,5 @@
 import EventEmitter from 'events'
-import { MessageHeader, HeaderBuildError } from '@carplay/messages/common'
+import { MessageHeader, HeaderBuildError } from '@projection/messages/common'
 import { decryptVendorSessionText } from '@main/helpers/vendorSessionInfo'
 import type { CommandValue } from '@shared/types/ProjectionEnums'
 import { HandDriveType, MicType, PhoneWorkMode } from '@shared/types'
@@ -16,7 +16,7 @@ import {
   DongleReady,
   Opened,
   type BoxInfoSettings
-} from '@carplay/messages/readable'
+} from '@projection/messages/readable'
 import {
   SendableMessage,
   SendNumber,
@@ -30,7 +30,7 @@ import {
   SendBluetoothPairedList,
   HeartBeat,
   SendDisconnectPhone
-} from '@carplay/messages/sendable'
+} from '@projection/messages/sendable'
 
 const CONFIG_NUMBER = 1
 const MAX_ERROR_COUNT = 5

@@ -41,7 +41,7 @@ export const Nav = ({ receivingVideo }: NavProps) => {
     const tab = tabs[newIndex]
 
     if (tab.path === ROUTES.QUIT) {
-      window.carplay.quit().catch(console.error)
+      window.projection.quit().catch(console.error)
       return
     }
 
@@ -106,7 +106,7 @@ export const Nav = ({ receivingVideo }: NavProps) => {
               return
             }
             if (tab.path === ROUTES.QUIT) {
-              window.carplay.quit().catch(console.error)
+              window.projection.quit().catch(console.error)
               return
             }
             navigate(tab.path)

@@ -1,7 +1,7 @@
 import { TabConfig } from './types'
 import { ROUTES } from '../../constants'
 import { useTheme } from '@mui/material/styles'
-import { useStatusStore, useCarplayStore } from '../../store/store'
+import { useStatusStore, useLiviStore } from '../../store/store'
 
 // Icons
 import CropPortraitOutlinedIcon from '@mui/icons-material/CropPortraitOutlined'
@@ -16,8 +16,8 @@ export const useTabsConfig: (receivingVideo: boolean) => TabConfig[] = (receivin
   const isStreaming = useStatusStore((s) => s.isStreaming)
   const isDongleConnected = useStatusStore((s) => s.isDongleConnected)
   const cameraFound = useStatusStore((s) => s.cameraFound)
-  const mapsEnabled = useCarplayStore((s) => s.settings?.mapsEnabled ?? false)
-  const telemetryEnabled = useCarplayStore((s) => s.settings?.telemetryEnabled ?? false)
+  const mapsEnabled = useLiviStore((s) => s.settings?.mapsEnabled ?? false)
+  const telemetryEnabled = useLiviStore((s) => s.settings?.telemetryEnabled ?? false)
 
   return [
     {

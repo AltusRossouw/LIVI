@@ -161,6 +161,12 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
     },
     {
       type: 'checkbox',
+      label: 'Play on Connect',
+      labelKey: 'settings.playOnConnect',
+      path: 'autoPlay'
+    },
+    {
+      type: 'checkbox',
       label: 'Disable Audio',
       labelKey: 'settings.disableAudio',
       path: 'audioTransferMode'

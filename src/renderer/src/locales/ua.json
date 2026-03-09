@@ -89,6 +89,7 @@
     "callQualityMedium": "Середня",
     "callQualityHigh": "Висока",
     "callQualityDescription": "Виберіть якість дзвінків для оптимізації продуктивності та використання даних.",
+    "playOnConnect": "Автовідтворення",
     "disableAudio": "Вимкнути аудіо",
     "video": "Відео",
     "width": "Ширина",

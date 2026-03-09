@@ -89,6 +89,7 @@
     "callQualityMedium": "Mittel",
     "callQualityHigh": "Hoch",
     "callQualityDescription": "Wählen Sie die Anrufqualität zur Optimierung der Leistung.",
+    "playOnConnect": "Autoplay",
     "disableAudio": "Audio deaktivieren",
     "video": "Video",
     "width": "Breite",

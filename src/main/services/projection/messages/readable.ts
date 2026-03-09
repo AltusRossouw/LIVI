@@ -48,6 +48,15 @@ export class SoftwareVersion extends Message {
   }
 }
 
+export class GnssData extends Message {
+  text: string
+
+  constructor(header: MessageHeader, data: Buffer) {
+    super(header)
+    this.text = data.toString('ascii').replace(/\0+$/g, '')
+  }
+}
+
 export class BluetoothAddress extends Message {
   address: string
 

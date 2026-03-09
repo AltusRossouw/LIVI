@@ -12,6 +12,7 @@ import {
   Command,
   BoxInfo,
   SoftwareVersion,
+  GnssData,
   SendCommand,
   SendTouch,
   SendMultiTouch,
@@ -182,6 +183,16 @@ export class ProjectionService {
       if (msg instanceof BoxInfo) {
         this.boxInfo = mergePreferExisting(this.boxInfo, msg.settings)
         this.emitDongleInfoIfChanged()
+        return
+      }
+
+      if (msg instanceof GnssData) {
+        this.webContents?.send('projection-event', {
+          type: 'gnss',
+          payload: {
+            text: msg.text
+          }
+        })
         return
       }
 

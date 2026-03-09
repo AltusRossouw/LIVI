@@ -13,6 +13,7 @@ import {
   WifiDeviceName,
   HiCarLink,
   BluetoothPairedList,
+  GnssData,
   Opened,
   DongleReady,
   BoxInfo,
@@ -46,6 +47,7 @@ export enum MessageType {
   MultiTouch = 0x17,
   HiCarLink = 0x18,
   BoxSettings = 0x19,
+  GnssData = 0x29,
   MetaData = 0x2a,
   NaviVideoData = 0x2c,
   SendFile = 0x99,
@@ -140,6 +142,8 @@ export class MessageHeader {
           return new VideoData(this, data)
         case MessageType.MetaData:
           return new MetaData(this, data)
+        case MessageType.GnssData:
+          return new GnssData(this, data)
         case MessageType.BluetoothAddress:
           return new BluetoothAddress(this, data)
         case MessageType.BluetoothDeviceName:

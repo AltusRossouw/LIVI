@@ -28,6 +28,7 @@ import {
   SendCommand,
   SendString,
   SendBluetoothPairedList,
+  SendGnssData,
   HeartBeat,
   SendDisconnectPhone
 } from '@projection/messages/sendable'
@@ -335,6 +336,10 @@ export class DongleDriver extends EventEmitter {
 
   public sendBluetoothPairedList = async (listText: string): Promise<boolean> => {
     return this.send(new SendBluetoothPairedList(listText))
+  }
+
+  public sendGnssData = async (nmeaText: string): Promise<boolean> => {
+    return this.send(new SendGnssData(nmeaText))
   }
 
   // isolate framing/decoding

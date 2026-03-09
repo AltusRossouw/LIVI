@@ -66,6 +66,26 @@ export class SendBluetoothPairedList extends SendableMessageWithPayload {
   }
 }
 
+export class SendGnssData extends SendableMessageWithPayload {
+  type = MessageType.GnssData
+  private readonly payload: Buffer
+
+  constructor(nmeaText: string) {
+    super()
+
+    const normalized = String(nmeaText ?? '')
+      .replace(/\r?\n/g, '\r\n')
+      .trim()
+
+    const withLineEnd = normalized.length > 0 ? normalized + '\r\n' : ''
+    this.payload = Buffer.from(withLineEnd, 'ascii')
+  }
+
+  getPayload(): Buffer {
+    return this.payload
+  }
+}
+
 export class SendTouch extends SendableMessageWithPayload {
   type = MessageType.Touch
   x: number

@@ -2,6 +2,7 @@ import { net, app } from 'electron'
 import { join, basename } from 'path'
 import { createWriteStream, existsSync } from 'fs'
 import { promises as fsp } from 'fs'
+import type { BoxInfoPayload } from '@shared/types'
 import type { DongleDriver } from '../driver/DongleDriver.js'
 import { SendTmpFile } from '../messages/sendable.js'
 
@@ -35,30 +36,6 @@ export type FirmwareCheckResult =
       raw: unknown
     }
   | { ok: false; error: string }
-
-type DevListEntry = {
-  id?: string
-  type?: string
-  name?: string
-  index?: string | number
-  time?: string
-  rfcomm?: string | number
-}
-
-type BoxInfoPayload = {
-  uuid?: string
-  MFD?: string
-  boxType?: string
-  OemName?: string
-  productType?: string
-  HiCar?: number
-  supportLinkType?: string
-  supportFeatures?: string
-  hwVersion?: string
-  wifiChannel?: number
-  CusCode?: string
-  DevList?: DevListEntry[]
-}
 
 type FirmwareManifest = {
   createdAt: string

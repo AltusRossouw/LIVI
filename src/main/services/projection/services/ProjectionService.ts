@@ -31,7 +31,7 @@ import {
   DEFAULT_CONFIG
 } from '../messages'
 import { PhoneWorkMode } from '@shared/types'
-import type { ExtraConfig } from '@shared/types'
+import type { ExtraConfig, DongleFirmwareAction, DongleFwApiRaw } from '@shared/types'
 import fs from 'fs'
 import path from 'path'
 import usb from 'usb'
@@ -60,20 +60,7 @@ type VolumeConfig = {
   callVolume?: number
 }
 
-type DongleFirmwareAction = 'check' | 'download' | 'upload' | 'status'
 type DongleFirmwareRequest = { action: DongleFirmwareAction }
-
-// Renderer expects this shape (USBDongle.tsx -> isDongleFwCheckResponse)
-type DongleFwApiRaw = {
-  err: number
-  token?: string
-  ver?: string
-  size?: string | number
-  id?: string
-  notes?: string
-  msg?: string
-  error?: string
-}
 
 type DongleFwCheckResponse = {
   ok: boolean

@@ -721,7 +721,7 @@ export function USBDongle() {
       { label: 'HW', value: fmt(boxInfo?.hwVersion), mono: true },
       { label: 'BoxType', value: fmt(boxInfo?.boxType) },
       { label: 'OEM', value: fmt(boxInfo?.OemName) },
-      { label: 'WiFi Channel', value: boxInfo?.WiFiChannel ?? null, mono: true },
+      { label: 'WiFi Channel', value: boxInfo?.wifiChannel ?? null, mono: true },
       { label: 'Links', value: fmt(boxInfo?.supportLinkType) },
       { label: 'Features', value: fmt(boxInfo?.supportFeatures) },
       { label: 'CusCode', value: fmt(boxInfo?.CusCode), mono: true },

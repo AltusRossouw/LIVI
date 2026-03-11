@@ -200,6 +200,22 @@ jobs:
         if: matrix.platform == 'x86_64'
         run: pnpm install --frozen-lockfile
 
+      - name: Collect test coverage [x86_64]
+        id: coverage
+        if: matrix.platform == 'x86_64' && (env.BUILD_BRANCH == 'main' || env.BUILD_BRANCH == 'dev')
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run coverage
+
+          MAIN_COVERAGE=$(node -e "const fs=require('fs');const p='coverage/main/coverage-summary.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));process.stdout.write(`${Number(j.total.lines.pct).toFixed(2)}%`);")
+          RENDERER_COVERAGE=$(node -e "const fs=require('fs');const p='coverage/renderer/coverage-summary.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));process.stdout.write(`${Number(j.total.lines.pct).toFixed(2)}%`);")
+
+          echo "main=$MAIN_COVERAGE" >> "$GITHUB_OUTPUT"
+          echo "renderer=$RENDERER_COVERAGE" >> "$GITHUB_OUTPUT"
+          echo "Coverage main: $MAIN_COVERAGE"
+          echo "Coverage renderer: $RENDERER_COVERAGE"
+
       - name: Build for x86_64 (native Ubuntu)
         if: matrix.platform == 'x86_64'
         shell: bash
@@ -381,5 +397,7 @@ jobs:
           version: ${{ steps.pkg.outputs.version }}
           node: ${{ steps.pnpm.outputs.node }}
           pnpm: ${{ steps.pnpm.outputs.pnpm }}
+          coverage-main: ${{ steps.coverage.outputs.main }}
+          coverage-renderer: ${{ steps.coverage.outputs.renderer }}
           repo: ${{ github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}

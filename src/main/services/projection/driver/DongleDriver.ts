@@ -2,8 +2,9 @@ import EventEmitter from 'events'
 import { MessageHeader, HeaderBuildError } from '@projection/messages/common'
 import { decryptVendorSessionText } from '@main/helpers/vendorSessionInfo'
 import type { CommandValue } from '@shared/types/ProjectionEnums'
-import { HandDriveType, MicType, PhoneWorkMode } from '@shared/types'
+import { MicType, PhoneWorkMode } from '@shared/types'
 import type { DongleConfig } from '@shared/types'
+import { DEFAULT_EXTRA_CONFIG } from '@shared/types'
 import { DEBUG } from '@main/constants'
 import {
   PhoneType,
@@ -55,32 +56,7 @@ export enum AndroidWorkMode {
   Search = 7
 }
 
-export const DEFAULT_CONFIG: DongleConfig = {
-  width: 800,
-  height: 480,
-  fps: 60,
-  dpi: 160,
-  lastPhoneWorkMode: PhoneWorkMode.CarPlay,
-  apkVer: '2025.03.19.1126',
-  carName: 'LIVI',
-  oemName: 'App',
-  nightMode: true,
-  hand: HandDriveType.LHD,
-  mediaDelay: 1000,
-  mediaSound: 1,
-  callQuality: 1,
-  autoPlay: true,
-  autoConn: true,
-  mapsEnabled: false,
-  audioTransferMode: false,
-  wifiType: '5ghz',
-  wifiChannel: 36,
-  micType: MicType.CarMic,
-  phoneConfig: {
-    [PhoneType.CarPlay]: { frameInterval: 5000 },
-    [PhoneType.AndroidAuto]: { frameInterval: null }
-  }
-}
+export const DEFAULT_CONFIG: DongleConfig = DEFAULT_EXTRA_CONFIG
 
 export class DriverStateError extends Error {}
 
@@ -581,7 +557,7 @@ export class DongleDriver extends EventEmitter {
       new SendCommand(cfg.audioTransferMode ? 'audioTransferOn' : 'audioTransferOff'),
       new SendCommand(micCmd),
       new SendIconConfig({ oemName: cfg.oemName }),
-      new SendBoxSettings(cfg, this._phoneWorkModeRuntime)
+      new SendBoxSettings(cfg)
     ]
 
     for (const m of messages) {

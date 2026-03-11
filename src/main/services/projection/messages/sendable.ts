@@ -313,8 +313,11 @@ type BoxSettingsBody = {
   wifiChannel: number
   mediaSound: 0 | 1
   callQuality: 0 | 1 | 2
-  autoPlay: boolean
-  autoConn: boolean
+  // Currently disabled:
+  // riddleBoxCfg uses `riddleBoxCfg -s AutoPlauMusic 1`, but setting it does not work.
+  // Likely vendor typo or firmware-side bug.
+  // autoPlay: 0 | 1
+  autoConn: 0 | 1
   wifiName: string
   btName: string
   boxName: string
@@ -348,8 +351,11 @@ export class SendBoxSettings extends SendableMessageWithPayload {
       wifiChannel: channel,
       mediaSound: cfg.mediaSound,
       callQuality: cfg.callQuality,
-      autoPlay: cfg.autoPlay,
-      autoConn: cfg.autoConn,
+      // Currently disabled:
+      // riddleBoxCfg uses `riddleBoxCfg -s AutoPlauMusic 1`, but setting it does not work.
+      // Likely vendor typo or firmware-side bug.
+      // autoPlay: cfg.autoPlay ? 1 : 0,
+      autoConn: cfg.autoConn ? 1 : 0,
       wifiName: cfg.carName,
       btName: cfg.carName,
       boxName: cfg.oemName ?? cfg.carName,
@@ -363,7 +369,7 @@ export class SendBoxSettings extends SendableMessageWithPayload {
         fps: cfg.fps
       }
     }
-
+    console.log('[SendBoxSettings]', JSON.stringify(body, null, 2))
     return Buffer.from(JSON.stringify(body), 'ascii')
   }
 

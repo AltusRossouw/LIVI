@@ -159,12 +159,14 @@ export const audioSchema: SettingsNode<ExtraConfig> = {
         labelDescription: 'settings.callQualityDescription'
       }
     },
+    // Currently disabled
+    /*
     {
       type: 'checkbox',
       label: 'Play on Connect',
       labelKey: 'settings.playOnConnect',
       path: 'autoPlay'
-    },
+    },*/
     {
       type: 'checkbox',
       label: 'Disable Audio',

@@ -400,5 +400,7 @@ jobs:
           version: ${{ steps.pkg.outputs.version }}
           node: ${{ steps.pnpm.outputs.node }}
           pnpm: ${{ steps.pnpm.outputs.pnpm }}
+          coverage-main: ${{ steps.coverage.outputs.main }}
+          coverage-renderer: ${{ steps.coverage.outputs.renderer }}
           repo: ${{ github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}

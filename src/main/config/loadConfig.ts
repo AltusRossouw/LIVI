@@ -15,7 +15,7 @@ export function loadConfig(): ExtraConfig {
     }
   }
 
-  const merged = validate(fileConfig, DEFAULT_EXTRA_CONFIG) as ExtraConfig
+  const merged = validate(fileConfig, DEFAULT_EXTRA_CONFIG)
 
   const needWrite =
     !existsSync(CONFIG_PATH) || JSON.stringify(fileConfig) !== JSON.stringify(merged)

@@ -51,5 +51,6 @@ export const DEFAULT_EXTRA_CONFIG: ExtraConfig = {
   bindings: DEFAULT_BINDINGS,
   dongleIcon120: ICON_120_B64,
   dongleIcon180: ICON_180_B64,
-  dongleIcon256: ICON_256_B64
+  dongleIcon256: ICON_256_B64,
+  dongleToolsIp: ''
 }

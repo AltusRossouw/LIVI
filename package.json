@@ -89,7 +89,7 @@
     "@typescript-eslint/parser": "^8.57.0",
     "@vitejs/plugin-react": "^5.1.4",
     "@webgpu/types": "^0.1.69",
-    "electron": "^41.0.1",
+    "electron": "^41.0.2",
     "electron-builder": "^26.8.2",
     "electron-vite": "^5.0.0",
     "eslint": "^10.0.3",

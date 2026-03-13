@@ -8,7 +8,12 @@ import {
   TouchAction,
   MultiTouchAction
 } from '@shared/types/ProjectionEnums'
-import { clamp, getCurrentTimeInMs, matchFittingAAResolution } from './utils.js'
+import {
+  clamp,
+  getCurrentTimeInMs,
+  matchFittingAAResolution,
+  computeAndroidAutoDpi
+} from '@shared/utils'
 import { buildServerCgiScript } from '../assets/LIVI_cgi.js'
 import { buildLiviWeb } from '../assets/LIVI_web.js'
 
@@ -251,6 +256,12 @@ export class SendBoolean extends SendNumber {
   }
 }
 
+export class SendAndroidAutoDpi extends SendNumber {
+  constructor(width: number, height: number) {
+    super(computeAndroidAutoDpi(width, height), FileAddress.DPI)
+  }
+}
+
 export class SendString extends SendFile {
   constructor(content: string, file: FileAddress) {
     let clean = content.normalize('NFKD').replace(/[^\u0020-\u007E]/g, '?')
@@ -276,14 +287,7 @@ export class SendOpen extends SendableMessageWithPayload {
   }
 
   getPayload(): Buffer {
-    let { width, height } = this.config
-    const { fps } = this.config
-
-    if (this.phoneWorkMode === PhoneWorkMode.Android) {
-      const adjusted = matchFittingAAResolution({ width, height })
-      width = adjusted.width
-      height = adjusted.height
-    }
+    const { width, height, fps } = this.config
 
     const FORMAT = 5
     const PACKET_MAX = 49152

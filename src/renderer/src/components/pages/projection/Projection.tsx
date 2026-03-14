@@ -6,9 +6,10 @@ import { matchFittingAAResolution } from '@shared/utils'
 import type { ExtraConfig } from '@shared/types'
 import { useLiviStore, useStatusStore } from '../../../store/store'
 import { InitEvent, UpdateFpsEvent } from '@worker/render/RenderEvents'
+import { createProjectionWorker } from '@worker/createProjectionWorker'
+import { createRenderWorker } from '@worker/createRenderWorker'
 import type { ProjectionWorker, UsbEvent, KeyCommand, WorkerToUI } from '@worker/types'
 import { useCarplayMultiTouch } from './hooks/useCarplayTouch'
-import { projectionWorkerUrl, renderWorkerUrl } from '@worker/workerUrls'
 
 // Icons
 import CropPortraitOutlinedIcon from '@mui/icons-material/CropPortraitOutlined'
@@ -287,9 +288,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
   // Projection worker setup
   const carplayWorker = useMemo<ProjectionWorker>(() => {
-    const w = new Worker(projectionWorkerUrl, {
-      type: 'module'
-    }) as ProjectionWorker
+    const w = createProjectionWorker()
 
     w.onerror = (e) => {
       console.error('Worker error:', e)
@@ -311,9 +310,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   useEffect(() => {
     if (canvasRef.current && !offscreenCanvasRef.current && !renderWorkerRef.current) {
       offscreenCanvasRef.current = canvasRef.current.transferControlToOffscreen()
-      const w = new Worker(renderWorkerUrl, {
-        type: 'module'
-      })
+      const w = createRenderWorker()
       renderWorkerRef.current = w
 
       const targetFps = initialFpsRef.current

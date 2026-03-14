@@ -5,9 +5,12 @@ import { CommandMapping } from '@shared/types/ProjectionEnums'
 const navigateMock = jest.fn()
 let mockPathname = '/'
 
-jest.mock('@worker/workerUrls', () => ({
-  projectionWorkerUrl: 'projection-worker-url',
-  renderWorkerUrl: 'render-worker-url'
+jest.mock('@worker/createProjectionWorker', () => ({
+  createProjectionWorker: jest.fn()
+}))
+
+jest.mock('@worker/createRenderWorker', () => ({
+  createRenderWorker: jest.fn()
 }))
 
 type AnyFn = (...args: any[]) => any
@@ -93,6 +96,13 @@ describe('Projection page', () => {
   beforeEach(() => {
     MockWorker.instances = []
     MockMessageChannel.instances = []
+
+    const { createProjectionWorker } = jest.requireMock('@worker/createProjectionWorker')
+    const { createRenderWorker } = jest.requireMock('@worker/createRenderWorker')
+
+    createProjectionWorker.mockImplementation(() => new MockWorker('projection-worker'))
+    createRenderWorker.mockImplementation(() => new MockWorker('render-worker'))
+
     onEventCb = undefined
     usbCb = undefined
     navigateMock.mockReset()

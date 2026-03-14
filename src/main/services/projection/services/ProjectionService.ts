@@ -401,7 +401,7 @@ export class ProjectionService {
           return
         }
 
-        // Navigation metadata (innerType 200)
+        // Navigation metadata (innerType 200/201)
         if (inner.kind === 'navigation') {
           if (!this.started) return
           const navMsg = inner.message

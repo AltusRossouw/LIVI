@@ -129,7 +129,9 @@ describe('Projection page', () => {
         stop: jest.fn().mockResolvedValue(undefined),
         sendFrame: jest.fn().mockResolvedValue(undefined),
         onVideoChunk: jest.fn(),
+        offVideoChunk: jest.fn(),
         onAudioChunk: jest.fn(),
+        offAudioChunk: jest.fn(),
         onEvent: jest.fn((cb: AnyFn) => {
           onEventCb = cb
         }),
@@ -148,7 +150,7 @@ describe('Projection page', () => {
     }
   })
 
-  test('starts projection and initializes workers on mount', async () => {
+  test('starts projection on usb plugged and initializes workers', async () => {
     render(
       <Projection
         receivingVideo={false}
@@ -161,8 +163,14 @@ describe('Projection page', () => {
       />
     )
 
+    expect((window as any).projection.ipc.start).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await usbCb?.(null, { type: 'plugged' })
+    })
+
     await waitFor(() => {
-      expect((window as any).projection.ipc.start).toHaveBeenCalled()
+      expect((window as any).projection.ipc.start).toHaveBeenCalledTimes(1)
     })
     expect(MockWorker.instances.length).toBeGreaterThanOrEqual(2)
   })

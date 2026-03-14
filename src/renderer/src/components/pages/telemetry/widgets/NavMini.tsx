@@ -310,7 +310,7 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
         gridTemplateRows: 'auto auto auto auto',
         alignItems: 'center',
         justifyItems: 'center',
-        rowGap: 0.6
+        rowGap: 1.6
       }}
     >
       {/* ICON */}
@@ -334,7 +334,7 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
       {/* distance to next maneuver */}
       <Typography
         sx={{
-          fontSize: 18,
+          fontSize: 22,
           fontWeight: 600,
           lineHeight: 1,
           textAlign: 'center',
@@ -350,7 +350,7 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
       <Box
         sx={{
           width: hasManeuverImage ? '72%' : '100%',
-          height: 0.4,
+          height: 1.4,
           borderRadius: 999,
           bgcolor: theme.palette.text.secondary,
           opacity: 0.35
@@ -370,16 +370,16 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
       >
         <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7, minWidth: 0 }}>
           {etaText && etaText !== '—' ? (
-            <AccessTimeIcon sx={{ fontSize: 18, opacity: 0.9 }} />
+            <AccessTimeIcon sx={{ fontSize: 22, opacity: 0.9 }} />
           ) : (
-            <SignpostIcon sx={{ fontSize: 18, opacity: 0.9 }} />
+            <SignpostIcon sx={{ fontSize: 22, opacity: 0.9 }} />
           )}
 
           <Typography
             sx={{
-              fontSize: 10,
+              fontSize: 20,
               fontWeight: 500,
-              lineHeight: 1,
+              lineHeight: 1.4,
               whiteSpace: 'nowrap',
               fontVariantNumeric: 'tabular-nums',
               minWidth: 0,
@@ -393,10 +393,10 @@ export function NavMini({ className, iconSize = 56 }: NavMiniProps) {
 
         {!hasManeuverImage && (
           <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.7 }}>
-            <RouteIcon sx={{ fontSize: 18, opacity: 0.9 }} />
+            <RouteIcon sx={{ fontSize: 22, opacity: 0.9 }} />
             <Typography
               sx={{
-                fontSize: 16,
+                fontSize: 22,
                 fontWeight: 500,
                 lineHeight: 1,
                 whiteSpace: 'nowrap',

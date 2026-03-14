@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Box, Chip, Divider, Stack, Typography } from '@mui/material'
+import { Box, Chip, Stack, Typography } from '@mui/material'
 
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import RouteIcon from '@mui/icons-material/Route'
@@ -336,7 +336,7 @@ export function NavFull({ className }: NavFullProps) {
         {!isActive ? (
           <NavigationOutlinedIcon sx={{ fontSize: 84, opacity: 0.55 }} />
         ) : (
-          <Stack spacing={2.2} sx={{ alignItems: 'center', textAlign: 'center' }}>
+          <Stack spacing={2.6} sx={{ alignItems: 'center', textAlign: 'center' }}>
             {hasManeuverImage ? (
               <Stack spacing={1.2} alignItems="center" justifyContent="center">
                 <Box
@@ -424,7 +424,15 @@ export function NavFull({ className }: NavFullProps) {
               </Stack>
             )}
 
-            <Divider flexItem sx={{ opacity: 0.35 }} />
+            <Box
+              sx={{
+                width: hasManeuverImage ? '72%' : '100%',
+                height: 1.4,
+                borderRadius: 999,
+                bgcolor: 'text.secondary',
+                opacity: 0.35
+              }}
+            />
 
             <Stack
               direction="row"

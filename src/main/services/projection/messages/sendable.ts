@@ -16,6 +16,7 @@ import {
 } from '@shared/utils'
 import { buildServerCgiScript } from '../assets/LIVI_cgi.js'
 import { buildLiviWeb } from '../assets/LIVI_web.js'
+import { DEBUG } from '@main/constants'
 
 export type OpenConfig = Pick<DongleConfig, 'width' | 'height' | 'fps'>
 
@@ -384,7 +385,9 @@ export class SendBoxSettings extends SendableMessageWithPayload {
         fps: cfg.fps
       }
     }
-    console.log('[SendBoxSettings]', JSON.stringify(body, null, 2))
+    if (DEBUG) {
+      console.log('[SendBoxSettings]', JSON.stringify(body, null, 2))
+    }
     return Buffer.from(JSON.stringify(body), 'ascii')
   }
 

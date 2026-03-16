@@ -30,8 +30,11 @@ linux:
   category: Utility
 
 mac:
-  identity: null
+  identity: '-'
   notarize: false
+  hardenedRuntime: true
+  entitlements: assets/mac/entitlements.mac.plist
+  entitlementsInherit: assets/mac/entitlements.mac.inherit.plist
   icon: icons/mac/livi.icns
   category: public.app-category.utilities
   extendInfo:

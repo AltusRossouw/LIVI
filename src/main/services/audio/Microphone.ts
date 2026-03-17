@@ -111,7 +111,7 @@ export default class Microphone extends EventEmitter {
 
     proc.on('error', (err) => {
       console.error('[Microphone] process error:', err)
-      this.cleanup()
+      this.cleanup(proc)
     })
 
     proc.on('close', (code, signal) => {
@@ -124,7 +124,7 @@ export default class Microphone extends EventEmitter {
           bytesRead: this.bytesRead
         })
       }
-      this.cleanup()
+      this.cleanup(proc)
     })
 
     if (DEBUG) {
@@ -140,7 +140,9 @@ export default class Microphone extends EventEmitter {
   }
 
   stop(): void {
-    if (!this.process) {
+    const proc = this.process
+
+    if (!proc) {
       if (DEBUG) {
         console.debug('[Microphone] No active process to stop')
       }
@@ -156,21 +158,25 @@ export default class Microphone extends EventEmitter {
     }
 
     try {
-      this.process.kill()
+      proc.kill()
     } catch (e) {
       if (DEBUG) {
         console.warn('[Microphone] Failed to kill process:', e)
       }
     }
 
-    this.cleanup()
+    this.cleanup(proc)
   }
 
   isCapturing(): boolean {
     return !!this.process
   }
 
-  private cleanup(): void {
+  private cleanup(proc?: ChildProcessWithoutNullStreams | null): void {
+    if (proc && this.process !== proc) {
+      return
+    }
+
     this.process = null
     this.bytesRead = 0
     this.chunkSeq = 0

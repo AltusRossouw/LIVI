@@ -3,9 +3,6 @@ import { AudioCommand } from '@shared/types/ProjectionEnums'
 import type { ExtraConfig } from '@shared/types'
 import { Microphone, AudioOutput, downsampleToMono } from '@main/services/audio'
 import { DEBUG } from '@main/constants'
-import fs from 'fs'
-import path from 'path'
-import { app } from 'electron'
 
 export type PlayerKey = string
 export type LogicalStreamKey = 'music' | 'nav' | 'siri' | 'call'
@@ -108,10 +105,6 @@ export class ProjectionAudio {
   // Visualizer / FFT toggle
   private visualizerEnabled = false
 
-  private callDumpStream: fs.WriteStream | null = null
-  private callDumpBytes = 0
-  private callDumpStartedAt = 0
-
   constructor(
     private readonly getConfig: () => ExtraConfig,
     private readonly sendProjectionEvent: SendProjectionEvent,
@@ -121,58 +114,6 @@ export class ProjectionAudio {
 
   public setVisualizerEnabled(enabled: boolean) {
     this.visualizerEnabled = !!enabled
-  }
-
-  private getCallDumpPath(): string {
-    const baseDir = app.getPath('desktop')
-    const ts = new Date().toISOString().replace(/[:.]/g, '-')
-    return path.join(baseDir, `livi-call-downlink-${ts}.s16le.pcm`)
-  }
-
-  private ensureCallDumpStream() {
-    if (this.callDumpStream) return
-
-    const filePath = this.getCallDumpPath()
-    this.callDumpStream = fs.createWriteStream(filePath, { flags: 'w' })
-    this.callDumpBytes = 0
-    this.callDumpStartedAt = Date.now()
-
-    if (DEBUG) {
-      console.debug('[ProjectionAudio] call dump started', {
-        ts: this.callDumpStartedAt,
-        filePath
-      })
-    }
-  }
-
-  private writeCallDump(pcm: Int16Array) {
-    this.ensureCallDumpStream()
-    if (!this.callDumpStream) return
-
-    const buf = Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength)
-    this.callDumpStream.write(buf)
-    this.callDumpBytes += buf.byteLength
-  }
-
-  private closeCallDump() {
-    if (!this.callDumpStream) return
-
-    const finishedAt = Date.now()
-    const durationMs = this.callDumpStartedAt > 0 ? finishedAt - this.callDumpStartedAt : 0
-    const bytes = this.callDumpBytes
-
-    this.callDumpStream.end()
-    this.callDumpStream = null
-    this.callDumpBytes = 0
-    this.callDumpStartedAt = 0
-
-    if (DEBUG) {
-      console.debug('[ProjectionAudio] call dump stopped', {
-        ts: finishedAt,
-        durationMs,
-        bytes
-      })
-    }
   }
 
   private emitAttention(
@@ -194,7 +135,6 @@ export class ProjectionAudio {
   public resetForSessionStart() {
     this.stopAllAudioPlayers()
     this._mic?.stop()
-    this.closeCallDump()
     this.clearNavMix()
 
     this.siriActive = false
@@ -229,7 +169,6 @@ export class ProjectionAudio {
   public resetForSessionStop() {
     this.stopAllAudioPlayers()
     this._mic?.stop()
-    this.closeCallDump()
     this.clearNavMix()
 
     this.siriActive = false
@@ -506,10 +445,6 @@ export class ProjectionAudio {
         })
       }
 
-      if (logicalKey === 'call') {
-        this.writeCallDump(pcm)
-      }
-
       // Playback
       player.write(pcm)
 
@@ -550,6 +485,17 @@ export class ProjectionAudio {
     // Command-only messages: Siri / phone / media / nav control
     if (msg.command != null) {
       const cmd = msg.command
+
+      if (DEBUG) {
+        console.debug('[ProjectionAudio] audio command', {
+          ts: Date.now(),
+          cmd,
+          decodeType: msg.decodeType,
+          audioType: msg.audioType,
+          siriActive: this.siriActive,
+          phonecallActive: this.phonecallActive
+        })
+      }
 
       // UI attention hints (renderer decides what to do)
 
@@ -713,18 +659,53 @@ export class ProjectionAudio {
         return
       }
 
+      if (cmd === AudioCommand.AudioOutputStop) {
+        if (DEBUG) {
+          console.debug('[ProjectionAudio] handling AudioOutputStop', {
+            ts: Date.now(),
+            mediaActive: this.mediaActive,
+            siriActive: this.siriActive,
+            phonecallActive: this.phonecallActive,
+            lastMusicPlayerKey: this.lastMusicPlayerKey,
+            lastNavPlayerKey: this.lastNavPlayerKey,
+            lastSiriPlayerKey: this.lastSiriPlayerKey,
+            lastCallPlayerKey: this.lastCallPlayerKey
+          })
+        }
+
+        // Call/Siri player are stopped by their dedicated stop commands.
+        // Here we mainly clean up generic 48k output paths like music/ring/alert.
+        if (!this.phonecallActive && !this.siriActive) {
+          if (this.lastMusicPlayerKey) {
+            this.stopPlayerByKey(this.lastMusicPlayerKey)
+            this.lastMusicPlayerKey = null
+          }
+
+          if (this.lastNavPlayerKey) {
+            this.stopPlayerByKey(this.lastNavPlayerKey)
+            this.lastNavPlayerKey = null
+          }
+        }
+
+        return
+      }
+
       if (cmd === AudioCommand.AudioInputConfig) {
         if (msg.decodeType != null) {
-          this.currentMicDecodeType = msg.decodeType
+          const nextMicDecodeType = msg.decodeType
+          const decodeTypeChanged = this.currentMicDecodeType !== nextMicDecodeType
+
+          this.currentMicDecodeType = nextMicDecodeType
 
           if (DEBUG) {
             console.debug('[ProjectionAudio] mic decodeType updated', {
               ts: Date.now(),
-              decodeType: this.currentMicDecodeType
+              decodeType: this.currentMicDecodeType,
+              decodeTypeChanged
             })
           }
 
-          if (this._mic && this._mic.isCapturing()) {
+          if (decodeTypeChanged && this._mic && this._mic.isCapturing()) {
             this._mic.start(this.currentMicDecodeType)
           }
         }
@@ -789,7 +770,6 @@ export class ProjectionAudio {
           }
         } else if (cmd === AudioCommand.AudioPhonecallStop) {
           this.phonecallActive = false
-          this.closeCallDump()
           if (this.lastCallPlayerKey) {
             this.stopPlayerByKey(this.lastCallPlayerKey)
             this.lastCallPlayerKey = null

@@ -1,16 +1,23 @@
 import { EventEmitter } from 'events'
 import os from 'os'
 import fs from 'fs'
-import { spawn, execSync } from 'child_process'
+import { spawn } from 'child_process'
 import { AudioOutput } from '@main/services/audio/AudioOutput'
+import { app } from 'electron'
 
 jest.mock('child_process', () => ({
-  spawn: jest.fn(),
-  execSync: jest.fn()
+  spawn: jest.fn()
 }))
 
 jest.mock('fs', () => ({
   existsSync: jest.fn()
+}))
+
+jest.mock('electron', () => ({
+  app: {
+    isPackaged: false,
+    getAppPath: jest.fn(() => '/mock/app')
+  }
 }))
 
 type MockProc = EventEmitter & {
@@ -76,12 +83,10 @@ describe('AudioOutput', () => {
     expect(proc.kill).toHaveBeenCalledTimes(1)
   })
 
-  test('darwin start without rec binary logs error and does not spawn', () => {
+  test('darwin start without bundled gstreamer logs error and does not spawn', () => {
     jest.spyOn(os, 'platform').mockReturnValue('darwin')
+    ;(app.getAppPath as jest.Mock).mockReturnValue('/mock/app')
     ;(fs.existsSync as jest.Mock).mockReturnValue(false)
-    ;(execSync as jest.Mock).mockImplementation(() => {
-      throw new Error('not found')
-    })
 
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -89,7 +94,7 @@ describe('AudioOutput', () => {
     out.start()
 
     expect(spawn).not.toHaveBeenCalled()
-    expect(errSpy).toHaveBeenCalled()
+    expect(errSpy).toHaveBeenCalledWith('[AudioOutput] Bundled GStreamer not found')
 
     errSpy.mockRestore()
   })

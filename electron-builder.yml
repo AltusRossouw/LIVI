@@ -78,5 +78,12 @@ extraResources:
       - ffmpeg.exe
       - '*.dll'
 
+  - from: assets/gstreamer/darwin
+    to: gstreamer/darwin
+    filter:
+      - '**/*'
+      - '!**/*.a'
+      - '!share/**'
+
 toolsets:
   appimage: '1.0.2'

@@ -1,5 +1,6 @@
-import { spawn, ChildProcessWithoutNullStreams, execSync } from 'child_process'
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import { DEBUG } from '@main/constants'
+import { app } from 'electron'
 import os from 'os'
 import fs from 'fs'
 import path from 'path'
@@ -49,35 +50,28 @@ export class AudioOutput {
         '-' // stdin
       ]
     } else if (os.platform() === 'darwin') {
-      const playPath = AudioOutput.resolvePlayPath()
-      if (!playPath) {
-        console.error('[AudioOutput] SoX (play) not found. Install with: brew install sox')
+      const gstRoot = AudioOutput.resolveGStreamerRoot()
+      if (!gstRoot) {
+        console.error('[AudioOutput] Bundled GStreamer not found')
         return
       }
-      // Known macOS limitation: minimizing the window via the frame controls (-)
-      // can block the main thread (event loop) for ~575ms,
-      // causing audio chunk gaps (data source stall).
-      cmd = playPath
+
+      cmd = path.join(gstRoot, 'bin', 'gst-launch-1.0')
       args = [
-        '-q',
-        '--buffer',
-        '4096',
-        '-t',
-        'raw',
-        '-r',
-        this.sampleRate.toString(),
-        '-e',
-        'signed-integer',
-        '-b',
-        '16',
-        '-c',
-        this.channels.toString(),
-        '-L',
-        '--ignore-length',
-        '-', // stdin
-        '-t',
-        'coreaudio',
-        'default'
+        'fdsrc',
+        'fd=0',
+        '!',
+        'rawaudioparse',
+        'format=pcm',
+        'pcm-format=s16le',
+        `sample-rate=${this.sampleRate}`,
+        `num-channels=${this.channels}`,
+        '!',
+        'audioconvert',
+        '!',
+        'audioresample',
+        '!',
+        'autoaudiosink'
       ]
     } else if (os.platform() === 'win32') {
       const ffplayPath = AudioOutput.resolveFfplayPath()
@@ -120,7 +114,20 @@ export class AudioOutput {
     this.queue = []
     this.writing = false
 
-    const spawnEnv = os.platform() === 'win32' ? process.env : env
+    let spawnEnv = os.platform() === 'win32' ? process.env : env
+
+    if (os.platform() === 'darwin') {
+      const gstRoot = AudioOutput.resolveGStreamerRoot()
+      if (gstRoot) {
+        spawnEnv = {
+          ...spawnEnv,
+          DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+          GST_PLUGIN_SYSTEM_PATH_1_0: path.join(gstRoot, 'lib', 'gstreamer-1.0'),
+          GST_PLUGIN_SCANNER: path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+        }
+      }
+    }
+
     this.process = spawn(cmd, args, { env: spawnEnv, shell: false })
 
     const proc = this.process
@@ -216,25 +223,12 @@ export class AudioOutput {
     this.process = null
   }
 
-  private static resolvePlayPath(): string | null {
-    const fromEnv = process.env.SOX_PLAY_PATH
-    if (fromEnv && fs.existsSync(fromEnv)) return fromEnv
+  private static resolveGStreamerRoot(): string | null {
+    const isPackaged = app.isPackaged
+    const base = isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'assets')
+    const bundled = path.join(base, 'gstreamer', 'darwin')
 
-    const candidates = ['/opt/homebrew/bin/play', '/usr/local/bin/play']
-    for (const p of candidates) if (fs.existsSync(p)) return p
-
-    try {
-      const widened = AudioOutput.buildExecPath(process.env.PATH)
-      const out = execSync('which play', {
-        encoding: 'utf8',
-        env: { ...process.env, PATH: widened }
-      })
-        .toString()
-        .trim()
-      if (out && fs.existsSync(out)) return out
-    } catch {}
-
-    return null
+    return fs.existsSync(bundled) ? bundled : null
   }
 
   private static resolveFfplayPath(): string | null {

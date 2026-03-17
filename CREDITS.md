@@ -24,3 +24,17 @@ during development.
 
 This list is likely incomplete — many thanks to everyone whose work contributed,
 directly or indirectly.
+
+---
+
+# Third-Party Components
+
+## GStreamer
+
+This application bundles parts of the **GStreamer multimedia framework**.
+
+GStreamer is licensed under the **GNU Lesser General Public License (LGPL), version 2.1 or later**.
+
+The license text is included in the `assets/gstreamer/LICENSES` directory.
+
+https://gstreamer.freedesktop.org/

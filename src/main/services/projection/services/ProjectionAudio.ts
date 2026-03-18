@@ -100,7 +100,7 @@ export class ProjectionAudio {
 
   private audioInfoSent = false
   private _mic: Microphone | null = null
-  private currentMicDecodeType = 5
+  private currentMicDecodeType: number | null = null
 
   // Visualizer / FFT toggle
   private visualizerEnabled = false
@@ -157,7 +157,7 @@ export class ProjectionAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
-    this.currentMicDecodeType = 5
+    this.currentMicDecodeType = null
 
     // UI hint state reset
     this.uiCallIncoming = false
@@ -191,7 +191,7 @@ export class ProjectionAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
-    this.currentMicDecodeType = 5
+    this.currentMicDecodeType = null
 
     // UI hint state reset
     this.uiCallIncoming = false
@@ -755,6 +755,16 @@ export class ProjectionAudio {
               console.error('[ProjectionAudio] failed to send mic audio', e)
             }
           })
+        }
+
+        if (this.currentMicDecodeType == null) {
+          if (DEBUG) {
+            console.debug('[ProjectionAudio] skip mic start without decodeType', {
+              ts: Date.now(),
+              cmd
+            })
+          }
+          return
         }
 
         this._mic.start(this.currentMicDecodeType)

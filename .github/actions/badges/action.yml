@@ -28,6 +28,10 @@ inputs:
     required: false
     default: ''
     description: 'Renderer coverage percent (e.g. 8.01%)'
+  gstreamer:
+    required: false
+    default: ''
+    description: 'GStreamer version (e.g. 1.28.1)'
 
 runs:
   using: 'composite'
@@ -43,6 +47,7 @@ runs:
         GH_TOKEN: ${{ inputs.token }}
         MAIN_COVERAGE: ${{ inputs.coverage-main }}
         RENDERER_COVERAGE: ${{ inputs.coverage-renderer }}
+        GSTREAMER_VERSION: ${{ inputs.gstreamer }}
       run: |
         set -euo pipefail
 
@@ -79,6 +84,7 @@ runs:
         echo "ELECTRON_SEMVER=${ELECTRON_SEMVER}"
         echo "CHROMIUM_VER=${CHROMIUM_VER}"
         echo "ELECTRON_DATE_DE=${ELECTRON_DATE_DE}"
+        echo "GSTREAMER_VERSION=${GSTREAMER_VERSION}"
 
         rm -rf temp-badges
         mkdir temp-badges
@@ -112,6 +118,14 @@ runs:
         echo "{\"schemaVersion\":1,\"label\":\"released\",\"message\":\"${ELECTRON_DATE_DE}\",\"color\":\"success\"}" > ".github/badges/${BRANCH_NAME}-electron-date.json"
         echo "{\"schemaVersion\":1,\"label\":\"Electron\",\"message\":\"${ELECTRON_SEMVER} • Chromium ${CHROMIUM_VER} • ${ELECTRON_DATE_DE}\",\"color\":\"blue\"}" > ".github/badges/${BRANCH_NAME}-electron-info.json"
 
+        if [ -n "${GSTREAMER_VERSION}" ]; then
+          echo "{\"schemaVersion\":1,\"label\":\"gstreamer\",\"message\":\"${GSTREAMER_VERSION}\",\"color\":\"blue\"}" > ".github/badges/${BRANCH_NAME}-gstreamer.json"
+
+          if [ "${BRANCH_NAME}" = "dev" ] && [ ! -f ".github/badges/main-gstreamer.json" ]; then
+            cp ".github/badges/${BRANCH_NAME}-gstreamer.json" ".github/badges/main-gstreamer.json"
+          fi
+        fi
+
         if [ -n "${MAIN_COVERAGE}" ]; then
           MAIN_COVERAGE_COLOR="$(coverage_color "${MAIN_COVERAGE}")"
           echo "{\"schemaVersion\":1,\"label\":\"coverage main\",\"message\":\"${MAIN_COVERAGE}\",\"color\":\"${MAIN_COVERAGE_COLOR}\"}" > ".github/badges/${BRANCH_NAME}-coverage-main.json"
@@ -133,5 +147,5 @@ runs:
         fi
 
         git add .github/badges/${BRANCH_NAME}-*.json
-        git commit -m "chore(badges): ${BRANCH_NAME} -> v${VERSION}, node ${NODE_VERSION}, pnpm ${PNPM_VERSION}, electron ${ELECTRON_SEMVER} (chromium ${CHROMIUM_VER}, ${ELECTRON_DATE_DE}), coverage main ${MAIN_COVERAGE:-n/a}, renderer ${RENDERER_COVERAGE:-n/a}" || echo "No changes"
+        git commit -m "chore(badges): ${BRANCH_NAME} -> v${VERSION}, node ${NODE_VERSION}, pnpm ${PNPM_VERSION}, electron ${ELECTRON_SEMVER} (chromium ${CHROMIUM_VER}, ${ELECTRON_DATE_DE}), gstreamer ${GSTREAMER_VERSION:-n/a}, coverage main ${MAIN_COVERAGE:-n/a}, renderer ${RENDERER_COVERAGE:-n/a}" || echo "No changes"
         git push

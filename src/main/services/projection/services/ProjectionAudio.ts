@@ -24,7 +24,7 @@ type SendChunked = (
   extra?: Record<string, unknown>
 ) => void
 
-type SendMicPcm = (pcm: Int16Array) => void
+type SendMicPcm = (pcm: Int16Array, decodeType: number) => void
 
 export class ProjectionAudio {
   // One AudioOutput per (sampleRate, channels)
@@ -746,11 +746,12 @@ export class ProjectionAudio {
 
           this._mic.on('data', (data: Buffer) => {
             if (!data || data.byteLength === 0) return
+            if (this.currentMicDecodeType == null) return
 
             const pcm16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2)
 
             try {
-              this.sendMicPcm(pcm16)
+              this.sendMicPcm(pcm16, this.currentMicDecodeType)
             } catch (e) {
               console.error('[ProjectionAudio] failed to send mic audio', e)
             }

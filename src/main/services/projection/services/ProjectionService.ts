@@ -160,9 +160,9 @@ export class ProjectionService {
       (channel, data, chunkSize, extra) => {
         this.sendChunked(channel, data, chunkSize, extra)
       },
-      (pcm) => {
+      (pcm, decodeType) => {
         try {
-          this.driver.send(new SendAudio(pcm))
+          this.driver.send(new SendAudio(pcm, decodeType))
         } catch (e) {
           console.error('[ProjectionService] failed to send mic audio', e)
         }

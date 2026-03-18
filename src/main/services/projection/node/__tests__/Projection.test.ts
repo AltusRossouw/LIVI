@@ -30,10 +30,16 @@ class VideoData {}
 class MediaData {}
 class Command {}
 class AudioData {
-  constructor(public command?: number) {}
+  constructor(
+    public command?: number,
+    public decodeType?: number
+  ) {}
 }
 class SendAudio {
-  constructor(public data: Int16Array) {}
+  constructor(
+    public data: Int16Array,
+    public decodeType: number
+  ) {}
 }
 class SendCommand {
   constructor(public value: string) {}
@@ -91,12 +97,15 @@ describe('Projection node wrapper', () => {
     const p = new Projection({}) as any
     const mic = micInstances[0]
 
+    p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioInputConfig, 3))
+
     const chunk = new Int16Array([1, 2, 3])
     mic.emit('data', chunk)
 
     expect(p.dongleDriver.send).toHaveBeenCalledTimes(1)
     expect(p.dongleDriver.send.mock.calls[0][0]).toBeInstanceOf(SendAudio)
     expect(p.dongleDriver.send.mock.calls[0][0].data).toBe(chunk)
+    expect(p.dongleDriver.send.mock.calls[0][0].decodeType).toBe(3)
   })
 
   test('handles Plugged event and emits onmessage plugged', () => {
@@ -112,12 +121,16 @@ describe('Projection node wrapper', () => {
     const p = new Projection({}) as any
     const mic = micInstances[0]
 
+    p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioInputConfig, 3))
+
     p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioSiriStart))
     p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioPhonecallStart))
     p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioSiriStop))
     p.dongleDriver.emit('message', new AudioData(AudioCommand.AudioPhonecallStop))
 
     expect(mic.start).toHaveBeenCalledTimes(2)
+    expect(mic.start).toHaveBeenNthCalledWith(1, 3)
+    expect(mic.start).toHaveBeenNthCalledWith(2, 3)
     expect(mic.stop).toHaveBeenCalledTimes(2)
   })
 

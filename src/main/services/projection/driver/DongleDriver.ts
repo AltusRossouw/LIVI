@@ -416,7 +416,7 @@ export class DongleDriver extends EventEmitter {
     const label = ui.length > 0 ? ui : cfg.carName
     const initMicRouteCommand: CommandValue =
       cfg.micType === MicType.DongleMic
-        ? 'boxMic'
+        ? 'boxMici2s'
         : cfg.micType === MicType.PhoneMic
           ? 'phoneMic'
           : 'mic'

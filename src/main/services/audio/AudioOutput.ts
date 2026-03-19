@@ -39,8 +39,8 @@ export class AudioOutput {
   start(): void {
     this.stop()
 
-    if (process.platform !== 'darwin') {
-      console.error('[AudioOutput] Only macOS is supported by this build')
+    if (process.platform !== 'darwin' && process.platform !== 'linux') {
+      console.error('[AudioOutput] Only macOS and Linux are supported by this build')
       return
     }
 
@@ -53,12 +53,25 @@ export class AudioOutput {
     const cmd = path.join(gstRoot, 'bin', 'gst-launch-1.0')
     const args = this.buildArgs()
 
-    const env = {
-      ...process.env,
-      DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-      GST_PLUGIN_SYSTEM_PATH_1_0: path.join(gstRoot, 'lib', 'gstreamer-1.0'),
-      GST_PLUGIN_SCANNER: path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
-    }
+    const pluginPath = path.join(gstRoot, 'lib', 'gstreamer-1.0')
+    const pluginScanner = path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+
+    const env =
+      process.platform === 'darwin'
+        ? {
+            ...process.env,
+            DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+            GST_PLUGIN_SYSTEM_PATH: '',
+            GST_PLUGIN_PATH: pluginPath,
+            GST_PLUGIN_SCANNER: pluginScanner
+          }
+        : {
+            ...process.env,
+            LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+            GST_PLUGIN_SYSTEM_PATH: '',
+            GST_PLUGIN_PATH: pluginPath,
+            GST_PLUGIN_SCANNER: pluginScanner
+          }
 
     if (DEBUG) {
       console.debug('[AudioOutput] Spawning', cmd, args.join(' '))
@@ -244,7 +257,9 @@ export class AudioOutput {
         ]
       : ['queue', 'max-size-time=100000000', 'max-size-bytes=0', 'max-size-buffers=0'] // max 100ms
 
-    const sinkArgs = isRealtime ? ['osxaudiosink', 'sync=false'] : ['osxaudiosink']
+    const sink = process.platform === 'darwin' ? 'osxaudiosink' : 'pulsesink'
+
+    const sinkArgs = isRealtime ? [sink, 'sync=false'] : [sink]
 
     return [
       'fdsrc',
@@ -285,8 +300,19 @@ export class AudioOutput {
   private static resolveGStreamerRoot(): string | null {
     const isPackaged = app.isPackaged
     const base = isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'assets')
-    const bundled = path.join(base, 'gstreamer', 'darwin')
 
+    const platformDir =
+      process.platform === 'darwin'
+        ? 'darwin'
+        : process.platform === 'linux'
+          ? process.arch === 'arm64'
+            ? 'linux-aarch64'
+            : 'linux-x86_64'
+          : null
+
+    if (!platformDir) return null
+
+    const bundled = path.join(base, 'gstreamer', platformDir)
     return fs.existsSync(bundled) ? bundled : null
   }
 }

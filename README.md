@@ -72,18 +72,18 @@ chmod +x LIVI-*-x86_64.AppImage
 
 ## Mac (arm64)
 
-Just download the `-arm64.dmg`, open it, and drag LIVI.app into Applications. Then remove the Gatekeeper quarantine once and launch the app.
-This step is required for all non-Apple-signed apps and future in-app updates will preserve this state.
+Download the `-arm64.dmg`, open it, and drag **LIVI.app** into Applications.
 
-```bash
-xattr -cr /Applications/LIVI.app
-```
+When launching the app for the first time, macOS may block it.  
+In that case:
 
-For audio support, please install Sound eXchange (SoX) via brew.
+1. Try to open the app once (it will be blocked)
+2. Go to **System Settings → Privacy & Security**
+3. Scroll down and click **“Open Anyway”**
+4. Confirm the dialog
 
-```bash
-brew install sox
-```
+After this, the app will launch normally and future updates will work without additional steps.
+
 
 ## Windows (x64)
 
@@ -121,6 +121,7 @@ Steps:
 ![electron](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron.json)
 ![chrome](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron-date.json)
 ![release](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron-chromium.json)
+![gstreamer](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-gstreamer.json)
 
 ### System Requirements (build)
 

@@ -1,4 +1,4 @@
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
+import { spawn, ChildProcessWithoutNullStreams, execSync } from 'child_process'
 import { EventEmitter } from 'events'
 import { DEBUG } from '@main/constants'
 import { app } from 'electron'
@@ -25,8 +25,8 @@ export default class Microphone extends EventEmitter {
   start(decodeType = 5): void {
     this.stop()
 
-    if (process.platform !== 'darwin') {
-      console.error('[Microphone] Only macOS is supported by this build')
+    if (process.platform !== 'darwin' && process.platform !== 'linux') {
+      console.error('[Microphone] Only macOS and Linux are supported by this build')
       return
     }
 
@@ -40,8 +40,14 @@ export default class Microphone extends EventEmitter {
     this.currentDecodeType = decodeType
 
     const cmd = path.join(gstRoot, 'bin', 'gst-launch-1.0')
+
+    const sourceArgs =
+      process.platform === 'darwin'
+        ? ['osxaudiosrc']
+        : ['alsasrc', `device=${Microphone.resolveLinuxAlsaDevice()}`]
+
     const args = [
-      'osxaudiosrc',
+      ...sourceArgs,
       '!',
       'queue',
       'max-size-time=20000000', // max 20 ms
@@ -59,12 +65,25 @@ export default class Microphone extends EventEmitter {
       'fd=1'
     ]
 
-    const env = {
-      ...process.env,
-      DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-      GST_PLUGIN_SYSTEM_PATH_1_0: path.join(gstRoot, 'lib', 'gstreamer-1.0'),
-      GST_PLUGIN_SCANNER: path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
-    }
+    const pluginPath = path.join(gstRoot, 'lib', 'gstreamer-1.0')
+    const pluginScanner = path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+
+    const env =
+      process.platform === 'darwin'
+        ? {
+            ...process.env,
+            DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+            GST_PLUGIN_SYSTEM_PATH: '',
+            GST_PLUGIN_PATH: pluginPath,
+            GST_PLUGIN_SCANNER: pluginScanner
+          }
+        : {
+            ...process.env,
+            LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+            GST_PLUGIN_SYSTEM_PATH: '',
+            GST_PLUGIN_PATH: pluginPath,
+            GST_PLUGIN_SCANNER: pluginScanner
+          }
 
     if (DEBUG) {
       console.debug('[Microphone] Spawning', cmd, args.join(' '))
@@ -134,7 +153,8 @@ export default class Microphone extends EventEmitter {
         frequency: format.frequency,
         channel: format.channel,
         bitDepth: format.bitDepth,
-        format: format.format
+        format: format.format,
+        device: process.platform === 'linux' ? Microphone.resolveLinuxAlsaDevice() : 'default'
       })
     }
   }
@@ -203,11 +223,48 @@ export default class Microphone extends EventEmitter {
     return raw.toUpperCase()
   }
 
+  private static resolveLinuxAlsaDevice(): string {
+    try {
+      const output = execSync('arecord -L', { encoding: 'utf8' })
+      const lines = output.split('\n')
+
+      for (const line of lines) {
+        const m = line.trim().match(/^sysdefault:CARD=([^\s,]+)/)
+        if (m?.[1]) {
+          return `plughw:CARD=${m[1]},DEV=0`
+        }
+      }
+
+      if (DEBUG) {
+        console.warn('[Microphone] sysdefault ALSA card not found, falling back to plughw:0,0')
+      }
+
+      return 'plughw:0,0'
+    } catch (e) {
+      if (DEBUG) {
+        console.warn('[Microphone] Failed to resolve ALSA device, falling back to plughw:0,0', e)
+      }
+
+      return 'plughw:0,0'
+    }
+  }
+
   private static resolveGStreamerRoot(): string | null {
     const isPackaged = app.isPackaged
     const base = isPackaged ? process.resourcesPath : path.join(app.getAppPath(), 'assets')
-    const bundled = path.join(base, 'gstreamer', 'darwin')
 
+    const platformDir =
+      process.platform === 'darwin'
+        ? 'darwin'
+        : process.platform === 'linux'
+          ? process.arch === 'arm64'
+            ? 'linux-aarch64'
+            : 'linux-x86_64'
+          : null
+
+    if (!platformDir) return null
+
+    const bundled = path.join(base, 'gstreamer', platformDir)
     return fs.existsSync(bundled) ? bundled : null
   }
 

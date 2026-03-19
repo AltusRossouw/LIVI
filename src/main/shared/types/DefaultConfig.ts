@@ -20,6 +20,7 @@ export const DEFAULT_EXTRA_CONFIG: ExtraConfig = {
   mediaSound: 1,
   callQuality: 1,
   autoConn: true,
+  UseBTPhone: false,
   audioTransferMode: false,
   dashboardMediaInfo: true,
   dashboardVehicleInfo: true,

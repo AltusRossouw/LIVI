@@ -168,18 +168,20 @@ export class SendMultiTouch extends SendableMessageWithPayload {
 export class SendAudio extends SendableMessageWithPayload {
   type = MessageType.AudioData
   data: Int16Array
+  decodeType: number
 
   getPayload(): Buffer {
     const audioData = Buffer.alloc(12)
-    audioData.writeUInt32LE(5, 0)
+    audioData.writeUInt32LE(this.decodeType, 0)
     audioData.writeFloatLE(0.0, 4)
     audioData.writeUInt32LE(3, 8)
     return Buffer.concat([audioData, Buffer.from(this.data.buffer)])
   }
 
-  constructor(data: Int16Array) {
+  constructor(data: Int16Array, decodeType: number) {
     super()
     this.data = data
+    this.decodeType = decodeType
   }
 }
 
@@ -324,6 +326,7 @@ type BoxSettingsBody = {
   DashboardInfo: number
   GNSSCapability: number
   autoConn: 0 | 1
+  UseBTPhone: 0 | 1
   wifiName: string
   btName: string
   boxName: string
@@ -372,6 +375,7 @@ export class SendBoxSettings extends SendableMessageWithPayload {
       DashboardInfo: dashboardInfo,
       GNSSCapability: gnssCapability,
       autoConn: cfg.autoConn ? 1 : 0,
+      UseBTPhone: cfg.UseBTPhone ? 1 : 0,
       wifiName: cfg.carName,
       btName: cfg.carName,
       boxName: cfg.oemName ?? cfg.carName,

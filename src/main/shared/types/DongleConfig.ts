@@ -32,6 +32,7 @@ export type DongleConfig = {
   mediaDelay: number
   mediaSound: 0 | 1
   callQuality: 0 | 1 | 2
+  UseBTPhone: boolean
   dashboardMediaInfo: boolean
   dashboardVehicleInfo: boolean
   dashboardRouteInfo: boolean

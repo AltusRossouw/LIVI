@@ -42,8 +42,13 @@ export default class Projection {
     const mic = new Microphone()
     const driver = new DongleDriver()
 
+    let currentMicDecodeType: number | null = null
+
     mic.on('data', (data) => {
-      driver.send(new SendAudio(data))
+      if (currentMicDecodeType == null) {
+        return
+      }
+      driver.send(new SendAudio(data, currentMicDecodeType))
     })
 
     driver.on('message', (message: Message) => {
@@ -74,10 +79,16 @@ export default class Projection {
       }
 
       if (message instanceof AudioData && message.command != null) {
+        if (message.command === AudioCommand.AudioInputConfig && message.decodeType != null) {
+          currentMicDecodeType = message.decodeType
+        }
+
         switch (message.command) {
           case AudioCommand.AudioSiriStart:
           case AudioCommand.AudioPhonecallStart:
-            mic.start()
+            if (currentMicDecodeType != null) {
+              mic.start(currentMicDecodeType)
+            }
             break
           case AudioCommand.AudioSiriStop:
           case AudioCommand.AudioPhonecallStop:

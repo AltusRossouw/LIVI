@@ -24,7 +24,7 @@ type SendChunked = (
   extra?: Record<string, unknown>
 ) => void
 
-type SendMicPcm = (pcm: Int16Array) => void
+type SendMicPcm = (pcm: Int16Array, decodeType: number) => void
 
 export class ProjectionAudio {
   // One AudioOutput per (sampleRate, channels)
@@ -100,6 +100,7 @@ export class ProjectionAudio {
 
   private audioInfoSent = false
   private _mic: Microphone | null = null
+  private currentMicDecodeType: number | null = null
 
   // Visualizer / FFT toggle
   private visualizerEnabled = false
@@ -133,6 +134,7 @@ export class ProjectionAudio {
   // Called from ProjectionService when a new projection session starts
   public resetForSessionStart() {
     this.stopAllAudioPlayers()
+    this._mic?.stop()
     this.clearNavMix()
 
     this.siriActive = false
@@ -155,6 +157,7 @@ export class ProjectionAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
+    this.currentMicDecodeType = null
 
     // UI hint state reset
     this.uiCallIncoming = false
@@ -165,6 +168,7 @@ export class ProjectionAudio {
   // Called from ProjectionService when a projection session stops
   public resetForSessionStop() {
     this.stopAllAudioPlayers()
+    this._mic?.stop()
     this.clearNavMix()
 
     this.siriActive = false
@@ -187,6 +191,7 @@ export class ProjectionAudio {
     this.lastCallPlayerKey = null
 
     this.audioInfoSent = false
+    this.currentMicDecodeType = null
 
     // UI hint state reset
     this.uiCallIncoming = false
@@ -231,6 +236,15 @@ export class ProjectionAudio {
       const now = Date.now()
       const voiceActive = this.siriActive || this.phonecallActive
       const logicalKey = this.getLogicalStreamKey(msg)
+
+      if (DEBUG && this.phonecallActive) {
+        console.debug('[ProjectionAudio] call downlink pcm received', {
+          decodeType: msg.decodeType,
+          audioType: msg.audioType,
+          logicalKey,
+          samples: msg.data.length
+        })
+      }
 
       // Player selection
       // music/nav use their normal stream player
@@ -423,6 +437,14 @@ export class ProjectionAudio {
         pcm = this.applyGain(msg.data, baseGain)
       }
 
+      if (DEBUG && logicalKey === 'call') {
+        console.debug('[ProjectionAudio] call playback write', {
+          decodeType: msg.decodeType,
+          audioType: msg.audioType,
+          samples: pcm.length
+        })
+      }
+
       // Playback
       player.write(pcm)
 
@@ -463,6 +485,17 @@ export class ProjectionAudio {
     // Command-only messages: Siri / phone / media / nav control
     if (msg.command != null) {
       const cmd = msg.command
+
+      if (DEBUG) {
+        console.debug('[ProjectionAudio] audio command', {
+          ts: Date.now(),
+          cmd,
+          decodeType: msg.decodeType,
+          audioType: msg.audioType,
+          siriActive: this.siriActive,
+          phonecallActive: this.phonecallActive
+        })
+      }
 
       // UI attention hints (renderer decides what to do)
 
@@ -626,6 +659,60 @@ export class ProjectionAudio {
         return
       }
 
+      if (cmd === AudioCommand.AudioOutputStop) {
+        if (DEBUG) {
+          console.debug('[ProjectionAudio] handling AudioOutputStop', {
+            ts: Date.now(),
+            mediaActive: this.mediaActive,
+            siriActive: this.siriActive,
+            phonecallActive: this.phonecallActive,
+            lastMusicPlayerKey: this.lastMusicPlayerKey,
+            lastNavPlayerKey: this.lastNavPlayerKey,
+            lastSiriPlayerKey: this.lastSiriPlayerKey,
+            lastCallPlayerKey: this.lastCallPlayerKey
+          })
+        }
+
+        // Call/Siri player are stopped by their dedicated stop commands.
+        // Here we mainly clean up generic 48k output paths like music/ring/alert.
+        if (!this.phonecallActive && !this.siriActive) {
+          if (this.lastMusicPlayerKey) {
+            this.stopPlayerByKey(this.lastMusicPlayerKey)
+            this.lastMusicPlayerKey = null
+          }
+
+          if (this.lastNavPlayerKey) {
+            this.stopPlayerByKey(this.lastNavPlayerKey)
+            this.lastNavPlayerKey = null
+          }
+        }
+
+        return
+      }
+
+      if (cmd === AudioCommand.AudioInputConfig) {
+        if (msg.decodeType != null) {
+          const nextMicDecodeType = msg.decodeType
+          const decodeTypeChanged = this.currentMicDecodeType !== nextMicDecodeType
+
+          this.currentMicDecodeType = nextMicDecodeType
+
+          if (DEBUG) {
+            console.debug('[ProjectionAudio] mic decodeType updated', {
+              ts: Date.now(),
+              decodeType: this.currentMicDecodeType,
+              decodeTypeChanged
+            })
+          }
+
+          if (decodeTypeChanged && this._mic && this._mic.isCapturing()) {
+            this._mic.start(this.currentMicDecodeType)
+          }
+        }
+
+        return
+      }
+
       if (cmd === AudioCommand.AudioSiriStart || cmd === AudioCommand.AudioPhonecallStart) {
         const cfg = this.getConfig() as ExtraConfig & {
           micType?: number
@@ -659,18 +746,29 @@ export class ProjectionAudio {
 
           this._mic.on('data', (data: Buffer) => {
             if (!data || data.byteLength === 0) return
+            if (this.currentMicDecodeType == null) return
 
-            const pcm16 = new Int16Array(data.buffer)
+            const pcm16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2)
 
             try {
-              this.sendMicPcm(pcm16)
+              this.sendMicPcm(pcm16, this.currentMicDecodeType)
             } catch (e) {
               console.error('[ProjectionAudio] failed to send mic audio', e)
             }
           })
         }
 
-        this._mic.start()
+        if (this.currentMicDecodeType == null) {
+          if (DEBUG) {
+            console.debug('[ProjectionAudio] skip mic start without decodeType', {
+              ts: Date.now(),
+              cmd
+            })
+          }
+          return
+        }
+
+        this._mic.start(this.currentMicDecodeType)
         return
       }
 
@@ -770,26 +868,17 @@ export class ProjectionAudio {
   }
 
   private getLogicalStreamKey(msg: AudioData): LogicalStreamKey {
+    if (this.phonecallActive) {
+      return 'call'
+    }
+
+    if (this.siriActive) {
+      return 'siri'
+    }
+
     const audioType = msg.audioType ?? 1
 
     if (audioType === 2) return 'nav'
-
-    if (audioType === 1) {
-      if (msg.decodeType === 4) {
-        return 'music'
-      }
-
-      if (msg.decodeType === 5) {
-        if (this.siriActive) return 'siri'
-        if (this.phonecallActive) return 'call'
-        return 'music'
-      }
-
-      if (this.siriActive) return 'siri'
-      if (this.phonecallActive) return 'call'
-      return 'music'
-    }
-
     if (audioType === 3) return 'siri'
     if (audioType === 4) return 'call'
 

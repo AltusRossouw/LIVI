@@ -36,6 +36,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
       contextIsolation: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      backgroundThrottling: false,
       experimentalFeatures: true
     }
   })

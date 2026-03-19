@@ -1,7 +1,7 @@
-import { protocol } from 'electron'
-import { join, extname } from 'path'
-import { existsSync, createReadStream } from 'fs'
-import { mimeTypeFromExt } from '../constants'
+import { protocol, net } from 'electron'
+import { join } from 'path'
+import { existsSync } from 'fs'
+import { pathToFileURL } from 'url'
 
 // protocol.registerSchemesAsPrivileged should be called before app is ready
 // Protocol & Config
@@ -19,26 +19,31 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 export function registerAppProtocol() {
-  protocol.registerStreamProtocol('app', (request, cb) => {
+  protocol.handle('app', async (request) => {
     try {
       const u = new URL(request.url)
       let path = decodeURIComponent(u.pathname)
       if (path === '/' || path === '') path = '/index.html'
+
       const file = join(__dirname, '../renderer', path)
-      if (!existsSync(file)) return cb({ statusCode: 404 })
-      cb({
-        statusCode: 200,
-        headers: {
-          'Content-Type': mimeTypeFromExt(extname(file)),
-          'Cross-Origin-Opener-Policy': 'same-origin',
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Resource-Policy': 'same-site'
-        },
-        data: createReadStream(file)
+      if (!existsSync(file)) {
+        return new Response(null, { status: 404 })
+      }
+
+      const response = await net.fetch(pathToFileURL(file).toString())
+
+      const headers = new Headers(response.headers)
+      headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+      headers.set('Cross-Origin-Embedder-Policy', 'require-corp')
+      headers.set('Cross-Origin-Resource-Policy', 'same-site')
+
+      return new Response(response.body, {
+        status: response.status,
+        headers
       })
     } catch (e) {
       console.error('[app-protocol] error', e)
-      cb({ statusCode: 500 })
+      return new Response(null, { status: 500 })
     }
   })
 }

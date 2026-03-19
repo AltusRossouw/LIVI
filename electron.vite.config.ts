@@ -69,10 +69,7 @@ export default defineConfig({
         input: { index: resolve(__dirname, 'src/renderer/index.html') },
         output: {
           entryFileNames: 'index.js',
-          assetFileNames: (chunkInfo) => {
-            if (chunkInfo.name?.endsWith('.css')) return 'index.css'
-            return 'assets/[name].[ext]'
-          }
+          assetFileNames: 'assets/[name].[ext]'
         }
       }
     },

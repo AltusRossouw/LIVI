@@ -60,7 +60,7 @@ jobs:
             include.push({ platform, os, asset_path, artifact_name });
           };
 
-          if (inputs.darwin) add('darwin', 'macos-latest', 'assets/gstreamer/darwin', 'gstreamer-darwin');
+          if (inputs.darwin) add('darwin', 'macos-latest', 'assets/gstreamer/darwin-arm64', 'gstreamer-darwin-arm64');
           if (inputs.linux_x86_64) add('linux-x86_64', 'ubuntu-24.04', 'assets/gstreamer/linux-x86_64', 'gstreamer-linux-x86_64');
           if (inputs.linux_aarch64) add('linux-aarch64', 'ubuntu-24.04-arm', 'assets/gstreamer/linux-aarch64', 'gstreamer-linux-aarch64');
           if (inputs.win_x86) add('win-x86', 'windows-latest', 'assets/gstreamer/win-x86', 'gstreamer-win-x86');
@@ -135,14 +135,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -C assets/gstreamer -czf gstreamer-darwin.tar.gz darwin
+          tar -C assets/gstreamer -czf gstreamer-darwin-arm64.tar.gz darwin-arm64
 
       - name: Upload artifact [darwin]
         if: matrix.platform == 'darwin'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
-          path: gstreamer-darwin.tar.gz
+          path: gstreamer-darwin-arm64.tar.gz
           retention-days: 7
 
       - name: Build bundle [linux-x86_64 via Debian forky]
@@ -295,20 +295,20 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Download artifact [darwin]
-        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-darwin"')
+        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-darwin-arm64"')
         uses: actions/download-artifact@v8
         with:
-          name: gstreamer-darwin
-          path: .artifacts/darwin
+          name: gstreamer-darwin-arm64
+          path: .artifacts/darwin-arm64
 
       - name: Extract artifact [darwin]
-        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-darwin"')
+        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-darwin-arm64"')
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf assets/gstreamer/darwin
+          rm -rf assets/gstreamer/darwin-arm64
           mkdir -p assets/gstreamer
-          tar -C assets/gstreamer -xzf .artifacts/darwin/gstreamer-darwin.tar.gz
+          tar -C assets/gstreamer -xzf .artifacts/darwin-arm64/gstreamer-darwin-arm64.tar.gz
 
       - name: Download artifact [linux-x86_64]
         if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-linux-x86_64"')
@@ -356,8 +356,8 @@ jobs:
           set -euo pipefail
 
           VERSION=""
-          if [[ -f assets/gstreamer/darwin/version.txt ]]; then
-            VERSION="$(cat assets/gstreamer/darwin/version.txt)"
+          if [[ -f assets/gstreamer/darwin-arm64/version.txt ]]; then
+            VERSION="$(cat assets/gstreamer/darwin-arm64/version.txt)"
           elif [[ -f assets/gstreamer/linux-x86_64/version.txt ]]; then
             VERSION="$(cat assets/gstreamer/linux-x86_64/version.txt)"
           elif [[ -f assets/gstreamer/linux-aarch64/version.txt ]]; then

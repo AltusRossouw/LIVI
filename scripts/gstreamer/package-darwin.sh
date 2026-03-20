@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUT="${1:-assets/gstreamer/darwin}"
+OUT="${1:-assets/gstreamer/darwin-arm64}"
 GST_ROOT="/Library/Frameworks/GStreamer.framework/Versions/1.0"
 
 copy_required() {

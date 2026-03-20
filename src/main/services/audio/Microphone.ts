@@ -47,6 +47,7 @@ export default class Microphone extends EventEmitter {
         : ['alsasrc', `device=${Microphone.resolveLinuxAlsaDevice()}`]
 
     const args = [
+      '-q',
       ...sourceArgs,
       '!',
       'queue',
@@ -255,7 +256,7 @@ export default class Microphone extends EventEmitter {
 
     const platformDir =
       process.platform === 'darwin'
-        ? 'darwin'
+        ? 'darwin-arm64'
         : process.platform === 'linux'
           ? process.arch === 'arm64'
             ? 'linux-aarch64'

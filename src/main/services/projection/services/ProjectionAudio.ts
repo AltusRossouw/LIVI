@@ -234,16 +234,11 @@ export class ProjectionAudio {
     // PCM downlink / output (music, nav, siri, phone, …)
     if (msg.data) {
       const now = Date.now()
-      const voiceActive = this.siriActive || this.phonecallActive
       const logicalKey = this.getLogicalStreamKey(msg)
 
-      if (DEBUG && this.phonecallActive) {
-        console.debug('[ProjectionAudio] call downlink pcm received', {
-          decodeType: msg.decodeType,
-          audioType: msg.audioType,
-          logicalKey,
-          samples: msg.data.length
-        })
+      // drain buffer
+      if (logicalKey === 'music' && !this.mediaActive) {
+        return
       }
 
       // Player selection
@@ -306,7 +301,7 @@ export class ProjectionAudio {
 
         const gateUntil = Math.max(this.nextMusicRampStartAt, this.musicWarmupUntil)
 
-        const isGatedMute = !this.mediaActive || voiceActive || (gateUntil > 0 && now < gateUntil)
+        const isGatedMute = gateUntil > 0 && now < gateUntil
 
         if (isGatedMute) {
           this.musicGateMuted = true
@@ -524,10 +519,7 @@ export class ProjectionAudio {
       }
 
       if (cmd === AudioCommand.AudioSiriStop) {
-        if (this.uiSiriHintActive) {
-          this.uiSiriHintActive = false
-          this.emitAttention('siri', false)
-        }
+        this.siriActive = false
       }
 
       // Navigation overlay hints
@@ -685,8 +677,17 @@ export class ProjectionAudio {
             this.stopPlayerByKey(this.lastNavPlayerKey)
             this.lastNavPlayerKey = null
           }
-        }
 
+          if (this.lastSiriPlayerKey) {
+            this.stopPlayerByKey(this.lastSiriPlayerKey)
+            this.lastSiriPlayerKey = null
+          }
+
+          if (this.lastCallPlayerKey) {
+            this.stopPlayerByKey(this.lastCallPlayerKey)
+            this.lastCallPlayerKey = null
+          }
+        }
         return
       }
 
@@ -758,6 +759,10 @@ export class ProjectionAudio {
           })
         }
 
+        if (msg.decodeType != null) {
+          this.currentMicDecodeType = msg.decodeType
+        }
+
         if (this.currentMicDecodeType == null) {
           if (DEBUG) {
             console.debug('[ProjectionAudio] skip mic start without decodeType', {
@@ -781,10 +786,6 @@ export class ProjectionAudio {
           }
         } else if (cmd === AudioCommand.AudioPhonecallStop) {
           this.phonecallActive = false
-          if (this.lastCallPlayerKey) {
-            this.stopPlayerByKey(this.lastCallPlayerKey)
-            this.lastCallPlayerKey = null
-          }
         }
 
         this._mic?.stop()
@@ -867,21 +868,10 @@ export class ProjectionAudio {
     return player
   }
 
-  private getLogicalStreamKey(msg: AudioData): LogicalStreamKey {
-    if (this.phonecallActive) {
-      return 'call'
-    }
-
-    if (this.siriActive) {
-      return 'siri'
-    }
-
-    const audioType = msg.audioType ?? 1
-
-    if (audioType === 2) return 'nav'
-    if (audioType === 3) return 'siri'
-    if (audioType === 4) return 'call'
-
+  private getLogicalStreamKey(_msg: AudioData): LogicalStreamKey {
+    if (this.phonecallActive) return 'call'
+    if (this.siriActive) return 'siri'
+    if (this.navActive) return 'nav'
     return 'music'
   }
 

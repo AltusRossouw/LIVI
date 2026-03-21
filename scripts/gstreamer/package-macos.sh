@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUT="${1:-assets/gstreamer/darwin-arm64}"
+OUT="${1:-assets/gstreamer/macos-arm64}"
 GST_ROOT="/Library/Frameworks/GStreamer.framework/Versions/1.0"
 
 copy_required() {
@@ -80,4 +80,4 @@ for plugin in "${plugins[@]}"; do
   copy_required "$GST_ROOT/lib/gstreamer-1.0/$plugin" "$OUT/lib/gstreamer-1.0/"
 done
 
-echo "Created Darwin GStreamer bundle at: $OUT"
+echo "Created macOS GStreamer bundle at: $OUT"

@@ -35,6 +35,7 @@ function makeProc(): MockProc {
 
 describe('Microphone', () => {
   const originalPlatform = process.platform
+  const originalArch = process.arch
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -42,15 +43,21 @@ describe('Microphone', () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin'
     })
+    Object.defineProperty(process, 'arch', {
+      value: 'arm64'
+    })
     ;(app.getAppPath as jest.Mock).mockReturnValue('/mock/app')
     ;(fs.existsSync as jest.Mock).mockImplementation((p: fs.PathLike) => {
-      return String(p).includes('/mock/app/assets/gstreamer/darwin-arm64')
+      return String(p).includes('/mock/app/assets/gstreamer/macos-arm64')
     })
   })
 
   afterAll(() => {
     Object.defineProperty(process, 'platform', {
       value: originalPlatform
+    })
+    Object.defineProperty(process, 'arch', {
+      value: originalArch
     })
   })
 
@@ -69,7 +76,7 @@ describe('Microphone', () => {
     mic.start(5)
 
     expect(spawn).toHaveBeenCalledWith(
-      '/mock/app/assets/gstreamer/darwin-arm64/bin/gst-launch-1.0',
+      '/mock/app/assets/gstreamer/macos-arm64/bin/gst-launch-1.0',
       expect.arrayContaining([
         'osxaudiosrc',
         'queue',
@@ -97,7 +104,7 @@ describe('Microphone', () => {
     mic.start(3)
 
     expect(spawn).toHaveBeenCalledWith(
-      '/mock/app/assets/gstreamer/darwin-arm64/bin/gst-launch-1.0',
+      '/mock/app/assets/gstreamer/macos-arm64/bin/gst-launch-1.0',
       expect.arrayContaining(['audio/x-raw,format=S16LE,rate=8000,channels=1']),
       expect.any(Object)
     )

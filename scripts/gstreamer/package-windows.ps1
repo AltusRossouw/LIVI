@@ -1,5 +1,5 @@
 param(
-  [string]$Out = "assets/gstreamer/win-x86_64"
+  [string]$Out = "assets/gstreamer/windows-x64"
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,7 +105,6 @@ if (Test-Path -LiteralPath $Scanner) {
   }
 }
 
-
 # runtime DLLs
 $libs = @(
   "gstreamer-1.0-0.dll",
@@ -160,7 +159,7 @@ foreach ($plugin in $plugins) {
   Copy-Required (Join-Path $PluginDir $plugin) (Join-Path $Out "lib\gstreamer-1.0")
 }
 
-Write-Host "Created Windows GStreamer probe bundle at: $Out"
+Write-Host "Created Windows GStreamer bundle at: $Out"
 Write-Host "Bundle size:"
 $size = (Get-ChildItem -LiteralPath $Out -Recurse -File | Measure-Object -Property Length -Sum).Sum
 "{0:N1} MB" -f ($size / 1MB)

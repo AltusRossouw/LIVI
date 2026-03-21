@@ -1,4 +1,4 @@
-import { spawn, ChildProcessWithoutNullStreams, execSync } from 'child_process'
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
 import { EventEmitter } from 'events'
 import { DEBUG } from '@main/constants'
 import { app } from 'electron'
@@ -54,7 +54,7 @@ export default class Microphone extends EventEmitter {
         ? ['osxaudiosrc']
         : process.platform === 'win32'
           ? ['wasapisrc']
-          : ['alsasrc', `device=${Microphone.resolveLinuxAlsaDevice()}`]
+          : ['pulsesrc']
 
     const args = [
       '-q',
@@ -182,7 +182,7 @@ export default class Microphone extends EventEmitter {
         format: format.format,
         device:
           process.platform === 'linux'
-            ? Microphone.resolveLinuxAlsaDevice()
+            ? 'pulse-default'
             : process.platform === 'win32'
               ? 'wasapi-default'
               : 'default'
@@ -252,32 +252,6 @@ export default class Microphone extends EventEmitter {
     }
 
     return raw.toUpperCase()
-  }
-
-  private static resolveLinuxAlsaDevice(): string {
-    try {
-      const output = execSync('arecord -L', { encoding: 'utf8' })
-      const lines = output.split('\n')
-
-      for (const line of lines) {
-        const m = line.trim().match(/^sysdefault:CARD=([^\s,]+)/)
-        if (m?.[1]) {
-          return `plughw:CARD=${m[1]},DEV=0`
-        }
-      }
-
-      if (DEBUG) {
-        console.warn('[Microphone] sysdefault ALSA card not found, falling back to plughw:0,0')
-      }
-
-      return 'plughw:0,0'
-    } catch (e) {
-      if (DEBUG) {
-        console.warn('[Microphone] Failed to resolve ALSA device, falling back to plughw:0,0', e)
-      }
-
-      return 'plughw:0,0'
-    }
   }
 
   private static resolveGStreamerRoot(): string | null {

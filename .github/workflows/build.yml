@@ -310,7 +310,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: LIVI-${{ steps.pkg.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.${{ matrix.artifact_ext }}
+          name: ${{ matrix.os == 'windows' && format('LIVI-{0}-windows-{1}-setup.exe', steps.pkg.outputs.version, matrix.arch) || format('LIVI-{0}-{1}-{2}.{3}', steps.pkg.outputs.version, matrix.os, matrix.arch, matrix.artifact_ext)}}
           path: |
             dist/*${{
               matrix.artifact_ext == 'dmg' && 'arm64.dmg' ||

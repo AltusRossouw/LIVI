@@ -64,10 +64,10 @@ mac:
         - '!share/**'
 
 dmg:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-macos-${arch}.${ext}
 
 appImage:
-  artifactName: ${name}-${version}-${arch}.${ext}
+  artifactName: ${name}-${version}-linux-${arch}.${ext}
 
 npmRebuild: false
 
@@ -81,7 +81,7 @@ win:
         - x64
   icon: icons/win/livi.ico
   executableName: LIVI
-  artifactName: ${name}-${version}-win-${arch}-setup.${ext}
+  artifactName: ${name}-${version}-windows-${arch}-setup.${ext}
   extraResources:
     - from: assets/gstreamer/windows-x64
       to: gstreamer/windows-x64

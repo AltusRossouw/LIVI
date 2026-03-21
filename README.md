@@ -93,15 +93,6 @@ After this, the app will launch normally and future updates will work without ad
 >
 > It is mainly intended for development, experimentation, and desktop testing.
 
-### Audio Backend
-
-On Windows, LIVI uses **FFmpeg / FFplay** for audio input and output:
-
-- `ffmpeg` is used for microphone capture (DirectShow)
-- `ffplay` is used for low-latency audio playback
-
-Both binaries are bundled with the application. No additional audio software is required.
-
 ### USB Driver Requirement
 
 The Carlinkit dongle requires a compatible **WinUSB (winusb.sys)** driver on Windows.

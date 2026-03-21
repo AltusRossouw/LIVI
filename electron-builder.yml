@@ -28,6 +28,19 @@ linux:
   icon: icons/linux/livi.png
   maintainer: 'Lasse Heitgres <hello@f-io.dev>'
   category: Utility
+  extraResources:
+    - from: assets/gstreamer/linux-x86_64
+      to: gstreamer/linux-x86_64
+      filter:
+        - '**/*'
+        - '!**/*.a'
+        - '!share/**'
+    - from: assets/gstreamer/linux-aarch64
+      to: gstreamer/linux-aarch64
+      filter:
+        - '**/*'
+        - '!**/*.a'
+        - '!share/**'
 
 mac:
   identity: '-'
@@ -42,6 +55,13 @@ mac:
     NSMicrophoneUsageDescription: LIVI requires microphone access for voice control.
     NSDocumentsFolderUsageDescription: LIVI requires access to documents.
     NSDownloadsFolderUsageDescription: LIVI requires access to downloads.
+  extraResources:
+    - from: assets/gstreamer/darwin-arm64
+      to: gstreamer/darwin-arm64
+      filter:
+        - '**/*'
+        - '!**/*.a'
+        - '!share/**'
 
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
@@ -62,6 +82,13 @@ win:
   icon: icons/win/livi.ico
   executableName: LIVI
   artifactName: ${name}-${version}-win-${arch}-setup.${ext}
+  extraResources:
+    - from: assets/gstreamer/win-x86_64
+      to: gstreamer/win-x86_64
+      filter:
+        - '**/*'
+        - '!**/*.a'
+        - '!share/**'
 
 nsis:
   oneClick: false
@@ -69,35 +96,6 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-
-extraResources:
-  - from: assets/gstreamer/darwin-arm64
-    to: gstreamer/darwin-arm64
-    filter:
-      - '**/*'
-      - '!**/*.a'
-      - '!share/**'
-
-  - from: assets/gstreamer/linux-x86_64
-    to: gstreamer/linux-x86_64
-    filter:
-      - '**/*'
-      - '!**/*.a'
-      - '!share/**'
-
-  - from: assets/gstreamer/linux-aarch64
-    to: gstreamer/linux-aarch64
-    filter:
-      - '**/*'
-      - '!**/*.a'
-      - '!share/**'
-
-  - from: assets/gstreamer/win-x64
-    to: gstreamer/win-x64
-    filter:
-      - '**/*'
-      - '!**/*.a'
-      - '!share/**'
 
 toolsets:
   appimage: '1.0.2'

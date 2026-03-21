@@ -7,7 +7,7 @@ on:
       darwin:
         description: 'Build Darwin bundle'
         type: boolean
-        default: true
+        default: false
       linux_x86_64:
         description: 'Build Linux x86_64 bundle'
         type: boolean
@@ -16,8 +16,8 @@ on:
         description: 'Build Linux aarch64 bundle'
         type: boolean
         default: false
-      win_x86:
-        description: 'Build Windows x86 bundle'
+      win_x86_64:
+        description: 'Build Windows x86-64 bundle'
         type: boolean
         default: false
 
@@ -39,7 +39,7 @@ jobs:
           IN_DARWIN: ${{ inputs.darwin }}
           IN_LINUX_X86_64: ${{ inputs.linux_x86_64 }}
           IN_LINUX_AARCH64: ${{ inputs.linux_aarch64 }}
-          IN_WIN_X86: ${{ inputs.win_x86 }}
+          IN_WIN_X86_64: ${{ inputs.win_x86_64 }}
         run: |
           set -euo pipefail
 
@@ -52,7 +52,7 @@ jobs:
             darwin: isTrue(process.env.IN_DARWIN),
             linux_x86_64: isTrue(process.env.IN_LINUX_X86_64),
             linux_aarch64: isTrue(process.env.IN_LINUX_AARCH64),
-            win_x86: isTrue(process.env.IN_WIN_X86),
+            win_x86_64: isTrue(process.env.IN_WIN_X86_64),
           };
 
           const include = [];
@@ -63,7 +63,7 @@ jobs:
           if (inputs.darwin) add('darwin', 'macos-latest', 'assets/gstreamer/darwin-arm64', 'gstreamer-darwin-arm64');
           if (inputs.linux_x86_64) add('linux-x86_64', 'ubuntu-24.04', 'assets/gstreamer/linux-x86_64', 'gstreamer-linux-x86_64');
           if (inputs.linux_aarch64) add('linux-aarch64', 'ubuntu-24.04-arm', 'assets/gstreamer/linux-aarch64', 'gstreamer-linux-aarch64');
-          if (inputs.win_x86) add('win-x86', 'windows-latest', 'assets/gstreamer/win-x86', 'gstreamer-win-x86');
+          if (inputs.win_x86_64) add('win-x86_64', 'windows-latest', 'assets/gstreamer/win-x86_64', 'gstreamer-win-x86_64');
 
           const matrixObj = { include };
           const matrix = JSON.stringify(matrixObj);
@@ -277,6 +277,77 @@ jobs:
           path: gstreamer-linux-aarch64.tar.gz
           retention-days: 7
 
+      - name: Download GStreamer runtime installer [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          curl.exe -L 'https://gstreamer.freedesktop.org/data/pkg/windows/1.28.1/msvc/gstreamer-1.0-msvc-x86_64-1.28.1.exe' -o 'gstreamer-runtime-x86_64.exe'
+
+      - name: Install GStreamer runtime [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $p = Start-Process `
+            -FilePath '.\gstreamer-runtime-x86_64.exe' `
+            -ArgumentList @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') `
+            -PassThru
+
+          if (-not $p.WaitForExit(180000)) {
+            try { $p.Kill() } catch {}
+            throw 'GStreamer installer timed out after 3 minutes'
+          }
+
+          if ($p.ExitCode -ne 0) {
+            throw "GStreamer installer failed with exit code $($p.ExitCode)"
+          }
+
+      - name: Build bundle [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/gstreamer/package-win.ps1 '${{ matrix.asset_path }}'
+
+      - name: Smoke test bundle [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/gstreamer/smoke-test-win.ps1 '${{ matrix.asset_path }}'
+
+      - name: Write version file [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $versionLine = & "${{ matrix.asset_path }}/bin/gst-launch-1.0.exe" --version |
+            Select-String '^gst-launch-1.0 version ' |
+            Select-Object -First 1
+
+          if (-not $versionLine) {
+            throw 'Could not determine GStreamer version'
+          }
+
+          $parts = $versionLine.ToString() -split '\s+'
+          if ($parts.Length -lt 3) {
+            throw "Unexpected version output: $versionLine"
+          }
+
+          $version = $parts[2]
+          Set-Content -Path "${{ matrix.asset_path }}/version.txt" -Value $version -NoNewline
+          Write-Host "Version: $version"
+
+      - name: Upload artifact [win-x86_64]
+        if: matrix.platform == 'win-x86_64'
+        uses: actions/upload-artifact@v6
+        with:
+          name: gstreamer-win-x86_64
+          path: assets/gstreamer/win-x86_64
+          retention-days: 7
+
   publish:
     name: Publish gstreamer assets
     needs:
@@ -342,12 +413,27 @@ jobs:
           mkdir -p assets/gstreamer
           tar -C assets/gstreamer -xzf .artifacts/linux-aarch64/gstreamer-linux-aarch64.tar.gz
 
-      - name: Download artifact [win-x86]
-        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-win-x86"')
+      - name: Prepare target dir [win-x86_64]
+        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-win-x86_64"')
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf assets/gstreamer/win-x86_64
+          mkdir -p assets/gstreamer
+
+      - name: Download artifact [win-x86_64]
+        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-win-x86_64"')
         uses: actions/download-artifact@v8
         with:
-          name: gstreamer-win-x86
-          path: assets/gstreamer/win-x86
+          name: gstreamer-win-x86_64
+          path: .artifacts/win-x86_64
+
+      - name: Copy artifact into repo [win-x86_64]
+        if: contains(needs.plan.outputs.matrix, '"artifact_name":"gstreamer-win-x86_64"')
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a .artifacts/win-x86_64 assets/gstreamer/win-x86_64
 
       - name: Read published version
         id: meta
@@ -362,8 +448,8 @@ jobs:
             VERSION="$(cat assets/gstreamer/linux-x86_64/version.txt)"
           elif [[ -f assets/gstreamer/linux-aarch64/version.txt ]]; then
             VERSION="$(cat assets/gstreamer/linux-aarch64/version.txt)"
-          elif [[ -f assets/gstreamer/win-x86/version.txt ]]; then
-            VERSION="$(cat assets/gstreamer/win-x86/version.txt)"
+          elif [[ -f assets/gstreamer/win-x86_64/version.txt ]]; then
+            VERSION="$(cat assets/gstreamer/win-x86_64/version.txt)"
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -374,16 +460,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "$(git status --porcelain -- assets/gstreamer)" ]]; then
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -f -A assets/gstreamer
+
+          if [[ -z "$(git status --porcelain)" ]]; then
             echo "No asset changes to commit"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A assets/gstreamer
 
           if [[ -n "${{ steps.meta.outputs.version }}" ]]; then
             git commit -m "chore(gstreamer): update bundled assets to ${{ steps.meta.outputs.version }}"
@@ -393,9 +479,8 @@ jobs:
 
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
-
       - name: Push gstreamer badge
-        if: steps.commit_assets.outputs.changed == 'true' && steps.meta.outputs.version != ''
+        if: steps.commit_assets.outputs.changed == 'true' && steps.meta.outputs.version != '' && (github.ref_name == 'main' || github.ref_name == 'dev')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

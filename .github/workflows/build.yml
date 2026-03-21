@@ -18,7 +18,7 @@ on:
         type: boolean
         default: false
       linux_arm64:
-        description: 'Build Linux arm64 (AppImage, native)'
+        description: 'Build Linux arm64 (AppImage)'
         type: boolean
         default: false
       macos_arm64:
@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
       windows_x64:
-        description: 'Build Windows x64 (nsis)'
+        description: 'Build Windows x86_64 (nsis)'
         type: boolean
         default: false
 
@@ -299,48 +299,6 @@ jobs:
         if: matrix.platform == 'win-x64'
         shell: pwsh
         run: pnpm install --frozen-lockfile
-
-      - name: Fetch fftools bundle (f-io/ffmpeg-bundles latest) [win-x64]
-        if: matrix.platform == 'win-x64'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          New-Item -ItemType Directory -Force -Path "assets/bin/win" | Out-Null
-
-          $assetName = "fftools-win-x64.zip"
-          $zip = Join-Path $env:RUNNER_TEMP $assetName
-
-          $tag = (gh release view --repo f-io/ffmpeg-bundles latest --json tagName -q ".tagName")
-          if (-not $tag) { throw "Could not resolve release tag from f-io/ffmpeg-bundles" }
-
-          gh release download $tag `
-            --repo f-io/ffmpeg-bundles `
-            --pattern $assetName `
-            --dir $env:RUNNER_TEMP
-
-          if (-not (Test-Path $zip)) { throw "Downloaded asset not found: $zip" }
-
-          $extract = Join-Path $env:RUNNER_TEMP "ffplay_extract"
-          if (Test-Path $extract) { Remove-Item $extract -Recurse -Force }
-          Expand-Archive -Path $zip -DestinationPath $extract -Force
-
-          $ffplay = Get-ChildItem -Path $extract -Recurse -Filter "ffplay.exe" | Select-Object -First 1
-          if (-not $ffplay) { throw "ffplay.exe not found in $assetName" }
-
-          $ffmpeg = Get-ChildItem -Path $extract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-          if (-not $ffmpeg) { throw "ffmpeg.exe not found in $assetName" }
-
-          $binDir = Split-Path $ffplay.FullName -Parent
-
-          Copy-Item "$binDir\ffplay.exe" "assets/bin/win/ffplay.exe" -Force
-          Copy-Item "$binDir\ffmpeg.exe" "assets/bin/win/ffmpeg.exe" -Force
-          Copy-Item "$binDir\*.dll" "assets/bin/win/" -Force -ErrorAction SilentlyContinue
-
-          Write-Host "Bundled ffplay files:"
-          Get-ChildItem "assets/bin/win" | Format-Table Name,Length
 
       - name: Build for Windows (native) [win-x64]
         if: matrix.platform == 'win-x64'

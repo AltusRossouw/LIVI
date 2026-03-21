@@ -39,8 +39,12 @@ export class AudioOutput {
   start(): void {
     this.stop()
 
-    if (process.platform !== 'darwin' && process.platform !== 'linux') {
-      console.error('[AudioOutput] Only macOS and Linux are supported by this build')
+    if (
+      process.platform !== 'darwin' &&
+      process.platform !== 'linux' &&
+      process.platform !== 'win32'
+    ) {
+      console.error('[AudioOutput] Unsupported platform')
       return
     }
 
@@ -50,28 +54,47 @@ export class AudioOutput {
       return
     }
 
-    const cmd = path.join(gstRoot, 'bin', 'gst-launch-1.0')
+    const cmd = path.join(
+      gstRoot,
+      'bin',
+      process.platform === 'win32' ? 'gst-launch-1.0.exe' : 'gst-launch-1.0'
+    )
     const args = this.buildArgs()
 
     const pluginPath = path.join(gstRoot, 'lib', 'gstreamer-1.0')
-    const pluginScanner = path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+    const pluginScanner = path.join(
+      gstRoot,
+      'libexec',
+      'gstreamer-1.0',
+      process.platform === 'win32' ? 'gst-plugin-scanner.exe' : 'gst-plugin-scanner'
+    )
 
-    const env =
-      process.platform === 'darwin'
-        ? {
-            ...process.env,
-            DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-            GST_PLUGIN_SYSTEM_PATH: '',
-            GST_PLUGIN_PATH: pluginPath,
-            GST_PLUGIN_SCANNER: pluginScanner
-          }
-        : {
-            ...process.env,
-            LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-            GST_PLUGIN_SYSTEM_PATH: '',
-            GST_PLUGIN_PATH: pluginPath,
-            GST_PLUGIN_SCANNER: pluginScanner
-          }
+    let env: NodeJS.ProcessEnv
+    if (process.platform === 'darwin') {
+      env = {
+        ...process.env,
+        DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    } else if (process.platform === 'linux') {
+      env = {
+        ...process.env,
+        LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    } else {
+      env = {
+        ...process.env,
+        PATH: `${path.join(gstRoot, 'bin')};${process.env.PATH ?? ''}`,
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    }
 
     if (DEBUG) {
       console.debug('[AudioOutput] Spawning', cmd, args.join(' '))
@@ -257,7 +280,12 @@ export class AudioOutput {
         ]
       : ['queue', 'max-size-time=100000000', 'max-size-bytes=0', 'max-size-buffers=0'] // max 100ms
 
-    const sink = process.platform === 'darwin' ? 'osxaudiosink' : 'pulsesink'
+    const sink =
+      process.platform === 'darwin'
+        ? 'osxaudiosink'
+        : process.platform === 'win32'
+          ? 'wasapisink'
+          : 'pulsesink'
 
     const sinkArgs = isRealtime ? [sink, 'sync=false'] : [sink]
 
@@ -276,8 +304,9 @@ export class AudioOutput {
       'audioconvert',
       '!',
       'audioresample',
-      '!',
-      'audio/x-raw,format=S16LE,rate=48000,channels=2',
+      ...(process.platform === 'win32'
+        ? []
+        : ['!', 'audio/x-raw,format=S16LE,rate=48000,channels=2']),
       '!',
       ...outputQueueArgs,
       '!',
@@ -308,7 +337,9 @@ export class AudioOutput {
           ? process.arch === 'arm64'
             ? 'linux-aarch64'
             : 'linux-x86_64'
-          : null
+          : process.platform === 'win32'
+            ? 'win-x86_64'
+            : null
 
     if (!platformDir) return null
 

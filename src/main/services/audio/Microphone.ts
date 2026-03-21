@@ -25,8 +25,12 @@ export default class Microphone extends EventEmitter {
   start(decodeType = 5): void {
     this.stop()
 
-    if (process.platform !== 'darwin' && process.platform !== 'linux') {
-      console.error('[Microphone] Only macOS and Linux are supported by this build')
+    if (
+      process.platform !== 'darwin' &&
+      process.platform !== 'linux' &&
+      process.platform !== 'win32'
+    ) {
+      console.error('[Microphone] Unsupported platform')
       return
     }
 
@@ -39,12 +43,18 @@ export default class Microphone extends EventEmitter {
     const format = Microphone.resolveFormat(decodeType)
     this.currentDecodeType = decodeType
 
-    const cmd = path.join(gstRoot, 'bin', 'gst-launch-1.0')
+    const cmd = path.join(
+      gstRoot,
+      'bin',
+      process.platform === 'win32' ? 'gst-launch-1.0.exe' : 'gst-launch-1.0'
+    )
 
     const sourceArgs =
       process.platform === 'darwin'
         ? ['osxaudiosrc']
-        : ['alsasrc', `device=${Microphone.resolveLinuxAlsaDevice()}`]
+        : process.platform === 'win32'
+          ? ['wasapisrc']
+          : ['alsasrc', `device=${Microphone.resolveLinuxAlsaDevice()}`]
 
     const args = [
       '-q',
@@ -67,24 +77,39 @@ export default class Microphone extends EventEmitter {
     ]
 
     const pluginPath = path.join(gstRoot, 'lib', 'gstreamer-1.0')
-    const pluginScanner = path.join(gstRoot, 'libexec', 'gstreamer-1.0', 'gst-plugin-scanner')
+    const pluginScanner = path.join(
+      gstRoot,
+      'libexec',
+      'gstreamer-1.0',
+      process.platform === 'win32' ? 'gst-plugin-scanner.exe' : 'gst-plugin-scanner'
+    )
 
-    const env =
-      process.platform === 'darwin'
-        ? {
-            ...process.env,
-            DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-            GST_PLUGIN_SYSTEM_PATH: '',
-            GST_PLUGIN_PATH: pluginPath,
-            GST_PLUGIN_SCANNER: pluginScanner
-          }
-        : {
-            ...process.env,
-            LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
-            GST_PLUGIN_SYSTEM_PATH: '',
-            GST_PLUGIN_PATH: pluginPath,
-            GST_PLUGIN_SCANNER: pluginScanner
-          }
+    let env: NodeJS.ProcessEnv
+    if (process.platform === 'darwin') {
+      env = {
+        ...process.env,
+        DYLD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    } else if (process.platform === 'linux') {
+      env = {
+        ...process.env,
+        LD_LIBRARY_PATH: path.join(gstRoot, 'lib'),
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    } else {
+      env = {
+        ...process.env,
+        PATH: `${path.join(gstRoot, 'bin')};${process.env.PATH ?? ''}`,
+        GST_PLUGIN_SYSTEM_PATH: '',
+        GST_PLUGIN_PATH: pluginPath,
+        GST_PLUGIN_SCANNER: pluginScanner
+      }
+    }
 
     if (DEBUG) {
       console.debug('[Microphone] Spawning', cmd, args.join(' '))
@@ -155,7 +180,12 @@ export default class Microphone extends EventEmitter {
         channel: format.channel,
         bitDepth: format.bitDepth,
         format: format.format,
-        device: process.platform === 'linux' ? Microphone.resolveLinuxAlsaDevice() : 'default'
+        device:
+          process.platform === 'linux'
+            ? Microphone.resolveLinuxAlsaDevice()
+            : process.platform === 'win32'
+              ? 'wasapi-default'
+              : 'default'
       })
     }
   }
@@ -261,7 +291,9 @@ export default class Microphone extends EventEmitter {
           ? process.arch === 'arm64'
             ? 'linux-aarch64'
             : 'linux-x86_64'
-          : null
+          : process.platform === 'win32'
+            ? 'win-x86_64'
+            : null
 
     if (!platformDir) return null
 

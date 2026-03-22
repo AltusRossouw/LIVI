@@ -185,9 +185,9 @@
 
       <p>
         LIVI - Linux In-Vehicle Infotainment - is an open-source project that provides a standalone
-        <strong>Apple Carplay and Android Auto head unit</strong> for Linux. It runs on standard
-        Linux desktops (x86_64) as well as various ARM-based single-board computers, including
-        Raspberry Pi and other embedded platforms.
+        <strong>Apple Carplay and Android Auto head unit</strong>. It runs on Linux desktops and
+        ARM-based embedded platforms such as Raspberry Pi, with pre-built releases also available
+        for macOS and Windows.
       </p>
 
       <h2>Features</h2>
@@ -197,8 +197,8 @@
         <li>Instrument cluster video stream support</li>
         <li>iAP2 turn-by-turn navigation data support</li>
         <li>Audio metadata and playback state integration</li>
-        <li>Low-latency audio output via PipeWire</li>
-        <li>Voice input support</li>
+        <li>Unified low-latency audio backend via GStreamer</li>
+        <li>Microphone input support for voice assistants and phone calls</li>
         <li>Touchscreen and multi-touch support</li>
         <li>Full non-touch navigation via D-Pad and button controls</li>
         <li>UI optimized for low-resolution OEM in-car displays</li>
@@ -220,10 +220,10 @@
 
       <h2>Installation</h2>
       <p>
-        Pre-built binaries for Linux are available here:
+        Pre-built binaries for Linux, macOS, and Windows are available here:
         <a href="https://github.com/f-io/LIVI/releases">https://github.com/f-io/LIVI/releases</a>
       </p>
-
+      
       <h2>How it works</h2>
       <p>
         LIVI does not implement Carplay itself. It relies on compatible USB dongles that handle the

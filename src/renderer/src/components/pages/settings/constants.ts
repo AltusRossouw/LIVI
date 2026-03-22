@@ -54,7 +54,6 @@ export const requiresRestartParams: (keyof ExtraConfig)[] = [
   'naviSafeAreaBottom',
   'naviSafeAreaLeft',
   'naviSafeAreaRight',
-  'naviSafeAreaDrawOutside',
 
   'mediaDelay',
   'wifiType',

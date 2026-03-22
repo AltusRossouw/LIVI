@@ -201,8 +201,8 @@ export const videoSchema: SettingsNode<ExtraConfig> = {
             description: 'Navigation screen FPS',
             labelDescription: 'settings.navigationScreenFpsDescription'
           }
-        }
-        /* does not work, firmware bug?
+        },
+        /* does not work, firmware bug?*/
         {
           type: 'route',
           label: 'Safe Area',
@@ -281,7 +281,7 @@ export const videoSchema: SettingsNode<ExtraConfig> = {
               path: 'naviSafeAreaDrawOutside'
             }
           ]
-        }*/
+        }
       ]
     },
     {

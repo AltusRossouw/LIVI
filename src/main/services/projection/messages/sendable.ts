@@ -247,14 +247,14 @@ export enum FileAddress {
   LIVI_WEB_PERSISTENT = '/etc/boa/www/index.html',
   HU_VIEWAREA_INFO = '/etc/RiddleBoxData/HU_VIEWAREA_INFO',
   HU_SAFEAREA_INFO = '/etc/RiddleBoxData/HU_SAFEAREA_INFO',
-  HU_NAVISCREEN_VIEWAREA_INFO = '/etc/RiddleBoxData/HU_NAVISCREEN_VIEWAREA_INFO',
-  HU_NAVISCREEN_SAFEAREA_INFO = '/etc/RiddleBoxData/HU_NAVISCREEN_SAFEAREA_INFO',
   TMP = '/tmp'
 }
 
-export enum AreaTarget {
-  Main = 'main',
-  Navi = 'navi'
+export type ViewAreaOptions = Record<string, never>
+
+export type SafeAreaOptions = {
+  insets?: Partial<ScreenInsets>
+  drawOutside?: boolean
 }
 
 export type ScreenInsets = {
@@ -264,41 +264,9 @@ export type ScreenInsets = {
   right: number
 }
 
-export type ViewAreaOptions = {
-  target?: AreaTarget
-}
-
-export type SafeAreaOptions = {
-  insets?: Partial<ScreenInsets>
-  drawOutside?: boolean
-  target?: AreaTarget
-}
-
-function getViewAreaFile(target: AreaTarget): FileAddress {
-  switch (target) {
-    case AreaTarget.Navi:
-      return FileAddress.HU_NAVISCREEN_VIEWAREA_INFO
-    case AreaTarget.Main:
-    default:
-      return FileAddress.HU_VIEWAREA_INFO
-  }
-}
-
-function getSafeAreaFile(target: AreaTarget): FileAddress {
-  switch (target) {
-    case AreaTarget.Navi:
-      return FileAddress.HU_NAVISCREEN_SAFEAREA_INFO
-    case AreaTarget.Main:
-    default:
-      return FileAddress.HU_SAFEAREA_INFO
-  }
-}
-
 /** 24 bytes LE: [screenW, screenH, viewW, viewH, originX, originY] */
 export class SendViewArea extends SendFile {
-  constructor(screenW: number, screenH: number, options: ViewAreaOptions = {}) {
-    const target = options.target ?? AreaTarget.Main
-
+  constructor(screenW: number, screenH: number, _options: ViewAreaOptions = {}) {
     const b = Buffer.alloc(24)
     b.writeUInt32LE(screenW, 0)
     b.writeUInt32LE(screenH, 4)
@@ -307,7 +275,7 @@ export class SendViewArea extends SendFile {
     b.writeUInt32LE(0, 16)
     b.writeUInt32LE(0, 20)
 
-    super(b, getViewAreaFile(target))
+    super(b, FileAddress.HU_VIEWAREA_INFO)
   }
 }
 
@@ -325,7 +293,6 @@ export class SendSafeArea extends SendFile {
     const safeH = Math.max(0, videoH - insets.top - insets.bottom)
     const hasInsets = (insets.top | insets.bottom | insets.left | insets.right) !== 0
     const drawOutside = options.drawOutside ?? hasInsets
-    const target = options.target ?? AreaTarget.Main
 
     const b = Buffer.alloc(20)
     b.writeUInt32LE(safeW, 0)
@@ -334,7 +301,7 @@ export class SendSafeArea extends SendFile {
     b.writeUInt32LE(insets.top, 12)
     b.writeUInt32LE(drawOutside ? 1 : 0, 16)
 
-    super(b, getSafeAreaFile(target))
+    super(b, FileAddress.HU_SAFEAREA_INFO)
   }
 }
 
@@ -417,6 +384,13 @@ type NaviScreenInfo = {
   width: number
   height: number
   fps: number
+  safearea?: {
+    width: number
+    height: number
+    x: number
+    y: number
+    outside: number
+  }
 }
 
 type BoxSettingsBody = {
@@ -488,10 +462,30 @@ export class SendBoxSettings extends SendableMessageWithPayload {
     }
 
     if (cfg.mapsEnabled) {
+      const insets = {
+        top: cfg.naviSafeAreaTop ?? 0,
+        bottom: cfg.naviSafeAreaBottom ?? 0,
+        left: cfg.naviSafeAreaLeft ?? 0,
+        right: cfg.naviSafeAreaRight ?? 0
+      }
+
+      const safeW = Math.max(0, cfg.naviWidth - insets.left - insets.right)
+      const safeH = Math.max(0, cfg.naviHeight - insets.top - insets.bottom)
+
+      const hasInsets = (insets.top | insets.bottom | insets.left | insets.right) !== 0
+      const drawOutside = cfg.naviSafeAreaDrawOutside ?? hasInsets
+
       body.naviScreenInfo = {
         width: cfg.naviWidth,
         height: cfg.naviHeight,
-        fps: cfg.naviFps
+        fps: cfg.naviFps,
+        safearea: {
+          width: safeW,
+          height: safeH,
+          x: insets.left,
+          y: insets.top,
+          outside: drawOutside ? 1 : 0
+        }
       }
     }
     if (DEBUG) {

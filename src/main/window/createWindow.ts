@@ -1,5 +1,5 @@
 import { isMacPlatform, pushSettingsToRenderer } from '@main/utils'
-import { BrowserWindow, session, shell } from 'electron'
+import { BrowserWindow, session, shell, screen } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { join } from 'path'
 import {
@@ -8,7 +8,6 @@ import {
   applyWindowedContentSize,
   attachKioskStateSync,
   currentKiosk,
-  fitWindowToWorkArea,
   persistKioskAndBroadcast
 } from './utils'
 import { runtimeStateProps, ServicesProps } from '@main/types'
@@ -22,9 +21,9 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   mainWindow = new BrowserWindow({
     width: runtimeState.config.width,
     height: runtimeState.config.height,
-    frame: isMac ? true : !runtimeState.config.kiosk,
+    frame: true,
     useContentSize: true,
-    kiosk: isMac ? false : runtimeState.config.kiosk,
+    kiosk: false,
     autoHideMenuBar: true,
     backgroundColor: '#000',
     fullscreenable: true,
@@ -69,22 +68,30 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return
 
-    if (isMac) {
-      const baseW = runtimeState.config.width || 800
-      const baseH = runtimeState.config.height || 480
-      applyWindowedContentSize(mainWindow, baseW, baseH)
-      mainWindow.show()
-      if (runtimeState.config.kiosk) setImmediate(() => mainWindow!.setFullScreen(true))
-    } else {
-      if (runtimeState.config.kiosk) {
-        mainWindow.setKiosk(true)
-        applyAspectRatioWindowed(mainWindow, 0, 0)
-        fitWindowToWorkArea(mainWindow)
-      } else {
-        applyWindowedContentSize(mainWindow, runtimeState.config.width, runtimeState.config.height)
-      }
-      mainWindow.show()
+    const baseW = runtimeState.config.width || 800
+    const baseH = runtimeState.config.height || 480
+
+    // always start windowed
+    applyWindowedContentSize(mainWindow, baseW, baseH)
+    mainWindow.show()
+
+    if (runtimeState.config.kiosk) {
+      setImmediate(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return
+
+        if (isMac) {
+          mainWindow.setFullScreen(true)
+        } else {
+          mainWindow.setKiosk(true)
+
+          const d = screen.getDisplayMatching(mainWindow.getBounds())
+          const wa = d.workAreaSize
+
+          mainWindow.setContentSize(wa.width, wa.height)
+        }
+      })
     }
+
     mainWindow.webContents.setZoomFactor((runtimeState.config.uiZoomPercent ?? 100) / 100)
     pushSettingsToRenderer(runtimeState, { kiosk: currentKiosk(runtimeState.config) })
 

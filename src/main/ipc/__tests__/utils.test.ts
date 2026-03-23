@@ -29,8 +29,7 @@ jest.mock('@main/utils', () => ({
 jest.mock('@main/window/utils', () => ({
   applyAspectRatioFullscreen: jest.fn(),
   applyAspectRatioWindowed: jest.fn(),
-  applyWindowedContentSize: jest.fn(),
-  fitWindowToWorkArea: jest.fn()
+  applyWindowedContentSize: jest.fn()
 }))
 
 describe('ipc utils', () => {

@@ -70,7 +70,9 @@ export default defineConfig({
         output: {
           entryFileNames: 'index.js',
           assetFileNames: (chunkInfo) => {
-            if (chunkInfo.name?.endsWith('.css')) return 'index.css'
+            const name = chunkInfo.name ?? ''
+            if (name.endsWith('.css')) return 'index.css'
+            if (/\.(woff2?|ttf|otf|eot)$/.test(name)) return '[name].[ext]'
             return 'assets/[name].[ext]'
           }
         }

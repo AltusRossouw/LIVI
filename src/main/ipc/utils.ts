@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import { existsSync, writeFileSync } from 'fs'
 import { execFile } from 'node:child_process'
+import { screen } from 'electron'
 import os from 'node:os'
 import { runtimeStateProps, UpdateEventPayload } from '@main/types'
 import { getMainWindow } from '@main/window/createWindow'
@@ -10,8 +11,7 @@ import { applyNullDeletes, pushSettingsToRenderer, sizesEqual } from '@main/util
 import {
   applyAspectRatioFullscreen,
   applyAspectRatioWindowed,
-  applyWindowedContentSize,
-  fitWindowToWorkArea
+  applyWindowedContentSize
 } from '@main/window/utils'
 import { CONFIG_PATH } from '@main/config/paths'
 
@@ -146,24 +146,22 @@ export function saveSettings(runtimeState: runtimeStateProps, next: Partial<Extr
       win.setKiosk(runtimeState.config.kiosk)
 
       if (leavingKiosk) {
-        applyWindowedContentSize(win, runtimeState.config.width, runtimeState.config.height)
-
-        // Re-apply bounds once the WM finishes the transition
         const onResize = () => {
           win.removeListener('resize', onResize)
-          fitWindowToWorkArea(win)
           applyWindowedContentSize(win, runtimeState.config.width, runtimeState.config.height)
         }
         win.on('resize', onResize)
 
         setImmediate(() => {
           if (win.isDestroyed()) return
-          fitWindowToWorkArea(win)
           applyWindowedContentSize(win, runtimeState.config.width, runtimeState.config.height)
         })
       } else {
         // entering kiosk
-        applyAspectRatioWindowed(win, 0, 0)
+        const d = screen.getDisplayMatching(win.getBounds())
+        const wa = d.workAreaSize
+
+        win.setContentSize(wa.width, wa.height)
       }
       return
     }

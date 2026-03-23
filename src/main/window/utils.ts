@@ -75,26 +75,6 @@ export function sendKioskSync(kiosk: boolean, mainWindow: BrowserWindow | null =
   mainWindow?.webContents.send('settings:kiosk-sync', kiosk)
 }
 
-export function fitWindowToWorkArea(win: BrowserWindow) {
-  const d = screen.getDisplayMatching(win.getBounds())
-  const wa = d.workArea
-
-  // Remove constraints
-  win.setResizable(true)
-  win.setMinimumSize(0, 0)
-  win.setAspectRatio(0)
-
-  // Apply bounds
-  win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: wa.height }, false)
-
-  // Apply once again on the first resize the WM triggers during the transition
-  const onResize = () => {
-    win.removeListener('resize', onResize)
-    win.setBounds({ x: wa.x, y: wa.y, width: wa.width, height: wa.height }, false)
-  }
-  win.on('resize', onResize)
-}
-
 export function restoreKioskAfterWmExit(runtimeState: runtimeStateProps) {
   const mainWindow: BrowserWindow | null = getMainWindow()
 

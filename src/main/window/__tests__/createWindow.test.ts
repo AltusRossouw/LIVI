@@ -57,7 +57,6 @@ jest.mock('@main/window/utils', () => ({
   applyWindowedContentSize: jest.fn(),
   attachKioskStateSync: jest.fn(),
   currentKiosk: jest.fn(() => false),
-  fitWindowToWorkArea: jest.fn(),
   persistKioskAndBroadcast: jest.fn()
 }))
 

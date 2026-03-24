@@ -73,6 +73,17 @@ const sendCarplayMicType = (micType: MicType) => {
   }
 }
 
+const sendCarplayNightMode = (nightMode: boolean) => {
+  const api = getProjectionApi()
+  if (!api?.ipc?.sendCommand) return
+
+  try {
+    api.ipc.sendCommand(nightMode ? 'enableNightMode' : 'disableNightMode')
+  } catch (err) {
+    console.warn('projection-set-night-mode IPC failed', err)
+  }
+}
+
 const saveSettingsIpc = async (patch: Partial<ExtraConfig>) => {
   const api = getProjectionApi()
   if (!api?.settings?.save) return
@@ -382,6 +393,10 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
 
         if (patch.micType !== undefined) {
           sendCarplayMicType(patch.micType as MicType)
+        }
+
+        if (patch.nightMode !== undefined) {
+          sendCarplayNightMode(Boolean(patch.nightMode))
         }
       }
 

@@ -1,3 +1,5 @@
+import { createDecipheriv } from 'node:crypto'
+
 const VENDOR_SESSION_KEY = Buffer.from('573245433158314e625a35385458746e', 'hex')
 
 export function decodeVendorSessionAscii(raw: Buffer): string {
@@ -16,11 +18,7 @@ export async function decryptVendorSessionInfo(decoded: Buffer): Promise<Buffer>
   const iv = decoded.subarray(0, 16)
   const ciphertext = decoded.subarray(16)
 
-  // Avoid static `node:crypto` import so
-  // Vite doesn't try to resolve it for the browser build
-  const spec = 'node:' + 'crypto'
-  const crypto = await import(spec)
-  const decipher = crypto.createDecipheriv('aes-128-cbc', VENDOR_SESSION_KEY, iv)
+  const decipher = createDecipheriv('aes-128-cbc', VENDOR_SESSION_KEY, iv)
   return Buffer.concat([decipher.update(ciphertext), decipher.final()])
 }
 

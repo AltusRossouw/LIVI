@@ -4,7 +4,7 @@ const { pathsToModuleNameMapper } = require('ts-jest')
 const { compilerOptions } = require('./tsconfig.json')
 
 const aliasMapper = pathsToModuleNameMapper(compilerOptions.paths || {}, {
-  prefix: '<rootDir>/src/'
+  prefix: '<rootDir>/'
 })
 
 module.exports = {

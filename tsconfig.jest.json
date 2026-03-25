@@ -12,12 +12,11 @@
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["jest", "node"],
-    "baseUrl": "./src",
     "paths": {
-      "@renderer/*": ["renderer/src/*"],
-      "@main/*": ["main/*"],
-      "@store/*": ["renderer/src/store/*"],
-      "@utils/*": ["renderer/src/utils/*"]
+      "@renderer/*": ["./src/renderer/src/*"],
+      "@main/*": ["./src/main/*"],
+      "@store/*": ["./src/renderer/src/store/*"],
+      "@utils/*": ["./src/renderer/src/utils/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "**/*.test.ts", "**/*.test.tsx", "jest.setup.ts"]

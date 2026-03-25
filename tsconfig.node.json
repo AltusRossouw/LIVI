@@ -18,15 +18,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "./src",
     "paths": {
-      "@main/*": ["main/*"],
-      "@shared/*": ["main/shared/*"],
-      "@projection/messages": ["main/services/projection/messages/index.ts"],
-      "@projection/messages/*": ["main/services/projection/messages/*"],
-      "@projection/node": ["main/services/projection/node"],
-      "@projection/*": ["main/services/projection/*"],
-      "@audio": ["main/audio/index.ts"]
+      "@main/*": ["./src/main/*"],
+      "@shared/*": ["./src/main/shared/*"],
+      "@projection/messages": ["./src/main/services/projection/messages/index.ts"],
+      "@projection/messages/*": ["./src/main/services/projection/messages/*"],
+      "@projection/node": ["./src/main/services/projection/node"],
+      "@projection/*": ["./src/main/services/projection/*"],
+      "@audio": ["./src/main/audio/index.ts"]
     }
   }
 }

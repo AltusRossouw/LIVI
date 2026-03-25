@@ -15,19 +15,18 @@
     "noEmit": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": "./src",
     "paths": {
-      "@audio": ["main/audio/index.ts"],
-      "@audio/*": ["main/audio/*"],
-      "@renderer/*": ["renderer/src/*"],
-      "@projection/messages": ["main/services/projection/messages/index.ts"],
-      "@projection/messages/*": ["main/services/projection/messages/*"],
-      "@main/*": ["main/*"],
-      "@shared/*": ["main/shared/*"],
-      "@worker/*": ["renderer/src/components/worker/*"],
-      "@store/*": ["renderer/src/store/*"],
-      "@utils/*": ["renderer/src/utils/*"],
-      "@types/*": ["renderer/src/types/*"]
+      "@audio": ["./src/main/audio/index.ts"],
+      "@audio/*": ["./src/main/audio/*"],
+      "@renderer/*": ["./src/renderer/src/*"],
+      "@projection/messages": ["./src/main/services/projection/messages/index.ts"],
+      "@projection/messages/*": ["./src/main/services/projection/messages/*"],
+      "@main/*": ["./src/main/*"],
+      "@shared/*": ["./src/main/shared/*"],
+      "@worker/*": ["./src/renderer/src/components/worker/*"],
+      "@store/*": ["./src/renderer/src/store/*"],
+      "@utils/*": ["./src/renderer/src/utils/*"],
+      "@types/*": ["./src/renderer/src/types/*"]
     }
   },
   "include": ["src/**/*", "src/types"]

@@ -4,7 +4,7 @@ const { pathsToModuleNameMapper } = require('ts-jest')
 const { compilerOptions } = require('./tsconfig.json')
 
 const aliasMapper = pathsToModuleNameMapper(compilerOptions.paths || {}, {
-  prefix: '<rootDir>/src/'
+  prefix: '<rootDir>/'
 })
 
 module.exports = {
@@ -28,7 +28,7 @@ module.exports = {
     '!<rootDir>/src/**/*.test.{ts,tsx,js,jsx}'
   ],
   coverageDirectory: '<rootDir>/coverage/main',
-  coverageReporters: ['text-summary', 'html', 'lcov', 'json-summary'],
+  coverageReporters: ['text', 'text-summary', 'html', 'lcov', 'json-summary'],
   testMatch: [
     '<rootDir>/src/main/**/*.test.(ts|tsx|js|jsx)',
     '<rootDir>/src/preload/**/*.test.(ts|tsx|js|jsx)',

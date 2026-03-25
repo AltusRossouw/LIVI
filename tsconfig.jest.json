@@ -1,23 +1,22 @@
 {
   "compilerOptions": {
-    "target": "es2021",
-    "module": "commonjs",
-    "lib": ["dom", "es2021"],
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["dom", "es2022"],
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["jest", "node"],
-    "baseUrl": "./src",
     "paths": {
-      "@renderer/*": ["renderer/src/*"],
-      "@main/*": ["main/*"],
-      "@store/*": ["renderer/src/store/*"],
-      "@utils/*": ["renderer/src/utils/*"]
+      "@renderer/*": ["./src/renderer/src/*"],
+      "@main/*": ["./src/main/*"],
+      "@store/*": ["./src/renderer/src/store/*"],
+      "@utils/*": ["./src/renderer/src/utils/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "**/*.test.ts", "**/*.test.tsx", "jest.setup.ts"]

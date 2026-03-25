@@ -108,7 +108,7 @@ describe('Render.worker', () => {
   })
 
   const importWorkerModule = async () => {
-    return await import('../Render.worker')
+    return require('../Render.worker')
   }
 
   test('init selects renderer and posts render-ready', async () => {

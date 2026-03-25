@@ -40,7 +40,7 @@ jest.mock('../i18n', () => ({}))
 describe('renderer main bootstrap', () => {
   test('initializes UI timers and mounts react root', async () => {
     document.body.innerHTML = '<div id="root"></div>'
-    await import('../main')
+    require('../main')
 
     expect(initUiBreatheClockMock).toHaveBeenCalled()
     expect(initCursorHiderMock).toHaveBeenCalled()

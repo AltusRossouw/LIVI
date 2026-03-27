@@ -12,20 +12,14 @@ during development.
 
 ## Inspiration & Prior Art
 
-- **ludwig-v/wireless-carplay-dongle-reverse-engineering** by Ludwig — firmware reverse-engineering
-- **electric-monk/pycarplay** by Colin Munro
-- **harrylepotter/carplay-receiver** by harrylepotter
+- **lvalen91/CPC200-CCPA-Firmware-Dump** by Tachi91
+- **ludwig-v/wireless-carplay-dongle-reverse-engineering** by Ludwig
 - **rhysmorgan134/node-carplay** by Rhys Morgan
-- **rhysmorgan134/react-carplay** by Rhys Morgan
 - **OllieJones/h264-interp-utils** by Ollie Jones
-- **BoostedMoose/v-link** by Louis and Tigo
-- **electron/electron** — based on the Chromium project
 - Various Carlinkit / CPC200 reverse-engineering projects, websites, and community write-ups
 
 This list is likely incomplete — many thanks to everyone whose work contributed,
 directly or indirectly.
-
----
 
 # Third-Party Components
 
@@ -34,7 +28,6 @@ directly or indirectly.
 This application bundles parts of the **GStreamer multimedia framework**.
 
 GStreamer is licensed under the **GNU Lesser General Public License (LGPL), version 2.1 or later**.
-
 The license text is included in the `assets/gstreamer/LICENSES` directory.
 
 https://gstreamer.freedesktop.org/

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Box } from '@mui/material'
 import { useLiviStore } from '@store/store'
 import { useTheme, alpha } from '@mui/material/styles'
+import { createFftWorker } from './createFftWorker'
 
 // Configuration
 const POINTS = 24
@@ -12,6 +13,10 @@ const MIN_FREQ = 20
 const MAX_FREQ = 20000
 const SPECTRUM_WIDTH_RATIO = 0.92
 const TARGET_FPS = 30
+
+export const normalizePcmBuffer = (pcm: Float32Array | ArrayLike<number>) => {
+  return pcm instanceof Float32Array ? pcm.slice() : new Float32Array(pcm)
+}
 
 export const FFTSpectrum = () => {
   const theme = useTheme()
@@ -38,9 +43,7 @@ export const FFTSpectrum = () => {
   const timeoutsRef = useRef<number[]>([])
 
   useEffect(() => {
-    const worker = new Worker(new URL('@worker/fft.worker.ts', import.meta.url), {
-      type: 'module'
-    })
+    const worker = createFftWorker()
     workerRef.current = worker
     worker.postMessage({
       type: 'init',
@@ -64,8 +67,7 @@ export const FFTSpectrum = () => {
       const worker = workerRef.current
       if (!worker || !pcm || pcm.length === 0) return
 
-      // Copy to avoid transferring the buffer from the store directly
-      const buf = pcm instanceof Float32Array ? pcm.slice() : new Float32Array(pcm)
+      const buf = normalizePcmBuffer(pcm)
 
       if (visualAudioDelayMs > 0) {
         const id = window.setTimeout(() => {
@@ -87,10 +89,12 @@ export const FFTSpectrum = () => {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+
     const update = () => {
       const { width, height } = canvas.getBoundingClientRect()
       setDimensions({ width, height })
     }
+
     const obs = new ResizeObserver(update)
     obs.observe(canvas)
     return () => obs.disconnect()
@@ -148,6 +152,7 @@ export const FFTSpectrum = () => {
   useEffect(() => {
     let rafId = 0
     let last = 0
+
     const draw = () => {
       rafId = requestAnimationFrame(draw)
       const now = performance.now()
@@ -158,6 +163,7 @@ export const FFTSpectrum = () => {
       if (!canvas) return
       const ctx = canvas.getContext('2d')!
       const { width: cw, height: ch } = dimensions
+
       if (canvas.width !== cw || canvas.height !== ch) {
         canvas.width = cw
         canvas.height = ch
@@ -177,8 +183,12 @@ export const FFTSpectrum = () => {
         ctx.fillRect(x, usableH - h, barW * 0.8, h)
       }
     }
+
     draw()
-    return () => cancelAnimationFrame(rafId)
+
+    return () => {
+      globalThis.cancelAnimationFrame?.(rafId)
+    }
   }, [dimensions, barColor])
 
   return (

@@ -781,19 +781,23 @@ export class NALUStream {
    * @returns iterator
    */
 
-  nextAnnexBPacket(buf: Uint8Array, p: number, _: number) {
+  nextAnnexBPacket(buf: Uint8Array, p: number, _: number): NextPackageResult {
     const buflen = buf.byteLength
     const start = p
-    if (p === buflen) return { n: -1, s: start, e: p }
-    while (p < buflen) {
+
+    while (true) {
+      if (p === buflen) return { n: -1, s: start, e: p }
       if (p + 2 > buflen) return { n: -1, s: start, e: buflen }
+
       if (buf[p] === 0 && buf[p + 1] === 0) {
         const d = buf[p + 2]
+
         if (d === 1) {
           /* 00 00 01 found */
           return { n: p + 3, s: start, e: p }
         } else if (d === 0) {
           if (p + 3 > buflen) return { n: -1, s: start, e: buflen }
+
           const e = buf[p + 3]
           if (e === 1) {
             /* 00 00 00 01 found */
@@ -801,9 +805,9 @@ export class NALUStream {
           }
         }
       }
+
       p++
     }
-    return { n: -1, s: start, e: p }
   }
 
   /**
@@ -989,7 +993,7 @@ export class SPS {
 
     if (!this.has_no_chroma_format_idc) {
       this.chroma_format_idc = bitstream.ue_v()
-      if (this.bit_depth_luma_minus8 && this.bit_depth_luma_minus8 > 3)
+      if (this.chroma_format_idc > 3)
         throw new Error('SPS error: chroma_format_idc must be 3 or less')
       if (this.chroma_format_idc === 3) {
         /* 3 = YUV444 */

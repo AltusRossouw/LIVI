@@ -206,4 +206,235 @@ describe('useFocus', () => {
     expect(result.current.moveFocusLinear(-1)).toBe(true)
     expect(document.activeElement).toBe(first)
   })
+
+  test('returns false when nav root is missing', () => {
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({ isTouchDevice: false, navEl: { current: null } as any })
+    })
+
+    expect(result.current.focusSelectedNav()).toBe(false)
+  })
+
+  test('returns false when no focusable target exists in main', () => {
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+    document.body.appendChild(contentRoot)
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any
+      })
+    })
+
+    expect(result.current.focusFirstInMain()).toBe(false)
+  })
+
+  test('moveFocusLinear returns false when there are no focusable elements', () => {
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+    document.body.appendChild(contentRoot)
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: null },
+        onSetAppContext: jest.fn()
+      })
+    })
+
+    expect(result.current.moveFocusLinear(1)).toBe(false)
+  })
+
+  test('moveFocusLinear focuses first item when active element is not in the list', () => {
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+
+    const first = document.createElement('button')
+    const second = document.createElement('button')
+    first.scrollIntoView = jest.fn()
+    second.scrollIntoView = jest.fn()
+
+    contentRoot.appendChild(first)
+    contentRoot.appendChild(second)
+    document.body.appendChild(contentRoot)
+
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    outside.focus()
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: 'x' },
+        onSetAppContext: jest.fn()
+      })
+    })
+
+    expect(result.current.moveFocusLinear(1)).toBe(true)
+    expect(document.activeElement).toBe(first)
+  })
+
+  test('moveFocusLinear uses scrollIntoView when there is no scrolled wrapper', () => {
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+
+    const first = document.createElement('button')
+    const second = document.createElement('button')
+    contentRoot.appendChild(first)
+    contentRoot.appendChild(second)
+    document.body.appendChild(contentRoot)
+
+    const scrollIntoViewSpy = jest.fn()
+    second.scrollIntoView = scrollIntoViewSpy
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: null },
+        onSetAppContext: jest.fn()
+      })
+    })
+
+    first.focus()
+
+    expect(result.current.moveFocusLinear(1)).toBe(true)
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(document.activeElement).toBe(second)
+  })
+
+  test('moveFocusLinear resets scrolled wrapper to top when next element is outside it', () => {
+    const onSetAppContext = jest.fn()
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+
+    const scrolledWrapper = document.createElement('div')
+    scrolledWrapper.setAttribute('data-scrolled-wrapper', 'true')
+    scrolledWrapper.scrollTop = 123
+    contentRoot.appendChild(scrolledWrapper)
+
+    const first = document.createElement('button')
+    const outside = document.createElement('button')
+
+    scrolledWrapper.appendChild(first)
+    contentRoot.appendChild(outside)
+
+    document.body.appendChild(contentRoot)
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: 'x' },
+        onSetAppContext
+      })
+    })
+
+    first.focus()
+
+    expect(result.current.moveFocusLinear(1)).toBe(true)
+    expect(scrolledWrapper.scrollTop).toBe(0)
+    expect(document.activeElement).toBe(outside)
+  })
+
+  test('moveFocusLinear returns false when moving past the list bounds', () => {
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+
+    const only = document.createElement('button')
+    contentRoot.appendChild(only)
+    document.body.appendChild(contentRoot)
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: null },
+        onSetAppContext: jest.fn()
+      })
+    })
+
+    only.focus()
+
+    expect(result.current.moveFocusLinear(1)).toBe(false)
+    expect(result.current.moveFocusLinear(-1)).toBe(false)
+  })
+
+  test('moveFocusLinear scrolls scrolled wrapper up when next element is above viewport', () => {
+    const onSetAppContext = jest.fn()
+    const contentRoot = document.createElement('div')
+    contentRoot.id = 'content-root'
+
+    const scrolledWrapper = document.createElement('div')
+    scrolledWrapper.setAttribute('data-scrolled-wrapper', 'true')
+    scrolledWrapper.scrollTop = 100
+    contentRoot.appendChild(scrolledWrapper)
+
+    const first = document.createElement('button')
+    const second = document.createElement('button')
+    scrolledWrapper.appendChild(first)
+    scrolledWrapper.appendChild(second)
+
+    document.body.appendChild(contentRoot)
+
+    Object.defineProperty(first, 'getBoundingClientRect', {
+      value: () => ({
+        top: 20,
+        bottom: 40,
+        left: 0,
+        right: 0,
+        width: 10,
+        height: 20,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      })
+    })
+
+    Object.defineProperty(second, 'getBoundingClientRect', {
+      value: () => ({
+        top: -30,
+        bottom: -10,
+        left: 0,
+        right: 0,
+        width: 10,
+        height: 20,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      })
+    })
+
+    Object.defineProperty(scrolledWrapper, 'getBoundingClientRect', {
+      value: () => ({
+        top: 0,
+        bottom: 80,
+        left: 0,
+        right: 0,
+        width: 100,
+        height: 80,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      })
+    })
+
+    const { result } = renderHook(() => useFocus(), {
+      wrapper: wrapperWithContext({
+        isTouchDevice: false,
+        contentEl: { current: contentRoot } as any,
+        keyboardNavigation: { focusedElId: 'x' },
+        onSetAppContext
+      })
+    })
+
+    first.focus()
+
+    expect(result.current.moveFocusLinear(1)).toBe(true)
+    expect(scrolledWrapper.scrollTop).toBe(70)
+    expect(document.activeElement).toBe(second)
+  })
 })

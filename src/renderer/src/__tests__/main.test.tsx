@@ -222,4 +222,47 @@ describe('renderer main bootstrap', () => {
 
     expect(buildRuntimeThemeMock).not.toHaveBeenCalled()
   })
+
+  test('onSetAppContext merges the patch into previous app context state', () => {
+    const tree = renderRootDirectly()
+
+    const onSetAppContext = tree.props.value.onSetAppContext as (patch: {
+      isTouchDevice?: boolean
+    }) => void
+
+    onSetAppContext({ isTouchDevice: false })
+
+    expect(setStateMock).toHaveBeenCalledTimes(1)
+
+    const updater = setStateMock.mock.calls[0][0] as (prev: { isTouchDevice: boolean }) => {
+      isTouchDevice: boolean
+    }
+
+    expect(updater({ isTouchDevice: true })).toEqual({ isTouchDevice: false })
+  })
+
+  test('detects touch device via coarse pointer media query when maxTouchPoints is negative', () => {
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      value: -1
+    })
+
+    const matchMediaMock = jest.fn().mockReturnValue({
+      matches: true,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn()
+    })
+
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: matchMediaMock
+    })
+
+    renderRootDirectly()
+
+    expect(matchMediaMock).toHaveBeenCalledWith('(pointer: coarse)')
+  })
 })

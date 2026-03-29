@@ -22,6 +22,8 @@ type CarplayUsbApi = {
 type CarplayIpcApi = {
   setVolume?: (stream: VolumeStreamKey, volume: number) => void
   setBluetoothPairedList?: (listText: string) => Promise<{ ok: boolean }>
+  connectBluetoothPairedDevice?: (mac: string) => Promise<{ ok: boolean }> | { ok: boolean } | void
+  forgetBluetoothPairedDevice?: (mac: string) => Promise<{ ok: boolean }> | { ok: boolean } | void
   sendCommand?: (command: string) => void
   onTelemetry?: (handler: (payload: unknown) => void) => void
   offTelemetry?: (handler: (payload: unknown) => void) => void
@@ -205,8 +207,9 @@ export interface CarplayStore {
   bluetoothPairedDeleteNeedsRestart: boolean
   applyBluetoothPairedList: () => Promise<boolean>
 
-  // Local editing (delete)
-  removeBluetoothPairedDeviceLocal: (mac: string) => void
+  // BT (forget, connect)
+  forgetBluetoothPairedDevice: (mac: string) => Promise<boolean>
+  connectBluetoothPairedDevice: (mac: string) => Promise<boolean>
 
   // Reconstruct text payload to send back to dongle
   buildBluetoothPairedListText: () => string
@@ -282,31 +285,45 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
       })
     },
 
-    removeBluetoothPairedDeviceLocal: (mac) =>
-      set((s) => {
-        const next = s.bluetoothPairedDevices.filter((d) => d.mac !== mac)
+    forgetBluetoothPairedDevice: async (mac) => {
+      const api = getProjectionApi()
+      if (!api?.ipc?.forgetBluetoothPairedDevice) return false
 
-        const boxInfo = get().boxInfo
-        const connected =
-          boxInfo &&
-          typeof boxInfo === 'object' &&
-          'btMacAddr' in boxInfo &&
-          typeof (boxInfo as { btMacAddr?: unknown }).btMacAddr === 'string'
-            ? (boxInfo as { btMacAddr: string }).btMacAddr
-            : undefined
-        const connectedMac = typeof connected === 'string' ? connected.trim().toUpperCase() : null
-        const deletedMac = String(mac).trim().toUpperCase()
+      try {
+        const res = await api.ipc.forgetBluetoothPairedDevice(mac)
+        const ok = Boolean(res && typeof res === 'object' && 'ok' in res ? res.ok : true)
 
-        const deletedIsConnected = connectedMac != null && deletedMac === connectedMac
-
-        return {
-          bluetoothPairedDevices: next,
-          bluetoothPairedListRaw: buildBluetoothPairedListFromDevices(next),
-          bluetoothPairedDirty: true,
-          bluetoothPairedDeleteNeedsRestart:
-            s.bluetoothPairedDeleteNeedsRestart || deletedIsConnected
+        if (ok) {
+          set((s) => {
+            const next = s.bluetoothPairedDevices.filter((d) => d.mac !== mac)
+            return {
+              bluetoothPairedDevices: next,
+              bluetoothPairedListRaw: buildBluetoothPairedListFromDevices(next),
+              bluetoothPairedDirty: false,
+              bluetoothPairedDeleteNeedsRestart: false
+            }
+          })
         }
-      }),
+
+        return ok
+      } catch (err) {
+        console.warn('[BT] forgetBluetoothPairedDevice failed', err)
+        return false
+      }
+    },
+
+    connectBluetoothPairedDevice: async (mac) => {
+      const api = getProjectionApi()
+      if (!api?.ipc?.connectBluetoothPairedDevice) return false
+
+      try {
+        const res = await api.ipc.connectBluetoothPairedDevice(mac)
+        return Boolean(res && typeof res === 'object' && 'ok' in res ? res.ok : true)
+      } catch (err) {
+        console.warn('[BT] connectBluetoothPairedDevice failed', err)
+        return false
+      }
+    },
 
     buildBluetoothPairedListText: () => {
       const { bluetoothPairedDevices } = get()
@@ -456,7 +473,6 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
 
         const mergeObjects = (a: unknown, b: unknown) => {
           if (!a || typeof a !== 'object') return b
-          if (!b || typeof b !== 'object') return a
           return { ...(a as Record<string, unknown>), ...(b as Record<string, unknown>) }
         }
 
@@ -519,6 +535,8 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
         vendorId: null,
         productId: null,
         usbFwVersion: null,
+        dongleFwVersion: null,
+        boxInfo: null,
         audioCodec: null,
         audioSampleRate: null,
         audioChannels: null,

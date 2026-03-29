@@ -162,11 +162,6 @@ export class USBService {
         return false
       }
 
-      if (process.platform === 'darwin') {
-        console.log('[USBService] macOS detected – using graceful reset')
-        return this.gracefulReset()
-      }
-
       return this.forceReset()
     })
 

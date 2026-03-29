@@ -22,6 +22,8 @@ import {
   SendServerCgiScript,
   SendLiviWeb,
   SendDisconnectPhone,
+  SendAutoConnectByBtAddress,
+  SendForgetBluetoothAddr,
   SendCloseDongle,
   FileAddress,
   DongleDriver,
@@ -131,6 +133,8 @@ export class ProjectionService {
   private mapsRequested = false
   private lastPluggedPhoneType?: PhoneType
   private aaPlaybackInferred: 1 | 2 = 1
+  private pendingReconnectBtMac: string | null = null
+  private shouldReconnectToPendingBtMac = false
 
   private audio: ProjectionAudio
 
@@ -235,7 +239,19 @@ export class ProjectionService {
         this.clearTimeouts()
         this.lastPluggedPhoneType = undefined
         this.aaPlaybackInferred = 1
+
+        if (isRecord(this.boxInfo)) {
+          this.boxInfo = { ...this.boxInfo, btMacAddr: '' }
+        }
+
         this.webContents.send('projection-event', { type: 'unplugged' })
+        this.webContents.send('projection-event', {
+          type: 'dongleInfo',
+          payload: {
+            dongleFwVersion: this.dongleFwVersion,
+            boxInfo: this.boxInfo
+          }
+        })
         this.resetNavigationSnapshot('unplugged')
 
         if (!this.shuttingDown && !this.stopping) {
@@ -470,6 +486,28 @@ export class ProjectionService {
       if (!this.started) return { ok: false }
       const ok = await this.driver.sendBluetoothPairedList(String(listText ?? ''))
       return { ok }
+    })
+
+    registerIpcHandle('projection-bt-connect-device', async (_evt, mac: string) => {
+      if (!this.started) return { ok: false }
+
+      const btMac = String(mac ?? '').trim()
+      if (!btMac) return { ok: false }
+
+      this.pendingReconnectBtMac = btMac
+      this.shouldReconnectToPendingBtMac = true
+
+      return { ok: true }
+    })
+
+    registerIpcHandle('projection-bt-forget-device', async (_evt, mac: string) => {
+      if (!this.started) return { ok: false }
+
+      const btMac = String(mac ?? '').trim()
+      if (!btMac) return { ok: false }
+
+      const ok = await this.driver.send(new SendForgetBluetoothAddr(btMac))
+      return { ok: Boolean(ok) }
     })
 
     registerIpcHandle('projection-upload-icons', async () => {
@@ -1029,7 +1067,9 @@ export class ProjectionService {
         this.audio.resetForSessionStart()
 
         this.dongleFwVersion = undefined
-        this.boxInfo = undefined
+        if (isRecord(this.boxInfo)) {
+          this.boxInfo = { ...this.boxInfo, btMacAddr: '' }
+        }
         this.lastDongleInfoEmitKey = ''
         this.lastVideoWidth = undefined
         this.lastVideoHeight = undefined
@@ -1061,6 +1101,19 @@ export class ProjectionService {
           }, 15000)
 
           this.started = true
+
+          if (this.shouldReconnectToPendingBtMac && this.pendingReconnectBtMac) {
+            const targetMac = this.pendingReconnectBtMac
+            this.shouldReconnectToPendingBtMac = false
+
+            setTimeout(() => {
+              try {
+                this.driver.send(new SendAutoConnectByBtAddress(targetMac))
+              } catch (e) {
+                console.warn('[ProjectionService] pending BT reconnect failed', e)
+              }
+            }, 300)
+          }
         } catch {
           try {
             await this.webUsbDevice?.close()
@@ -1081,6 +1134,7 @@ export class ProjectionService {
     if (!this.started) return false
 
     let ok = false
+
     try {
       ok = (await this.driver.send(new SendDisconnectPhone())) || ok
     } catch (e) {
@@ -1133,7 +1187,9 @@ export class ProjectionService {
       this.resetNavigationSnapshot('session-stop')
 
       this.dongleFwVersion = undefined
-      this.boxInfo = undefined
+      if (isRecord(this.boxInfo)) {
+        this.boxInfo = { ...this.boxInfo, btMacAddr: '' }
+      }
       this.lastDongleInfoEmitKey = ''
       this.lastVideoWidth = undefined
       this.lastVideoHeight = undefined

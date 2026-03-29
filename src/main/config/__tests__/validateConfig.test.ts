@@ -37,4 +37,31 @@ describe('validate', () => {
       list: []
     })
   })
+
+  test('uses empty object as source when input is not an object', () => {
+    const schema = {
+      width: 800,
+      title: 'LIVI'
+    }
+
+    expect(validate(null, schema)).toEqual(schema)
+    expect(validate('invalid', schema)).toEqual(schema)
+  })
+
+  test('keeps array value when schema default and input value are both arrays', () => {
+    const schema = {
+      list: [] as string[]
+    }
+
+    const result = validate(
+      {
+        list: ['a', 'b', 'c']
+      },
+      schema
+    )
+
+    expect(result).toEqual({
+      list: ['a', 'b', 'c']
+    })
+  })
 })

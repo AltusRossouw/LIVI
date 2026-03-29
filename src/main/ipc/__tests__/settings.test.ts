@@ -119,4 +119,101 @@ describe('registerSettingsIpc', () => {
 
     warnSpy.mockRestore()
   })
+
+  test('requestSave event handler delegates to saveSettings', () => {
+    registerSettingsIpc(runtimeState)
+
+    const requestSaveHandler = (configEvents.on as jest.Mock).mock.calls.find(
+      ([event]) => event === 'requestSave'
+    )?.[1] as ((settings: Partial<Record<string, unknown>>) => void) | undefined
+
+    if (!requestSaveHandler) {
+      throw new Error('requestSave handler not registered')
+    }
+
+    const patch = { language: 'uk' }
+    requestSaveHandler(patch)
+
+    expect(saveSettings).toHaveBeenCalledWith(runtimeState, patch)
+  })
+
+  test('settings:reset-dongle-icons restores bundled icon defaults and returns them', () => {
+    const richRuntimeState = {
+      config: {
+        kiosk: true,
+        dongleIcon120: 'old-120',
+        dongleIcon180: 'old-180',
+        dongleIcon256: 'old-256'
+      }
+    } as never
+
+    registerSettingsIpc(richRuntimeState)
+
+    const handler = getHandler<
+      () => {
+        dongleIcon120: string
+        dongleIcon180: string
+        dongleIcon256: string
+      }
+    >('settings:reset-dongle-icons')
+
+    const result = handler()
+
+    expect(saveSettings).toHaveBeenCalledWith(
+      richRuntimeState,
+      expect.objectContaining({
+        dongleIcon120: expect.any(String),
+        dongleIcon180: expect.any(String),
+        dongleIcon256: expect.any(String)
+      })
+    )
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        dongleIcon120: expect.any(String),
+        dongleIcon180: expect.any(String),
+        dongleIcon256: expect.any(String)
+      })
+    )
+  })
+
+  test('app:getLatestRelease falls back to json.name when tag_name is missing', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        name: 'v2.3.4',
+        assets: [{ name: 'LIVI-x86_64.AppImage', browser_download_url: 'https://example.com/a' }]
+      })
+    })
+    ;(global as any).fetch = fetchMock
+
+    registerSettingsIpc(runtimeState)
+    const handler =
+      getHandler<() => Promise<{ version: string; url?: string }>>('app:getLatestRelease')
+
+    const result = await handler()
+
+    expect(pickAssetForPlatform).toHaveBeenCalledWith([
+      { name: 'LIVI-x86_64.AppImage', browser_download_url: 'https://example.com/a' }
+    ])
+    expect(result).toEqual({ version: '2.3.4', url: 'https://example.com/LIVI.AppImage' })
+  })
+
+  test('app:getLatestRelease falls back to empty version and empty assets array', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({})
+    })
+    ;(global as any).fetch = fetchMock
+    ;(pickAssetForPlatform as jest.Mock).mockReturnValueOnce({ url: undefined })
+
+    registerSettingsIpc(runtimeState)
+    const handler =
+      getHandler<() => Promise<{ version: string; url?: string }>>('app:getLatestRelease')
+
+    const result = await handler()
+
+    expect(pickAssetForPlatform).toHaveBeenCalledWith([])
+    expect(result).toEqual({ version: '', url: undefined })
+  })
 })

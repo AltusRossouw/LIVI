@@ -188,4 +188,37 @@ describe('translateNavigation', () => {
     expect(result.DistanceRemainingDisplayStringText).toBeUndefined()
     expect(result.RemainDistanceText).toBeUndefined()
   })
+
+  test.each([
+    [3, 'Go straight'],
+    [4, 'Make a U-turn'],
+    [5, 'Continue on the current road'],
+    [6, 'Enter roundabout'],
+    [7, 'Exit roundabout'],
+    [8, 'Exit highway'],
+    [9, 'Merge onto highway'],
+    [10, 'End of navigation'],
+    [11, 'Proceed to the route'],
+    [12, 'Arrived'],
+    [13, 'Keep left'],
+    [14, 'Keep right'],
+    [15, 'Enter ferry'],
+    [16, 'Exit ferry'],
+    [17, 'Change ferry'],
+    [18, 'Make a U-turn to rejoin the route'],
+    [19, 'Use the roundabout to make a U-turn'],
+    [20, 'At the end of the road, turn left'],
+    [21, 'At the end of the road, turn right'],
+    [22, 'Exit highway on the left'],
+    [23, 'Exit highway on the right'],
+    [24, 'Arrived (left)'],
+    [25, 'Arrived (right)'],
+    [27, 'End of directions'],
+    [49, 'Slight left'],
+    [50, 'Slight right'],
+    [51, 'Change highway'],
+    [52, 'Change highway (left)']
+  ])('maps maneuver code %i to %s', (code, expected) => {
+    expect(translateNavigation({ NaviManeuverType: code }, 'en').ManeuverTypeText).toBe(expected)
+  })
 })

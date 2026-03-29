@@ -54,4 +54,101 @@ describe('theme module', () => {
     expect(v).not.toBe('')
     jest.useRealTimers()
   })
+
+  test('buildRuntimeTheme falls back to default highlight when only primary is provided', () => {
+    const theme = buildRuntimeTheme(THEME.DARK, '#112233')
+
+    expect(theme.palette.primary.main).toBe('#112233')
+    expect(typeof theme.palette.secondary.main).toBe('string')
+    expect(theme.palette.secondary.main).not.toBe('')
+  })
+
+  test('buildRuntimeTheme falls back to default primary when only highlight is provided', () => {
+    const theme = buildRuntimeTheme(THEME.LIGHT, undefined, '#aabbcc')
+
+    expect(theme.palette.secondary.main).toBe('#aabbcc')
+    expect(typeof theme.palette.primary.main).toBe('string')
+    expect(theme.palette.primary.main).not.toBe('')
+  })
+
+  test('initUiBreatheClock does nothing on second call', () => {
+    jest.useFakeTimers()
+
+    const setPropertySpy = jest.spyOn(document.documentElement.style, 'setProperty')
+
+    initUiBreatheClock()
+    const callsAfterFirstStart = setPropertySpy.mock.calls.length
+
+    initUiBreatheClock()
+    const callsAfterSecondStart = setPropertySpy.mock.calls.length
+
+    expect(callsAfterSecondStart).toBe(callsAfterFirstStart)
+
+    jest.useRealTimers()
+  })
+
+  test('initUiBreatheClock updates opacity across multiple animation phases', () => {
+    jest.useFakeTimers()
+
+    const perfSpy = jest.spyOn(performance, 'now')
+    perfSpy
+      .mockReturnValueOnce(0) // start
+      .mockReturnValueOnce(100) // rising
+      .mockReturnValueOnce(700) // plateau
+      .mockReturnValueOnce(1100) // falling
+      .mockReturnValueOnce(1500) // zero phase
+
+    initUiBreatheClock()
+
+    const first = document.documentElement.style.getPropertyValue('--ui-breathe-opacity')
+
+    jest.advanceTimersByTime(42)
+    const second = document.documentElement.style.getPropertyValue('--ui-breathe-opacity')
+
+    jest.advanceTimersByTime(42)
+    const third = document.documentElement.style.getPropertyValue('--ui-breathe-opacity')
+
+    jest.advanceTimersByTime(42)
+    const fourth = document.documentElement.style.getPropertyValue('--ui-breathe-opacity')
+
+    expect(first).not.toBe('')
+    expect(second).not.toBe('')
+    expect(third).not.toBe('')
+    expect(fourth).not.toBe('')
+
+    perfSpy.mockRestore()
+    jest.useRealTimers()
+  })
+
+  test('initUiBreatheClock covers plateau, falling and zero wave phases', () => {
+    jest.resetModules()
+    jest.useFakeTimers()
+
+    const perfSpy = jest.spyOn(performance, 'now')
+    perfSpy
+      .mockReturnValueOnce(0) // start
+      .mockReturnValueOnce(700) // p = 700 / 1600 = 0.4375  -> wave = 1
+      .mockReturnValueOnce(1100) // p = 1100 / 1600 = 0.6875 -> falling branch
+      .mockReturnValueOnce(1500) // p = 1500 / 1600 = 0.9375 -> wave = 0
+
+    const { initUiBreatheClock } = require('../theme') as typeof import('../theme')
+
+    initUiBreatheClock()
+
+    expect(document.documentElement.style.getPropertyValue('--ui-breathe-opacity')).toBe('1.000')
+
+    jest.advanceTimersByTime(42)
+    expect(document.documentElement.style.getPropertyValue('--ui-breathe-opacity')).not.toBe(
+      '1.000'
+    )
+    expect(document.documentElement.style.getPropertyValue('--ui-breathe-opacity')).not.toBe(
+      '0.180'
+    )
+
+    jest.advanceTimersByTime(42)
+    expect(document.documentElement.style.getPropertyValue('--ui-breathe-opacity')).toBe('0.180')
+
+    perfSpy.mockRestore()
+    jest.useRealTimers()
+  })
 })

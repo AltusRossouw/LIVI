@@ -435,4 +435,297 @@ describe('AudioOutput', () => {
     expect(cls.resolveGStreamerRoot()).toBe('/mock/resources/gstreamer/linux-x64')
     ;(app as any).isPackaged = false
   })
+
+  test('constructor normalizes fractional and negative channel counts', () => {
+    const a = new AudioOutput({ sampleRate: 48000, channels: 2.9, mode: 'music' }) as any
+    const b = new AudioOutput({ sampleRate: 48000, channels: -3, mode: 'music' }) as any
+
+    expect(a.channels).toBe(2)
+    expect(b.channels).toBe(1)
+  })
+
+  test('write flushes immediately only when not already writing', () => {
+    const proc = makeProc()
+    ;(spawn as jest.Mock).mockReturnValue(proc)
+
+    const out = new AudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' }) as any
+    out.start()
+    out.writing = true
+
+    out.write(Buffer.from([1, 2, 3, 4]))
+
+    expect(proc.stdin.write).not.toHaveBeenCalled()
+    expect(out.queue).toHaveLength(1)
+  })
+
+  test('stop does not end stdin when stdin is already destroyed', () => {
+    const proc = makeProc()
+    proc.stdin.destroyed = true
+    ;(spawn as jest.Mock).mockReturnValue(proc)
+
+    const out = new AudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' })
+    out.start()
+    out.stop()
+
+    expect(proc.stdin.end).not.toHaveBeenCalled()
+    expect(proc.kill).toHaveBeenCalledTimes(1)
+  })
+
+  test('resolveGStreamerRoot returns null when supported platform dir does not exist', () => {
+    const cls = AudioOutput as any
+
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+    Object.defineProperty(process, 'arch', { value: 'x64' })
+    ;(app as any).isPackaged = false
+    ;(app.getAppPath as jest.Mock).mockReturnValue('/mock/app')
+    ;(fs.existsSync as jest.Mock).mockReturnValue(false)
+
+    expect(cls.resolveGStreamerRoot()).toBeNull()
+  })
+
+  test('cleanup clears queue, writing flag and process', () => {
+    const out = new AudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' }) as any
+    out.process = makeProc()
+    out.queue = [Buffer.from([1]), Buffer.from([2])]
+    out.writing = true
+
+    out.cleanup()
+
+    expect(out.process).toBeNull()
+    expect(out.queue).toEqual([])
+    expect(out.writing).toBe(false)
+  })
+
+  test('linux realtime buildArgs uses pulsesink with sync=false and leaky queues', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+
+    const out = new AudioOutput({ sampleRate: 16000, channels: 1, mode: 'realtime' }) as any
+    const args = out.buildArgs()
+
+    expect(args).toEqual(expect.arrayContaining(['pulsesink', 'sync=false', 'leaky=downstream']))
+  })
+
+  test('emits debug logs for constructor, spawn, stdin error, drain, stderr, process error and close when DEBUG is enabled', () => {
+    jest.resetModules()
+
+    jest.doMock('@main/constants', () => ({
+      DEBUG: true
+    }))
+
+    const { spawn: freshSpawn } = require('child_process') as { spawn: jest.Mock }
+    const freshFs = require('fs') as { existsSync: jest.Mock }
+    const { app: freshApp } = require('electron') as {
+      app: { isPackaged: boolean; getAppPath: jest.Mock }
+    }
+
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+      configurable: true
+    })
+    Object.defineProperty(process, 'arch', {
+      value: 'arm64',
+      configurable: true
+    })
+
+    freshApp.isPackaged = false
+    freshApp.getAppPath.mockReturnValue('/mock/app')
+    freshFs.existsSync.mockImplementation((p: fs.PathLike) =>
+      String(p).includes('/mock/app/assets/gstreamer/macos-arm64')
+    )
+
+    const { AudioOutput: DebugAudioOutput } =
+      require('@main/services/audio/AudioOutput') as typeof import('@main/services/audio/AudioOutput')
+
+    const proc = makeProc()
+    freshSpawn.mockReturnValue(proc)
+
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => undefined)
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    const out = new DebugAudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' })
+    out.start()
+
+    proc.stdin.emit('error', new Error('stdin failed'))
+    proc.stdin.emit('drain')
+    proc.stderr.emit('data', Buffer.from('gst stderr'))
+    proc.emit('error', new Error('proc failed'))
+    proc.emit('close', 0, null)
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] Init',
+      expect.objectContaining({
+        sampleRate: 48000,
+        channels: 2,
+        mode: 'music',
+        platform: 'darwin'
+      })
+    )
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] Spawning',
+      '/mock/app/assets/gstreamer/macos-arm64/bin/gst-launch-1.0',
+      expect.any(String)
+    )
+
+    expect(warnSpy).toHaveBeenCalledWith('[AudioOutput] stdin error:', 'stdin failed')
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] stdin drain',
+      expect.objectContaining({
+        mode: 'music',
+        queueLength: expect.any(Number),
+        bytesWritten: expect.any(Number),
+        ts: expect.any(Number)
+      })
+    )
+
+    expect(warnSpy).toHaveBeenCalledWith('[AudioOutput] STDERR:', 'gst stderr')
+
+    expect(errorSpy).toHaveBeenCalledWith('[AudioOutput] process error:', expect.any(Error))
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] process exited',
+      expect.objectContaining({
+        code: 0,
+        signal: null,
+        mode: 'music',
+        bytesWritten: expect.any(Number),
+        ts: expect.any(Number)
+      })
+    )
+  })
+
+  test('logs write queued on first and hundredth write and warns on stdin backpressure when DEBUG is enabled', () => {
+    jest.resetModules()
+
+    jest.doMock('@main/constants', () => ({
+      DEBUG: true
+    }))
+
+    const { spawn: freshSpawn } = require('child_process') as { spawn: jest.Mock }
+    const freshFs = require('fs') as { existsSync: jest.Mock }
+    const { app: freshApp } = require('electron') as {
+      app: { isPackaged: boolean; getAppPath: jest.Mock }
+    }
+
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+      configurable: true
+    })
+    Object.defineProperty(process, 'arch', {
+      value: 'arm64',
+      configurable: true
+    })
+
+    freshApp.isPackaged = false
+    freshApp.getAppPath.mockReturnValue('/mock/app')
+    freshFs.existsSync.mockImplementation((p: fs.PathLike) =>
+      String(p).includes('/mock/app/assets/gstreamer/macos-arm64')
+    )
+
+    const { AudioOutput: DebugAudioOutput } =
+      require('@main/services/audio/AudioOutput') as typeof import('@main/services/audio/AudioOutput')
+
+    const proc = makeProc()
+    proc.stdin.write
+      .mockReturnValueOnce(false) // first write => backpressure
+      .mockReturnValue(true)
+
+    freshSpawn.mockReturnValue(proc)
+
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => undefined)
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const out = new DebugAudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' })
+    out.start()
+
+    out.write(Buffer.from([1, 2, 3, 4]))
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] write queued',
+      expect.objectContaining({
+        seq: 1,
+        chunkBytes: 4,
+        queueLength: 1,
+        ts: expect.any(Number)
+      })
+    )
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[AudioOutput] stdin backpressure',
+      expect.objectContaining({
+        mode: 'music',
+        queueLength: 0,
+        bytesWritten: 4,
+        ts: expect.any(Number)
+      })
+    )
+
+    debugSpy.mockClear()
+
+    for (let i = 0; i < 99; i += 1) {
+      out.write(Buffer.from([9]))
+    }
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[AudioOutput] write queued',
+      expect.objectContaining({
+        seq: 100,
+        chunkBytes: 1,
+        ts: expect.any(Number)
+      })
+    )
+  })
+
+  test('warns when stdin.end and kill throw while stopping in DEBUG mode', () => {
+    jest.resetModules()
+
+    jest.doMock('@main/constants', () => ({
+      DEBUG: true
+    }))
+
+    const { spawn: freshSpawn } = require('child_process') as { spawn: jest.Mock }
+    const freshFs = require('fs') as { existsSync: jest.Mock }
+    const { app: freshApp } = require('electron') as {
+      app: { isPackaged: boolean; getAppPath: jest.Mock }
+    }
+
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+      configurable: true
+    })
+    Object.defineProperty(process, 'arch', {
+      value: 'arm64',
+      configurable: true
+    })
+
+    freshApp.isPackaged = false
+    freshApp.getAppPath.mockReturnValue('/mock/app')
+    freshFs.existsSync.mockImplementation((p: fs.PathLike) =>
+      String(p).includes('/mock/app/assets/gstreamer/macos-arm64')
+    )
+
+    const { AudioOutput: DebugAudioOutput } =
+      require('@main/services/audio/AudioOutput') as typeof import('@main/services/audio/AudioOutput')
+
+    const proc = makeProc()
+    proc.stdin.end.mockImplementation(() => {
+      throw new Error('end fail')
+    })
+    proc.kill.mockImplementation(() => {
+      throw new Error('kill fail')
+    })
+
+    freshSpawn.mockReturnValue(proc)
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    const out = new DebugAudioOutput({ sampleRate: 48000, channels: 2, mode: 'music' })
+    out.start()
+    out.stop()
+
+    expect(warnSpy).toHaveBeenCalledWith('[AudioOutput] failed to end stdin:', expect.any(Error))
+    expect(warnSpy).toHaveBeenCalledWith('[AudioOutput] failed to kill process:', expect.any(Error))
+  })
 })

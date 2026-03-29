@@ -872,6 +872,29 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           }
           break
         }
+
+        case 'plugged': {
+          setDongleConnected(true)
+          break
+        }
+
+        case 'unplugged': {
+          setStreaming(false)
+          setDongleConnected(false)
+          setReceivingVideo(false)
+          pendingVideoFocusRef.current = false
+          setNavVideoOverlayActive(false)
+          break
+        }
+
+        case 'failure': {
+          setStreaming(false)
+          setDongleConnected(false)
+          setReceivingVideo(false)
+          pendingVideoFocusRef.current = false
+          setNavVideoOverlayActive(false)
+          break
+        }
       }
     }
 
@@ -881,7 +904,9 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     gotoHostUI,
     setReceivingVideo,
     navigate,
+    setStreaming,
     isStreaming,
+    setDongleConnected,
     setNavVideoOverlayActive,
     applyAttention,
     rendererError,

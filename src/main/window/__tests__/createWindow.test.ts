@@ -363,4 +363,120 @@ describe('createMainWindow', () => {
 
     setImmediateSpy.mockRestore()
   })
+
+  test('permission request handler allows supported permission', () => {
+    const runtimeState = {
+      config: { width: 800, height: 480, kiosk: false, uiZoomPercent: 100 },
+      isQuitting: false
+    } as any
+    const services = { projectionService: { attachRenderer: jest.fn() } } as any
+
+    createMainWindow(runtimeState, services)
+
+    const win = browserWindowInstances[0]
+    const handler = win.webContents.session.setPermissionRequestHandler.mock.calls[0][0]
+    const cb = jest.fn()
+
+    handler({}, 'usb', cb)
+
+    expect(cb).toHaveBeenCalledWith(true)
+  })
+
+  test('permission request handler rejects unsupported permission', () => {
+    const runtimeState = {
+      config: { width: 800, height: 480, kiosk: false, uiZoomPercent: 100 },
+      isQuitting: false
+    } as any
+    const services = { projectionService: { attachRenderer: jest.fn() } } as any
+
+    createMainWindow(runtimeState, services)
+
+    const win = browserWindowInstances[0]
+    const handler = win.webContents.session.setPermissionRequestHandler.mock.calls[0][0]
+    const cb = jest.fn()
+
+    handler({}, 'notifications', cb)
+
+    expect(cb).toHaveBeenCalledWith(false)
+  })
+
+  test('usb protected classes handler keeps only allowed classes', () => {
+    const runtimeState = {
+      config: { width: 800, height: 480, kiosk: false, uiZoomPercent: 100 },
+      isQuitting: false
+    } as any
+    const services = { projectionService: { attachRenderer: jest.fn() } } as any
+
+    createMainWindow(runtimeState, services)
+
+    const win = browserWindowInstances[0]
+    const handler = win.webContents.session.setUSBProtectedClassesHandler.mock.calls[0][0]
+
+    const result = handler({
+      protectedClasses: ['audio', 'hid', 'video', 'mass-storage', 'vendor-specific']
+    })
+
+    expect(result).toEqual(['audio', 'video', 'vendor-specific'])
+  })
+
+  test('headers received handler injects COOP COEP and CORP headers', () => {
+    const runtimeState = {
+      config: { width: 800, height: 480, kiosk: false, uiZoomPercent: 100 },
+      isQuitting: false
+    } as any
+    const services = { projectionService: { attachRenderer: jest.fn() } } as any
+
+    createMainWindow(runtimeState, services)
+
+    const handler = (session.defaultSession.webRequest.onHeadersReceived as jest.Mock).mock
+      .calls[0][1]
+    const cb = jest.fn()
+
+    handler(
+      {
+        responseHeaders: {
+          Existing: ['x']
+        }
+      },
+      cb
+    )
+
+    expect(cb).toHaveBeenCalledWith({
+      responseHeaders: {
+        Existing: ['x'],
+        'Cross-Origin-Opener-Policy': ['same-origin'],
+        'Cross-Origin-Embedder-Policy': ['require-corp'],
+        'Cross-Origin-Resource-Policy': ['same-site']
+      }
+    })
+  })
+
+  test('ready-to-show enters fullscreen on mac when kiosk is configured', () => {
+    const setImmediateSpy = jest.spyOn(global, 'setImmediate').mockImplementation(((fn: any) => {
+      fn()
+      return 0 as any
+    }) as any)
+
+    ;(isMacPlatform as jest.Mock).mockReturnValue(true)
+
+    const runtimeState = {
+      config: { width: 800, height: 480, kiosk: true, uiZoomPercent: 100 },
+      isQuitting: false
+    } as any
+    const services = { projectionService: { attachRenderer: jest.fn() } } as any
+
+    createMainWindow(runtimeState, services)
+
+    const win = browserWindowInstances[0]
+    const readyHandler = win.once.mock.calls.find(
+      ([event]: any[]) => event === 'ready-to-show'
+    )?.[1]
+
+    readyHandler()
+
+    expect(win.setFullScreen).toHaveBeenCalledWith(true)
+    expect(win.setKiosk).not.toHaveBeenCalled()
+    ;(isMacPlatform as jest.Mock).mockReturnValue(false)
+    setImmediateSpy.mockRestore()
+  })
 })

@@ -223,4 +223,70 @@ describe('useMediaState', () => {
 
     expect(clamp).not.toHaveBeenCalled()
   })
+
+  it('reuses previous play time when incoming media event has no MediaSongPlayTime', () => {
+    let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
+    mockOnEvent.mockImplementationOnce((cb) => {
+      handler = cb
+      return jest.fn()
+    })
+    ;(payloadFromLiveEvent as jest.Mock)
+      .mockReturnValueOnce({
+        type: 1,
+        media: { MediaSongPlayTime: 123 }
+      })
+      .mockReturnValueOnce({
+        type: 1,
+        media: {}
+      })
+    ;(mergePayload as jest.Mock)
+      .mockReturnValueOnce({
+        type: 1,
+        media: { MediaSongPlayTime: 123 }
+      })
+      .mockReturnValueOnce({
+        type: 1,
+        media: {}
+      })
+
+    const { result } = renderHook(() => useMediaState(false))
+
+    act(() => {
+      handler({}, { type: 'media', payload: { payload: { media: { MediaSongPlayTime: 123 } } } })
+    })
+
+    expect(result.current.livePlayMs).toBe(123)
+    expect(result.current.snap?.payload.media?.MediaSongPlayTime).toBe(123)
+
+    act(() => {
+      handler({}, { type: 'media', payload: { payload: { media: {} } } })
+    })
+
+    expect(result.current.livePlayMs).toBe(123)
+    expect(result.current.snap?.payload.media?.MediaSongPlayTime).toBeUndefined()
+  })
+
+  it('falls back to 0 when incoming media event has no MediaSongPlayTime and previous play time is not a number', () => {
+    let handler: (ev: unknown, ...args: unknown[]) => void = () => {}
+    mockOnEvent.mockImplementationOnce((cb) => {
+      handler = cb
+      return jest.fn()
+    })
+    ;(payloadFromLiveEvent as jest.Mock).mockReturnValue({
+      type: 1,
+      media: {}
+    })
+    ;(mergePayload as jest.Mock).mockReturnValue({
+      type: 1,
+      media: {}
+    })
+
+    const { result } = renderHook(() => useMediaState(false))
+
+    act(() => {
+      handler({}, { type: 'media', payload: { payload: { media: {} } } })
+    })
+
+    expect(result.current.livePlayMs).toBe(0)
+  })
 })

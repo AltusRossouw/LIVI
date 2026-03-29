@@ -25,4 +25,48 @@ describe('useActiveControl', () => {
     expect(result.current(el)).toBe(true)
     expect(dispatch).toHaveBeenCalled()
   })
+
+  test('dispatches click event for non-switch, non-dropdown elements without click function', () => {
+    const { result } = renderHook(() => useActiveControl())
+    const el = document.createElement('div')
+
+    Object.defineProperty(el, 'click', {
+      value: undefined,
+      configurable: true
+    })
+
+    const dispatch = jest.spyOn(el, 'dispatchEvent')
+
+    expect(result.current(el)).toBe(true)
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    expect(dispatch.mock.calls[0][0]).toEqual(expect.any(MouseEvent))
+    expect(dispatch.mock.calls[0][0].type).toBe('click')
+  })
+
+  test('returns false when fallback click dispatchEvent returns false', () => {
+    const { result } = renderHook(() => useActiveControl())
+    const el = document.createElement('div')
+
+    Object.defineProperty(el, 'click', {
+      value: undefined,
+      configurable: true
+    })
+
+    jest.spyOn(el, 'dispatchEvent').mockReturnValue(false)
+
+    expect(result.current(el)).toBe(false)
+  })
+
+  test('clicks closest clickable ancestor before falling back to the element itself', () => {
+    const { result } = renderHook(() => useActiveControl())
+
+    const button = document.createElement('button')
+    const child = document.createElement('span')
+    button.appendChild(child)
+
+    const click = jest.spyOn(button, 'click')
+
+    expect(result.current(child)).toBe(true)
+    expect(click).toHaveBeenCalled()
+  })
 })

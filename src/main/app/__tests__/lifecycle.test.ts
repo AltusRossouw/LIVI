@@ -253,4 +253,100 @@ describe('setupLifecycle', () => {
     )
     expect(app.quit).toHaveBeenCalledTimes(1)
   })
+
+  test('before-quit logs watchdog warning when shutdown takes too long', async () => {
+    jest.useFakeTimers()
+
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    const projectionService = {
+      beginShutdown: jest.fn(),
+      disconnectPhone: jest.fn(() => Promise.resolve()),
+      stop: jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, 7000)
+          })
+      )
+    }
+
+    const usbService = {
+      beginShutdown: jest.fn(),
+      stop: jest.fn(() => Promise.resolve())
+    }
+
+    const telemetrySocket = {
+      disconnect: jest.fn(() => Promise.resolve())
+    }
+
+    const runtimeState = { isQuitting: false } as never
+    setupLifecycle(runtimeState, { projectionService, usbService, telemetrySocket } as never)
+
+    const beforeQuit = getRegisteredHandler('before-quit') as
+      | ((e: { preventDefault: jest.Mock }) => Promise<void>)
+      | undefined
+
+    const promise = beforeQuit?.({ preventDefault: jest.fn() } as any)
+
+    await jest.advanceTimersByTimeAsync(3100)
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[MAIN] before-quit watchdog: giving up waiting after 3000ms'
+    )
+
+    await jest.advanceTimersByTimeAsync(10000)
+    await promise
+
+    expect(app.quit).toHaveBeenCalledTimes(1)
+  })
+
+  test('before-quit uses fallback resolved promises when usb stop and telemetry disconnect are missing', async () => {
+    jest.useFakeTimers()
+
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {})
+
+    const projectionService = {
+      beginShutdown: jest.fn(),
+      disconnectPhone: jest.fn(() => Promise.resolve()),
+      stop: jest.fn(() => Promise.resolve())
+    }
+
+    const usbService = {
+      beginShutdown: jest.fn()
+    }
+
+    const telemetrySocket = {}
+
+    const runtimeState = { isQuitting: false } as never
+    setupLifecycle(runtimeState, { projectionService, usbService, telemetrySocket } as never)
+
+    const beforeQuit = getRegisteredHandler('before-quit') as
+      | ((e: { preventDefault: jest.Mock }) => Promise<void>)
+      | undefined
+
+    const promise = beforeQuit?.({ preventDefault: jest.fn() } as any)
+
+    await jest.advanceTimersByTimeAsync(1000)
+    await promise
+
+    expect(projectionService.beginShutdown).toHaveBeenCalledTimes(1)
+    expect(usbService.beginShutdown).toHaveBeenCalledTimes(1)
+    expect(projectionService.disconnectPhone).toHaveBeenCalledTimes(1)
+    expect(projectionService.stop).toHaveBeenCalledTimes(1)
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[MAIN] before-quit step:start usbService.stop()')
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[MAIN] before-quit step:start telemetrySocket.disconnect()')
+    )
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[MAIN] before-quit step:start projection.disconnectPhone()')
+    )
+
+    expect(app.quit).toHaveBeenCalledTimes(1)
+  })
 })

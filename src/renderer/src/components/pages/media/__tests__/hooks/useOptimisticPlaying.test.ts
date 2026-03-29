@@ -146,12 +146,12 @@ describe('useOptimisticPlaying', () => {
   })
 
   it('ignores realPlaying updates when mediaPayloadError is present and override set', async () => {
-    const { result, rerender } = renderHook(
-      ({ playing, error }) => useOptimisticPlaying(playing, error),
-      {
-        initialProps: { playing: true, error: null }
-      }
-    )
+    const { result, rerender } = renderHook<
+      ReturnType<typeof useOptimisticPlaying>,
+      { playing: boolean; error: unknown }
+    >(({ playing, error }) => useOptimisticPlaying(playing, error), {
+      initialProps: { playing: true, error: null }
+    })
 
     act(() => {
       result.current.setOverride(false)
@@ -392,15 +392,16 @@ describe('useOptimisticPlaying', () => {
   })
 
   it('deprecated match effect clears a truthy running timer before resetting override', () => {
-    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((cb: any) => {
+    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
       return 123 as any
     })
     const clearSpy = jest.spyOn(window, 'clearTimeout')
 
     const { result, rerender } = renderHook(
-      ({ realPlaying }) => useOptimisticPlaying_deprecated(realPlaying),
+      ({ realPlaying }: { realPlaying: boolean | undefined }) =>
+        useOptimisticPlaying_deprecated(realPlaying),
       {
-        initialProps: { realPlaying: false as boolean | undefined }
+        initialProps: { realPlaying: false }
       }
     )
 
@@ -417,7 +418,7 @@ describe('useOptimisticPlaying', () => {
   })
 
   it('deprecated override-effect cleanup clears a truthy timer on unmount', () => {
-    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((cb: any) => {
+    const setTimeoutSpy = jest.spyOn(window, 'setTimeout').mockImplementation((_cb: any) => {
       return 456 as any
     })
     const clearSpy = jest.spyOn(window, 'clearTimeout')

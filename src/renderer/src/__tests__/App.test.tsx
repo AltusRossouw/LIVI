@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import App from '../App'
 import { AppContext } from '../context'
-import i18n from 'i18next'
 
 const navigateMock = jest.fn()
 const useKeyDownHandler = jest.fn()

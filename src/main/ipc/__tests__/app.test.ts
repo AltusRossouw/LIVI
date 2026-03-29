@@ -354,4 +354,48 @@ describe('registerAppIpc', () => {
     })
     expect(shell.openExternal).toHaveBeenCalledWith('https://example.com')
   })
+
+  test('app:restartApp relaunches and exits on non-APPIMAGE path', async () => {
+    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: TimerHandler) => {
+      if (typeof fn === 'function') fn()
+      return 0 as any
+    }) as typeof setTimeout)
+
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    delete process.env.APPIMAGE
+
+    const beginShutdown = jest.fn()
+    const gracefulReset = jest.fn().mockResolvedValue(undefined)
+
+    const runtimeState = { isQuitting: false, suppressNextFsSync: false } as any
+    const services = { usbService: { beginShutdown, gracefulReset } } as any
+
+    registerAppIpc(runtimeState, services)
+
+    const restartHandler = getHandle('app:restartApp') as (() => Promise<void>) | undefined
+    await restartHandler?.()
+
+    expect(runtimeState.isQuitting).toBe(true)
+    expect(beginShutdown).toHaveBeenCalledTimes(1)
+    expect(gracefulReset).toHaveBeenCalledTimes(1)
+    expect(mockedSpawn).not.toHaveBeenCalled()
+    expect(app.relaunch).toHaveBeenCalledTimes(1)
+    expect(app.exit).toHaveBeenCalledWith(0)
+  })
+
+  test('app:openExternal rejects undefined urls via nullish fallback', async () => {
+    const runtimeState = { isQuitting: false, suppressNextFsSync: false } as never
+    const services = { usbService: {} } as never
+
+    registerAppIpc(runtimeState, services)
+
+    const openExternalHandler = getHandle('app:openExternal') as
+      | ((evt: unknown, url?: string) => Promise<unknown>)
+      | undefined
+
+    await expect(openExternalHandler?.(undefined, undefined)).resolves.toEqual({
+      ok: false,
+      error: 'Empty URL'
+    })
+  })
 })

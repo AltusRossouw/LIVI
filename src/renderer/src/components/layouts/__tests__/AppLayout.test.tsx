@@ -91,4 +91,103 @@ describe('AppLayout', () => {
     fireEvent.pointerDown(container.querySelector('#main') as HTMLElement)
     expect((window as any).app.notifyUserActivity).toHaveBeenCalled()
   })
+
+  test('shows nav again and re-arms hide timer on mousemove in maps mode', () => {
+    mockPathname = '/maps'
+    const navRef = createRef<HTMLDivElement>()
+    const mainRef = createRef<HTMLDivElement>()
+
+    const { container } = render(
+      <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>
+        <div>Content</div>
+      </AppLayout>
+    )
+
+    act(() => {
+      jest.advanceTimersByTime(3000)
+    })
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
+
+    fireEvent.mouseMove(document)
+
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
+
+    act(() => {
+      jest.advanceTimersByTime(3000)
+    })
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
+  })
+
+  test('shows nav again when focus moves into nav area on maps page', () => {
+    mockPathname = '/maps'
+    const navRef = createRef<HTMLDivElement>()
+    const mainRef = createRef<HTMLDivElement>()
+
+    const { container, getByTestId } = render(
+      <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>
+        <div>Content</div>
+      </AppLayout>
+    )
+
+    act(() => {
+      jest.advanceTimersByTime(3000)
+    })
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('1')
+
+    const navChild = getByTestId('nav')
+    ;(navChild as HTMLElement).setAttribute('tabindex', '-1')
+    ;(navChild as HTMLElement).focus()
+    fireEvent.focusIn(navChild)
+
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
+  })
+
+  test('clears auto-hide timer and keeps nav visible when leaving auto-hide pages', () => {
+    mockPathname = '/maps'
+    const navRef = createRef<HTMLDivElement>()
+    const mainRef = createRef<HTMLDivElement>()
+
+    const { container, rerender } = render(
+      <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>
+        <div>Content</div>
+      </AppLayout>
+    )
+
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
+
+    mockPathname = '/'
+    rerender(
+      <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>
+        <div>Content</div>
+      </AppLayout>
+    )
+
+    act(() => {
+      jest.advanceTimersByTime(3000)
+    })
+
+    expect(container.querySelector('#content-root')?.getAttribute('data-nav-hidden')).toBe('0')
+  })
+
+  test('removes wake listeners on unmount for auto-hide pages', () => {
+    mockPathname = '/maps'
+    const navRef = createRef<HTMLDivElement>()
+    const mainRef = createRef<HTMLDivElement>()
+
+    const windowRemoveSpy = jest.spyOn(window, 'removeEventListener')
+    const documentRemoveSpy = jest.spyOn(document, 'removeEventListener')
+
+    const { unmount } = render(
+      <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={false}>
+        <div>Content</div>
+      </AppLayout>
+    )
+
+    unmount()
+
+    expect(windowRemoveSpy).toHaveBeenCalledWith('keydown', expect.any(Function))
+    expect(documentRemoveSpy).toHaveBeenCalledWith('mousemove', expect.any(Function))
+    expect(documentRemoveSpy).toHaveBeenCalledWith('wheel', expect.any(Function))
+    expect(documentRemoveSpy).toHaveBeenCalledWith('focusin', expect.any(Function))
+  })
 })

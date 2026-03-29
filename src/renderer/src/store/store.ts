@@ -473,7 +473,6 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
 
         const mergeObjects = (a: unknown, b: unknown) => {
           if (!a || typeof a !== 'object') return b
-          if (!b || typeof b !== 'object') return a
           return { ...(a as Record<string, unknown>), ...(b as Record<string, unknown>) }
         }
 

@@ -67,4 +67,39 @@ describe('SettingsLayout', () => {
     fireEvent.click(screen.getByLabelText('Apply'))
     expect(onRestart).toHaveBeenCalledTimes(1)
   })
+
+  test('blurs the active element before navigating back when it is not the body', () => {
+    render(
+      <SettingsLayout title="System" showRestart={false}>
+        <div>Body</div>
+      </SettingsLayout>
+    )
+
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    const blurSpy = jest.spyOn(input, 'blur')
+    input.focus()
+
+    fireEvent.click(screen.getByLabelText('Back'))
+
+    expect(blurSpy).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith(-1)
+  })
+
+  test('does not blur when the active element is the body', () => {
+    render(
+      <SettingsLayout title="System" showRestart={false}>
+        <div>Body</div>
+      </SettingsLayout>
+    )
+
+    const blurSpy = jest.spyOn(document.body, 'blur')
+    document.body.focus()
+
+    fireEvent.click(screen.getByLabelText('Back'))
+
+    expect(blurSpy).not.toHaveBeenCalled()
+    expect(navigateMock).toHaveBeenCalledWith(-1)
+  })
 })

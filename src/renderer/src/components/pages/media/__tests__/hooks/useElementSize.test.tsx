@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
-import { useElementSize } from '../useElementSize'
+import { useElementSize } from '../../hooks/useElementSize'
 
 describe('useElementSize', () => {
   let resizeObserverCallback:
@@ -128,5 +128,110 @@ describe('useElementSize', () => {
     unmount()
 
     expect(cancelAnimationFrameMock).toHaveBeenCalledWith(42)
+  })
+
+  test('does nothing when observed ref is not attached', () => {
+    function DetachedComponent() {
+      const [, size] = useElementSize<HTMLDivElement>()
+      return (
+        <div data-testid="size">
+          {size.w}x{size.h}
+        </div>
+      )
+    }
+
+    render(<DetachedComponent />)
+
+    expect(observeMock).not.toHaveBeenCalled()
+    expect(screen.getByTestId('size')).toHaveTextContent('1280x720')
+  })
+
+  test('schedules only one animation frame while multiple resize events arrive before flush', () => {
+    let queuedFrame: FrameRequestCallback | undefined
+
+    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+      queuedFrame = cb
+      return 7
+    })
+    ;(global as any).requestAnimationFrame = requestAnimationFrameMock
+
+    render(<TestComponent />)
+
+    act(() => {
+      resizeObserverCallback?.([{ contentRect: { width: 100, height: 200 } }])
+      resizeObserverCallback?.([{ contentRect: { width: 300, height: 400 } }])
+      resizeObserverCallback?.([{ contentRect: { width: 500, height: 600 } }])
+    })
+
+    expect(requestAnimationFrameMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('size')).toHaveTextContent('1280x720')
+
+    act(() => {
+      queuedFrame?.(0)
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('500x600')
+  })
+
+  test('flush returns early when no pending size exists', () => {
+    let queuedFrame: FrameRequestCallback | undefined
+
+    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+      queuedFrame = cb
+      return 9
+    })
+    ;(global as any).requestAnimationFrame = requestAnimationFrameMock
+
+    render(<TestComponent />)
+
+    act(() => {
+      resizeObserverCallback?.([{ contentRect: { width: 111, height: 222 } }])
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('1280x720')
+
+    act(() => {
+      queuedFrame?.(0)
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('111x222')
+
+    act(() => {
+      queuedFrame?.(0)
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('111x222')
+  })
+
+  test('keeps previous state when flushed size matches current size exactly', () => {
+    let queuedFrame: FrameRequestCallback | undefined
+
+    requestAnimationFrameMock = jest.fn((cb: FrameRequestCallback) => {
+      queuedFrame = cb
+      return 11
+    })
+    ;(global as any).requestAnimationFrame = requestAnimationFrameMock
+
+    render(<TestComponent />)
+
+    act(() => {
+      resizeObserverCallback?.([{ contentRect: { width: 200, height: 300 } }])
+    })
+
+    act(() => {
+      queuedFrame?.(0)
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('200x300')
+
+    act(() => {
+      resizeObserverCallback?.([{ contentRect: { width: 200, height: 300 } }])
+    })
+
+    act(() => {
+      queuedFrame?.(0)
+    })
+
+    expect(screen.getByTestId('size')).toHaveTextContent('200x300')
   })
 })

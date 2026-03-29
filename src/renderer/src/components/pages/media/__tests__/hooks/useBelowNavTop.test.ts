@@ -4,34 +4,32 @@ import { useBelowNavTop } from '../../hooks'
 describe('useBelowNavTop', () => {
   let mockDisconnect: jest.Mock
   let mockObserve: jest.Mock
+  let resizeObserverCallback: (() => void) | undefined
   let originalResizeObserver: typeof ResizeObserver
   let originalAddEventListener: typeof window.addEventListener
   let originalRemoveEventListener: typeof window.removeEventListener
 
   beforeEach(() => {
+    document.body.innerHTML = ''
+
     mockDisconnect = jest.fn()
     mockObserve = jest.fn()
+    resizeObserverCallback = undefined
 
-    // Save originals
     originalResizeObserver = global.ResizeObserver
     originalAddEventListener = window.addEventListener
     originalRemoveEventListener = window.removeEventListener
 
-    // Mock ResizeObserver
-    global.ResizeObserver = jest.fn().mockImplementation(() => ({
-      observe: mockObserve,
-      disconnect: mockDisconnect
-    })) as unknown as typeof ResizeObserver
+    global.ResizeObserver = jest.fn().mockImplementation((cb: () => void) => {
+      resizeObserverCallback = cb
+      return {
+        observe: mockObserve,
+        disconnect: mockDisconnect
+      }
+    }) as unknown as typeof ResizeObserver
 
-    // Mock add/removeEventListener
     window.addEventListener = jest.fn()
     window.removeEventListener = jest.fn()
-
-    // Mock DOM element
-    const mockNav = document.createElement('div')
-    mockNav.className = 'MuiTabs-root'
-    mockNav.getBoundingClientRect = jest.fn(() => ({ bottom: 42 })) as never
-    document.body.appendChild(mockNav)
   })
 
   afterEach(() => {
@@ -42,36 +40,84 @@ describe('useBelowNavTop', () => {
     jest.restoreAllMocks()
   })
 
-  it('returns initial top = 0 before effect runs', () => {
+  const appendNav = (bottom = 42) => {
+    const mockNav = document.createElement('div')
+    mockNav.className = 'MuiTabs-root'
+    mockNav.getBoundingClientRect = jest.fn(() => ({ bottom })) as never
+    document.body.appendChild(mockNav)
+    return mockNav
+  }
+
+  it('reads initial nav bottom on mount', () => {
+    appendNav(42)
+
     const { result } = renderHook(() => useBelowNavTop())
+
     expect(result.current).toBe(42)
+    expect(window.addEventListener).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(mockObserve).toHaveBeenCalledTimes(1)
   })
 
   it('updates top when nav position changes via ResizeObserver', () => {
-    const mockNav = document.querySelector('.MuiTabs-root') as HTMLElement
-    ;(mockNav.getBoundingClientRect as jest.Mock).mockReturnValue({ bottom: 99 })
-
+    const mockNav = appendNav(42)
     const { result } = renderHook(() => useBelowNavTop())
 
+    ;(mockNav.getBoundingClientRect as jest.Mock).mockReturnValue({ bottom: 99 })
+
     act(() => {
-      const callback = (global.ResizeObserver as jest.Mock).mock.calls[0][0]
-      callback()
+      resizeObserverCallback?.()
     })
 
     expect(result.current).toBe(99)
   })
 
-  it('returns 0 if no .MuiTabs-root element is found', () => {
-    document.body.innerHTML = ''
+  it('updates top when window resize listener runs', () => {
+    const mockNav = appendNav(42)
     const { result } = renderHook(() => useBelowNavTop())
+
+    ;(mockNav.getBoundingClientRect as jest.Mock).mockReturnValue({ bottom: 77 })
+
+    const resizeHandler = (window.addEventListener as jest.Mock).mock.calls.find(
+      ([event]) => event === 'resize'
+    )?.[1] as (() => void) | undefined
+
+    act(() => {
+      resizeHandler?.()
+    })
+
+    expect(result.current).toBe(77)
+  })
+
+  it('clamps negative nav bottom to 0', () => {
+    appendNav(-12)
+
+    const { result } = renderHook(() => useBelowNavTop())
+
     expect(result.current).toBe(0)
   })
 
+  it('returns 0 and does not observe when no nav element exists', () => {
+    const { result } = renderHook(() => useBelowNavTop())
+
+    expect(result.current).toBe(0)
+    expect(mockObserve).not.toHaveBeenCalled()
+  })
+
   it('cleans up event listeners and ResizeObserver on unmount', () => {
+    appendNav(42)
+
     const { unmount } = renderHook(() => useBelowNavTop())
     unmount()
 
     expect(window.removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function))
-    expect(mockDisconnect).toHaveBeenCalled()
+    expect(mockDisconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('cleans up safely without ResizeObserver instance when no nav exists', () => {
+    const { unmount } = renderHook(() => useBelowNavTop())
+    unmount()
+
+    expect(window.removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 })

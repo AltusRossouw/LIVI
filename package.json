@@ -85,7 +85,7 @@
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/w3c-web-usb": "^1.0.13",
+    "@types/w3c-web-usb": "^1.0.14",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "@vitejs/plugin-react": "^6.0.1",

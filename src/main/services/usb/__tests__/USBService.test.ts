@@ -232,15 +232,19 @@ describe('USBService', () => {
     expect(Microphone.getSysdefaultPrettyName).toHaveBeenCalledTimes(1)
   })
 
-  test('usb-force-reset uses gracefulReset on darwin', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin' })
+  test('usb-force-reset uses forceReset on darwin', async () => {
+    Object.defineProperty(process, 'platform', {
+      value: 'darwin',
+      configurable: true
+    })
 
     const s = new USBService(projection) as any
-    s.gracefulReset = jest.fn(async () => true)
+    s.forceReset = jest.fn(async () => true)
 
     const h = getHandler<() => Promise<boolean>>('usb-force-reset')
+
     await expect(h()).resolves.toBe(true)
-    expect(s.gracefulReset).toHaveBeenCalledTimes(1)
+    expect(s.forceReset).toHaveBeenCalledTimes(1)
   })
 
   test('usb-force-reset uses forceReset on non-darwin', async () => {

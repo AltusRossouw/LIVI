@@ -52,6 +52,7 @@ export enum MessageType {
   MultiTouch = 0x17,
   HiCarLink = 0x18,
   BoxSettings = 0x19,
+  ForgetBluetoothAddr = 0x22,
   PeerBluetoothAddress = 0x23,
   PeerBluetoothAddressAlt = 0x24,
   UiHidePeerInfo = 0x25,

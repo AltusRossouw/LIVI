@@ -117,6 +117,10 @@ const api = {
     sendFrame: (): Promise<void> => ipcRenderer.invoke('projection-sendframe'),
     setBluetoothPairedList: (listText: string): Promise<{ ok: boolean }> =>
       ipcRenderer.invoke('projection-bt-pairedlist-set', listText),
+    connectBluetoothPairedDevice: (mac: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('projection-bt-connect-device', mac),
+    forgetBluetoothPairedDevice: (mac: string): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke('projection-bt-forget-device', mac),
     dongleFirmware: (action: 'check' | 'download' | 'upload' | 'status'): Promise<unknown> =>
       ipcRenderer.invoke('dongle-fw', { action }),
     sendTouch: (x: number, y: number, action: number): void =>

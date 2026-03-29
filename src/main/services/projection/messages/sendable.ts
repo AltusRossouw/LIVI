@@ -558,6 +558,34 @@ export class SendDisconnectPhone extends SendableMessage {
   type = MessageType.DisconnectPhone
 }
 
+export class SendAutoConnectByBtAddress extends SendableMessageWithPayload {
+  type = MessageType.WifiStatusData
+  private readonly payload: Buffer
+
+  constructor(btMac: string) {
+    super()
+    this.payload = Buffer.from(btMac, 'ascii')
+  }
+
+  getPayload(): Buffer {
+    return this.payload
+  }
+}
+
+export class SendForgetBluetoothAddr extends SendableMessageWithPayload {
+  type = MessageType.ForgetBluetoothAddr
+  private readonly payload: Buffer
+
+  constructor(btMac: string) {
+    super()
+    this.payload = Buffer.from(btMac, 'ascii')
+  }
+
+  getPayload(): Buffer {
+    return this.payload
+  }
+}
+
 export class SendNaviFocusRequest extends SendableMessage {
   type = MessageType.NaviFocusRequest
 }

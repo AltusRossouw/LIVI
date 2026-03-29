@@ -12,6 +12,8 @@ type ProjectionApiOverrides = {
   ipc?: {
     setVolume?: jest.Mock | undefined
     setBluetoothPairedList?: jest.Mock | undefined
+    connectBluetoothPairedDevice?: jest.Mock | undefined
+    forgetBluetoothPairedDevice?: jest.Mock | undefined
     sendCommand?: jest.Mock | undefined
     onTelemetry?: jest.Mock | undefined
     offTelemetry?: jest.Mock | undefined
@@ -30,6 +32,8 @@ type TestProjectionApi = {
   ipc: {
     setVolume: jest.Mock | undefined
     setBluetoothPairedList: jest.Mock | undefined
+    connectBluetoothPairedDevice: jest.Mock | undefined
+    forgetBluetoothPairedDevice: jest.Mock | undefined
     sendCommand: jest.Mock | undefined
     onTelemetry: jest.Mock | undefined
     offTelemetry: jest.Mock | undefined
@@ -53,6 +57,8 @@ describe('store', () => {
     ipc?: Partial<{
       setVolume: jest.Mock | undefined
       setBluetoothPairedList: jest.Mock | undefined
+      connectBluetoothPairedDevice: jest.Mock | undefined
+      forgetBluetoothPairedDevice: jest.Mock | undefined
       sendCommand: jest.Mock | undefined
       onTelemetry: jest.Mock | undefined
       offTelemetry: jest.Mock | undefined
@@ -71,6 +77,8 @@ describe('store', () => {
     ipc: {
       setVolume: jest.fn(),
       setBluetoothPairedList: jest.fn(),
+      connectBluetoothPairedDevice: jest.fn(),
+      forgetBluetoothPairedDevice: jest.fn(),
       sendCommand: jest.fn(),
       onTelemetry: jest.fn(),
       offTelemetry: jest.fn(),
@@ -334,34 +342,6 @@ describe('store', () => {
     ])
     expect(useLiviStore.getState().bluetoothPairedDirty).toBe(false)
     expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
-  })
-
-  test('removeBluetoothPairedDeviceLocal updates raw text and dirty flags', async () => {
-    const projection = makeProjectionApi({
-      settings: {
-        get: jest.fn().mockResolvedValue(baseSettings)
-      }
-    })
-
-    const { useLiviStore } = loadFreshStore(projection)
-
-    await waitForStoreSettings(useLiviStore)
-
-    useLiviStore.setState({
-      bluetoothPairedDevices: [
-        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
-        { mac: '11:22:33:44:55:66', name: 'Phone B' }
-      ],
-      boxInfo: { btMacAddr: 'AA:BB:CC:DD:EE:FF' }
-    })
-
-    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
-
-    const state = useLiviStore.getState()
-    expect(state.bluetoothPairedDevices).toEqual([{ mac: '11:22:33:44:55:66', name: 'Phone B' }])
-    expect(state.bluetoothPairedDirty).toBe(true)
-    expect(state.bluetoothPairedDeleteNeedsRestart).toBe(true)
-    expect(state.bluetoothPairedListRaw).toBe('11:22:33:44:55:66Phone B\n')
   })
 
   test('buildBluetoothPairedListText reconstructs payload from devices', async () => {
@@ -1113,13 +1093,15 @@ describe('store', () => {
     ])
   })
 
-  test('removeBluetoothPairedDeviceLocal does not require restart when deleted device is not connected', async () => {
+  test('forgetBluetoothPairedDevice does not require restart when deleted device is not connected', async () => {
     const projection = makeProjectionApi({
       settings: {
         get: jest.fn().mockResolvedValue(baseSettings)
+      },
+      ipc: {
+        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
       }
     })
-
     const { useLiviStore } = loadFreshStore(projection)
 
     await waitForStoreSettings(useLiviStore)
@@ -1133,7 +1115,8 @@ describe('store', () => {
       boxInfo: { btMacAddr: '77:88:99:AA:BB:CC' }
     })
 
-    useLiviStore.getState().removeBluetoothPairedDeviceLocal('11:22:33:44:55:66')
+    await useLiviStore.getState().forgetBluetoothPairedDevice('11:22:33:44:55:66')
+    expect(projection.ipc.forgetBluetoothPairedDevice).toHaveBeenCalledWith('11:22:33:44:55:66')
 
     expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
   })
@@ -1195,10 +1178,13 @@ describe('store', () => {
     expect(useLiviStore.getState().usbFwVersion).toBeNull()
   })
 
-  test('removeBluetoothPairedDeviceLocal preserves existing restart flag when already true', async () => {
+  test('forgetBluetoothPairedDevice preserves existing restart flag when already true', async () => {
     const projection = makeProjectionApi({
       settings: {
         get: jest.fn().mockResolvedValue(baseSettings)
+      },
+      ipc: {
+        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
       }
     })
 
@@ -1215,9 +1201,10 @@ describe('store', () => {
       boxInfo: null
     })
 
-    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
+    await useLiviStore.getState().forgetBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
 
-    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(true)
+    expect(projection.ipc.forgetBluetoothPairedDevice).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF')
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
   })
 
   test('applyBluetoothPairedList returns false when ipc responds with ok false', async () => {
@@ -1367,10 +1354,13 @@ describe('store', () => {
     expect(useLiviStore.getState().settings).toEqual(baseSettings)
   })
 
-  test('removeBluetoothPairedDeviceLocal handles non-string btMacAddr without restart requirement', async () => {
+  test('forgetBluetoothPairedDevice handles non-string btMacAddr without restart requirement', async () => {
     const projection = makeProjectionApi({
       settings: {
         get: jest.fn().mockResolvedValue(baseSettings)
+      },
+      ipc: {
+        forgetBluetoothPairedDevice: jest.fn().mockResolvedValue({ ok: true })
       }
     })
 
@@ -1387,7 +1377,8 @@ describe('store', () => {
       boxInfo: { btMacAddr: 12345 }
     })
 
-    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
+    await useLiviStore.getState().forgetBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
+    expect(projection.ipc.forgetBluetoothPairedDevice).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF')
 
     expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
       { mac: '11:22:33:44:55:66', name: 'Phone B' }

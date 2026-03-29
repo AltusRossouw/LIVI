@@ -255,11 +255,26 @@ describe('preload api bridge', () => {
     const { app } = loadPreload()
     ipcRendererMock.invoke.mockResolvedValue({ ok: true })
 
+    await app.getVersion()
+    await app.getLatestRelease()
+    await app.performUpdate('https://example.com/update.img')
+    await app.resetDongleIcons()
+    await app.beginInstall()
+    await app.abortUpdate()
     await app.quitApp()
     await app.restartApp()
     await app.openExternal('https://example.com')
     app.notifyUserActivity()
 
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:getVersion')
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:getLatestRelease')
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith(
+      'app:performUpdate',
+      'https://example.com/update.img'
+    )
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith('settings:reset-dongle-icons')
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:beginInstall')
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:abortUpdate')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:quitApp')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:restartApp')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('app:openExternal', 'https://example.com')
@@ -283,6 +298,8 @@ describe('preload api bridge', () => {
     await projection.ipc.stop()
     await projection.ipc.sendFrame()
     await projection.ipc.setBluetoothPairedList('abc')
+    await projection.ipc.connectBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
+    await projection.ipc.forgetBluetoothPairedDevice('AA:BB:CC:DD:EE:FF')
     await projection.ipc.dongleFirmware('check')
     await projection.ipc.readMedia()
     await projection.ipc.readNavigation()
@@ -301,6 +318,14 @@ describe('preload api bridge', () => {
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-stop')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-sendframe')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-bt-pairedlist-set', 'abc')
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith(
+      'projection-bt-connect-device',
+      'AA:BB:CC:DD:EE:FF'
+    )
+    expect(ipcRendererMock.invoke).toHaveBeenCalledWith(
+      'projection-bt-forget-device',
+      'AA:BB:CC:DD:EE:FF'
+    )
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('dongle-fw', { action: 'check' })
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-media-read')
     expect(ipcRendererMock.invoke).toHaveBeenCalledWith('projection-navigation-read')
@@ -324,5 +349,100 @@ describe('preload api bridge', () => {
     expect(ipcRendererMock.send).toHaveBeenCalledWith('projection-multi-touch', [
       { id: 1, x: 0.1, y: 0.2, action: 2 }
     ])
+  })
+
+  test('usb listenForEvents forwards usb events directly when handler is already registered', () => {
+    const { projection } = loadPreload()
+    const cb = jest.fn()
+
+    projection.usb.listenForEvents(cb)
+    emit('usb-event', 'plugged', { vendorId: 1 })
+
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(cb).toHaveBeenCalledWith(expect.anything(), 'plugged', { vendorId: 1 })
+  })
+
+  test('ipc onTelemetry forwards telemetry updates directly when handler is already registered', () => {
+    const { projection } = loadPreload()
+    const handler = jest.fn()
+
+    projection.ipc.onTelemetry(handler)
+    emit('telemetry:update', { speed: 77 })
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith({ speed: 77 })
+  })
+
+  test('ipc onVideoChunk forwards chunks directly when handler is already registered', () => {
+    const { projection } = loadPreload()
+    const handler = jest.fn()
+
+    projection.ipc.onVideoChunk(handler)
+    emit('projection-video-chunk', { id: 'live-video' })
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith({ id: 'live-video' })
+  })
+
+  test('ipc onAudioChunk forwards chunks directly when handler is already registered', () => {
+    const { projection } = loadPreload()
+    const handler = jest.fn()
+
+    projection.ipc.onAudioChunk(handler)
+    emit('projection-audio-chunk', { id: 'live-audio' })
+
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith({ id: 'live-audio' })
+  })
+
+  test('ipc maps handlers forward payloads directly when handlers are already registered', () => {
+    const { projection } = loadPreload()
+    const videoHandler = jest.fn()
+    const resolutionHandler = jest.fn()
+
+    projection.ipc.onMapsVideoChunk(videoHandler)
+    projection.ipc.onMapsResolution(resolutionHandler)
+
+    emit('maps-video-chunk', { chunk: 2 })
+    emit('maps-video-resolution', { width: 1280, height: 720 })
+
+    expect(videoHandler).toHaveBeenCalledTimes(1)
+    expect(videoHandler).toHaveBeenCalledWith({ chunk: 2 })
+    expect(resolutionHandler).toHaveBeenCalledTimes(1)
+    expect(resolutionHandler).toHaveBeenCalledWith({ width: 1280, height: 720 })
+  })
+
+  test('ipc offVideoChunk ignores different handler and removes matching handler', () => {
+    const { projection } = loadPreload()
+    const activeHandler = jest.fn()
+    const otherHandler = jest.fn()
+
+    projection.ipc.onVideoChunk(activeHandler)
+    projection.ipc.offVideoChunk(otherHandler)
+
+    emit('projection-video-chunk', { id: 'still-active' })
+    expect(activeHandler).toHaveBeenCalledWith({ id: 'still-active' })
+
+    projection.ipc.offVideoChunk(activeHandler)
+    emit('projection-video-chunk', { id: 'after-remove' })
+
+    expect(activeHandler).toHaveBeenCalledTimes(1)
+  })
+
+  test('ipc offAudioChunk ignores different handler and removes matching handler', () => {
+    const { projection } = loadPreload()
+    const activeHandler = jest.fn()
+    const otherHandler = jest.fn()
+
+    projection.ipc.onAudioChunk(activeHandler)
+    projection.ipc.offAudioChunk(otherHandler)
+
+    emit('projection-audio-chunk', { id: 'still-active' })
+    expect(activeHandler).toHaveBeenCalledWith({ id: 'still-active' })
+
+    projection.ipc.offAudioChunk(activeHandler)
+    emit('projection-audio-chunk', { id: 'after-remove' })
+
+    expect(activeHandler).toHaveBeenCalledTimes(1)
   })
 })

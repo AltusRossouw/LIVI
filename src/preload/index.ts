@@ -33,6 +33,9 @@ type TelemetryHandler = (payload: unknown) => void
 let telemetryQueue: unknown[] = []
 let telemetryHandlers: TelemetryHandler[] = []
 
+let projectionEventQueue: Array<[IpcRendererEvent, ...unknown[]]> = []
+let projectionEventHandlers: Array<ApiCallback> = []
+
 ipcRenderer.on('projection-video-chunk', (_event, payload: unknown) => {
   if (videoChunkHandler) videoChunkHandler(payload)
   else videoChunkQueue.push(payload)
@@ -57,6 +60,14 @@ ipcRenderer.on('telemetry:update', (_event, payload: unknown) => {
     telemetryHandlers.forEach((handler) => handler(payload))
   } else {
     telemetryQueue.push(payload)
+  }
+})
+
+ipcRenderer.on('projection-event', (event, ...args: unknown[]) => {
+  if (projectionEventHandlers.length) {
+    projectionEventHandlers.forEach((handler) => handler(event, ...args))
+  } else {
+    projectionEventQueue.push([event, ...args])
   }
 })
 
@@ -135,10 +146,12 @@ const api = {
       })
     },
     onEvent: (callback: ApiCallback): void => {
-      ipcRenderer.on('projection-event', callback)
+      projectionEventHandlers.push(callback)
+      projectionEventQueue.forEach(([evt, ...args]) => callback(evt, ...args))
+      projectionEventQueue = []
     },
     offEvent: (callback: ApiCallback): void => {
-      ipcRenderer.removeListener('projection-event', callback)
+      projectionEventHandlers = projectionEventHandlers.filter((cb) => cb !== callback)
     },
     readMedia: (): Promise<unknown> => ipcRenderer.invoke('projection-media-read'),
     readNavigation: (): Promise<unknown> => ipcRenderer.invoke('projection-navigation-read'),

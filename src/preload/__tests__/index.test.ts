@@ -148,16 +148,21 @@ describe('preload api bridge', () => {
     expect(ipcRendererMock.removeListener).toHaveBeenCalledWith('settings', cb)
   })
 
-  test('ipc onEvent and offEvent forward projection-event listener management', () => {
+  test('ipc onEvent and offEvent manage projection-event handlers via preload fan-out', () => {
     const { projection } = loadPreload()
     const cb = jest.fn()
 
     projection.ipc.onEvent(cb)
     emit('projection-event', { type: 'plugged' })
+
+    expect(cb).toHaveBeenCalledTimes(1)
     expect(cb).toHaveBeenCalledWith(expect.anything(), { type: 'plugged' })
 
     projection.ipc.offEvent(cb)
-    expect(ipcRendererMock.removeListener).toHaveBeenCalledWith('projection-event', cb)
+    emit('projection-event', { type: 'unplugged' })
+
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(ipcRendererMock.removeListener).not.toHaveBeenCalledWith('projection-event', cb)
   })
 
   test('ipc onVideoChunk flushes queued chunks and offVideoChunk clears active handler', () => {

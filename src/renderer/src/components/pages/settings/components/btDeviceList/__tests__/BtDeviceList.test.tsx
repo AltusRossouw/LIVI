@@ -35,7 +35,8 @@ describe('BtDeviceList', () => {
 
   const renderWithState = (state: {
     bluetoothPairedDevices: Array<{ mac: string; name: string }> | unknown
-    forgetBluetoothPairedDevice: (mac: string) => void
+    forgetBluetoothPairedDevice?: (mac: string) => void
+    removeBluetoothPairedDeviceLocal?: (mac: string) => void
     connectBluetoothPairedDevice: (mac: string) => Promise<boolean> | boolean
     saveSettings: (settings: unknown) => Promise<void> | void
     boxInfo?: {
@@ -55,7 +56,8 @@ describe('BtDeviceList', () => {
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Android Device' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -88,7 +90,8 @@ describe('BtDeviceList', () => {
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'BB:BB:BB:BB:BB:BB', name: 'iPhone' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -114,7 +117,8 @@ describe('BtDeviceList', () => {
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -141,7 +145,8 @@ describe('BtDeviceList', () => {
 
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -177,7 +182,8 @@ describe('BtDeviceList', () => {
       }
     } = {
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -210,7 +216,8 @@ describe('BtDeviceList', () => {
   test('calls remove handler with device mac on click', () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -228,7 +235,8 @@ describe('BtDeviceList', () => {
   test('handles missing boxInfo gracefully', () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: undefined
@@ -240,7 +248,8 @@ describe('BtDeviceList', () => {
   test('uses cached device metadata when DevList entry is no longer present', () => {
     let state = {
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -283,7 +292,8 @@ describe('BtDeviceList', () => {
         { mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' },
         { mac: 'BB:BB:BB:BB:BB:BB', name: 'Device B' }
       ],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -311,7 +321,8 @@ describe('BtDeviceList', () => {
   test('renders no buttons when bluetoothPairedDevices is not an array', () => {
     renderWithState({
       bluetoothPairedDevices: null,
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -326,7 +337,8 @@ describe('BtDeviceList', () => {
   test('ignores DevList entries with empty ids', () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -348,7 +360,8 @@ describe('BtDeviceList', () => {
         { mac: 'AA:AA:AA:AA:AA:AA', name: 'Device A' },
         { mac: 'BB:BB:BB:BB:BB:BB', name: 'Device B' }
       ],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {
@@ -368,7 +381,8 @@ describe('BtDeviceList', () => {
   test('falls back to "Unknown device" when device name is blank', () => {
     renderWithState({
       bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: '   ' }],
-      forgetBluetoothPairedDevice: removeMock,
+      //forgetBluetoothPairedDevice: removeMock,
+      removeBluetoothPairedDeviceLocal: removeMock,
       connectBluetoothPairedDevice: connectMock,
       saveSettings: saveSettingsMock,
       boxInfo: {

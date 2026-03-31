@@ -26,7 +26,9 @@ export const BtDeviceList = () => {
   const [pendingConnectMac, setPendingConnectMac] = useState<string>('')
   const deviceMetaCacheRef = useRef<Record<string, { type?: string; index?: number }>>({})
 
-  const remove = useLiviStore((s) => s.forgetBluetoothPairedDevice)
+  const remove = useLiviStore((s) => s.removeBluetoothPairedDeviceLocal)
+  //const remove = useLiviStore((s) => s.forgetBluetoothPairedDevice)
+
   const connect = useLiviStore((s) => s.connectBluetoothPairedDevice)
   const saveSettings = useLiviStore((s) => s.saveSettings)
 
@@ -159,8 +161,14 @@ export const BtDeviceList = () => {
                 />
               </IconButton>
 
-              <IconButton sx={btnSx} onClick={() => remove(d.mac)}>
-                <CloseIcon sx={iconSx} />
+              <IconButton sx={btnSx} disabled={isSwitching} onClick={() => remove(d.mac)}>
+                <CloseIcon
+                  sx={{
+                    ...iconSx,
+                    opacity: isSwitching ? 0.3 : 1,
+                    color: isSwitching ? 'action.disabled' : 'inherit'
+                  }}
+                />
               </IconButton>
             </div>
           </StackItem>

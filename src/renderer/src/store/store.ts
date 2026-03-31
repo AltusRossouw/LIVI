@@ -208,8 +208,10 @@ export interface CarplayStore {
   applyBluetoothPairedList: () => Promise<boolean>
 
   // BT (forget, connect)
+  // warning forget does have a dongle firmware bug!
   forgetBluetoothPairedDevice: (mac: string) => Promise<boolean>
   connectBluetoothPairedDevice: (mac: string) => Promise<boolean>
+  removeBluetoothPairedDeviceLocal: (mac: string) => void
 
   // Reconstruct text payload to send back to dongle
   buildBluetoothPairedListText: () => string
@@ -223,7 +225,7 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
   let didInit = false
 
   const parseBluetoothPairedList = (raw: string): BluetoothPairedDevice[] => {
-    const clean = String(raw ?? '').replace(/\0+$/g, '')
+    const clean = String(raw).replace(/\0+$/g, '')
     const lines = clean.split('\n')
 
     const out: BluetoothPairedDevice[] = []
@@ -324,6 +326,33 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
         return false
       }
     },
+
+    removeBluetoothPairedDeviceLocal: (mac) =>
+      set((s) => {
+        const next = s.bluetoothPairedDevices.filter((d) => d.mac !== mac)
+
+        const boxInfo = get().boxInfo
+        const connected =
+          boxInfo &&
+          typeof boxInfo === 'object' &&
+          'btMacAddr' in boxInfo &&
+          typeof (boxInfo as { btMacAddr?: unknown }).btMacAddr === 'string'
+            ? (boxInfo as { btMacAddr: string }).btMacAddr
+            : undefined
+
+        const connectedMac = typeof connected === 'string' ? connected.trim().toUpperCase() : null
+        const deletedMac = String(mac).trim().toUpperCase()
+
+        const deletedIsConnected = connectedMac != null && deletedMac === connectedMac
+
+        return {
+          bluetoothPairedDevices: next,
+          bluetoothPairedListRaw: buildBluetoothPairedListFromDevices(next),
+          bluetoothPairedDirty: true,
+          bluetoothPairedDeleteNeedsRestart:
+            s.bluetoothPairedDeleteNeedsRestart || deletedIsConnected
+        }
+      }),
 
     buildBluetoothPairedListText: () => {
       const { bluetoothPairedDevices } = get()

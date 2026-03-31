@@ -1893,4 +1893,149 @@ describe('store', () => {
     expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('')
     expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([])
   })
+
+  test('removeBluetoothPairedDeviceLocal removes non-connected device without restart requirement', async () => {
+    const projection = makeProjectionApi({
+      settings: {
+        get: jest.fn().mockResolvedValue(baseSettings)
+      }
+    })
+
+    const { useLiviStore } = loadFreshStore(projection)
+    await waitForStoreSettings(useLiviStore)
+
+    useLiviStore.setState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
+        { mac: '11:22:33:44:55:66', name: 'Phone B' }
+      ],
+      bluetoothPairedDeleteNeedsRestart: false,
+      boxInfo: { btMacAddr: '77:88:99:AA:BB:CC' }
+    })
+
+    useLiviStore.getState().removeBluetoothPairedDeviceLocal('11:22:33:44:55:66')
+
+    expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
+      { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' }
+    ])
+    expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('AA:BB:CC:DD:EE:FFPhone A\n')
+    expect(useLiviStore.getState().bluetoothPairedDirty).toBe(true)
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
+  })
+
+  test('removeBluetoothPairedDeviceLocal marks restart required when connected device is removed', async () => {
+    const projection = makeProjectionApi({
+      settings: {
+        get: jest.fn().mockResolvedValue(baseSettings)
+      }
+    })
+
+    const { useLiviStore } = loadFreshStore(projection)
+    await waitForStoreSettings(useLiviStore)
+
+    useLiviStore.setState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
+        { mac: '11:22:33:44:55:66', name: 'Phone B' }
+      ],
+      bluetoothPairedDeleteNeedsRestart: false,
+      boxInfo: { btMacAddr: ' aa:bb:cc:dd:ee:ff ' }
+    })
+
+    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
+
+    expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
+      { mac: '11:22:33:44:55:66', name: 'Phone B' }
+    ])
+    expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('11:22:33:44:55:66Phone B\n')
+    expect(useLiviStore.getState().bluetoothPairedDirty).toBe(true)
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(true)
+  })
+
+  test('removeBluetoothPairedDeviceLocal preserves existing restart flag when already true', async () => {
+    const projection = makeProjectionApi({
+      settings: {
+        get: jest.fn().mockResolvedValue(baseSettings)
+      }
+    })
+
+    const { useLiviStore } = loadFreshStore(projection)
+    await waitForStoreSettings(useLiviStore)
+
+    useLiviStore.setState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
+        { mac: '11:22:33:44:55:66', name: 'Phone B' }
+      ],
+      bluetoothPairedDeleteNeedsRestart: true,
+      boxInfo: { btMacAddr: '77:88:99:AA:BB:CC' }
+    })
+
+    useLiviStore.getState().removeBluetoothPairedDeviceLocal('11:22:33:44:55:66')
+
+    expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
+      { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' }
+    ])
+    expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('AA:BB:CC:DD:EE:FFPhone A\n')
+    expect(useLiviStore.getState().bluetoothPairedDirty).toBe(true)
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(true)
+  })
+
+  test('removeBluetoothPairedDeviceLocal handles non-string btMacAddr without restart requirement', async () => {
+    const projection = makeProjectionApi({
+      settings: {
+        get: jest.fn().mockResolvedValue(baseSettings)
+      }
+    })
+
+    const { useLiviStore } = loadFreshStore(projection)
+    await waitForStoreSettings(useLiviStore)
+
+    useLiviStore.setState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
+        { mac: '11:22:33:44:55:66', name: 'Phone B' }
+      ],
+      bluetoothPairedDeleteNeedsRestart: false,
+      boxInfo: { btMacAddr: 12345 }
+    })
+
+    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
+
+    expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
+      { mac: '11:22:33:44:55:66', name: 'Phone B' }
+    ])
+    expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('11:22:33:44:55:66Phone B\n')
+    expect(useLiviStore.getState().bluetoothPairedDirty).toBe(true)
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
+  })
+
+  test('removeBluetoothPairedDeviceLocal works without boxInfo', async () => {
+    const projection = makeProjectionApi({
+      settings: {
+        get: jest.fn().mockResolvedValue(baseSettings)
+      }
+    })
+
+    const { useLiviStore } = loadFreshStore(projection)
+    await waitForStoreSettings(useLiviStore)
+
+    useLiviStore.setState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:BB:CC:DD:EE:FF', name: 'Phone A' },
+        { mac: '11:22:33:44:55:66', name: 'Phone B' }
+      ],
+      bluetoothPairedDeleteNeedsRestart: false,
+      boxInfo: null
+    })
+
+    useLiviStore.getState().removeBluetoothPairedDeviceLocal('AA:BB:CC:DD:EE:FF')
+
+    expect(useLiviStore.getState().bluetoothPairedDevices).toEqual([
+      { mac: '11:22:33:44:55:66', name: 'Phone B' }
+    ])
+    expect(useLiviStore.getState().bluetoothPairedListRaw).toBe('11:22:33:44:55:66Phone B\n')
+    expect(useLiviStore.getState().bluetoothPairedDirty).toBe(true)
+    expect(useLiviStore.getState().bluetoothPairedDeleteNeedsRestart).toBe(false)
+  })
 })

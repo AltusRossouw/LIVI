@@ -169,10 +169,8 @@ export const Media = () => {
       }
     }
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     window.projection.usb.listenForEvents(usbHandler)
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     return () => window.projection.usb.unlistenForEvents(usbHandler)
   }, [clearOverride, resetPress])
 

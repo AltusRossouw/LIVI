@@ -52,16 +52,18 @@ export const getNodeByPath = (
 
     const segment = segments[i]
 
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const routeChild = current.children.find((c) => c.type === 'route' && c.route === segment)
+    const routeChild: SettingsNode<ExtraConfig> | undefined = current.children.find(
+      (c: SettingsNode<ExtraConfig>) => c.type === 'route' && c.route === segment
+    )
 
     if (routeChild) {
       current = routeChild
       continue
     }
 
-    const leafChild = current.children.find((c) => 'path' in c && c.path === segment)
+    const leafChild: SettingsNode<ExtraConfig> | undefined = current.children.find(
+      (c: SettingsNode<ExtraConfig>) => 'path' in c && c.path === segment
+    )
 
     if (leafChild) {
       return leafChild

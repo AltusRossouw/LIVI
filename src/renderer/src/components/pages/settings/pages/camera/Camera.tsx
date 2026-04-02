@@ -19,7 +19,6 @@ export const Camera: React.FC<SettingsCustomPageProps<ExtraConfig, string>> = ({
 }) => {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
   const setCameraFound = useStatusStore((s) => s.setCameraFound)
 
   const safeCameraPersist = useCallback(

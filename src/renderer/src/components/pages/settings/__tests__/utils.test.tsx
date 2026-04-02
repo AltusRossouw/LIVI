@@ -35,7 +35,7 @@ describe('settings utils', () => {
     expect(leaf && 'path' in leaf ? leaf.path : null).toBe('mute')
 
     const route = getNodeByPath(tree, ['audio'])
-    expect(route && route.type).toBe('route')
+    expect(route?.type).toBe('route')
 
     expect(getNodeByPath(tree, ['video'])).toBeNull()
   })

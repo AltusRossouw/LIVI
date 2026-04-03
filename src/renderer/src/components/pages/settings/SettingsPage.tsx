@@ -71,8 +71,7 @@ export function SettingsPage() {
   }
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  const children = node.children ?? []
+  const children = 'children' in node ? (node.children ?? []) : []
 
   return (
     <SettingsLayout title={title} showRestart={showRestart} onRestart={handleRestart}>

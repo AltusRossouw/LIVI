@@ -624,8 +624,6 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     return () => {
       disposed = true
       window.projection.usb.unlistenForEvents?.(usbHandler)
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
       window.electron?.ipcRenderer.removeListener('usb-event', usbHandler)
     }
   }, [

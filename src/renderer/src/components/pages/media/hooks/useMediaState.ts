@@ -71,7 +71,6 @@ export function useMediaState(allowInitialHydrate: boolean) {
     ;(async () => {
       try {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
         const initial = await window.projection.ipc.readMedia()
         if (!cancelled && initial) {
           hydratedOnceRef.current = true

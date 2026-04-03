@@ -31,7 +31,6 @@ describe('Media component', () => {
   beforeAll(() => {
     // — expand the global window
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     window.projection = {
       ipc: { sendCommand: jest.fn() },
       usb: {
@@ -39,7 +38,6 @@ describe('Media component', () => {
         unlistenForEvents: jest.fn()
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
     } as unknown as typeof window.projection
   })
 
@@ -47,7 +45,6 @@ describe('Media component', () => {
     jest.useFakeTimers()
     // — expand the global window
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     window.projection = {
       ipc: {
         sendCommand: jest.fn()
@@ -57,7 +54,6 @@ describe('Media component', () => {
         unlistenForEvents: jest.fn()
       }
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
     } as unknown as typeof window.projection
   })
 
@@ -76,7 +72,6 @@ describe('Media component', () => {
     })
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     expect(window.projection.ipc.sendCommand).toHaveBeenCalledWith('play')
 
     // advance timers for reset
@@ -91,7 +86,6 @@ describe('Media component', () => {
     })
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     expect(window.projection.ipc.sendCommand).toHaveBeenCalledWith('pause')
   })
 
@@ -104,10 +98,8 @@ describe('Media component', () => {
     })
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     expect(window.projection.ipc.sendCommand).toHaveBeenCalledWith('next')
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     expect(window.projection.ipc.sendCommand).toHaveBeenCalledWith('prev')
   })
 
@@ -116,7 +108,6 @@ describe('Media component', () => {
     unmount()
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     expect(window.projection.usb.unlistenForEvents).toHaveBeenCalled()
   })
 })

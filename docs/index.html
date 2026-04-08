@@ -195,6 +195,7 @@
         <li>Carplay and Android Auto support via compatible USB dongles</li>
         <li>Hardware-accelerated video pipeline</li>
         <li>Instrument cluster video stream support</li>
+        <li>Device switching</li>
         <li>iAP2 turn-by-turn navigation data support</li>
         <li>Audio metadata and playback state integration</li>
         <li>Unified low-latency audio backend via GStreamer</li>
@@ -203,6 +204,12 @@
         <li>Full non-touch navigation via D-Pad and button controls</li>
         <li>UI optimized for low-resolution OEM in-car displays</li>
       </ul>
+
+      <h2>Dashboard</h2>
+        <p>The Dashboard is currently in an early stage. Widgets and layouts will be extended over time.</p>
+        <p style="text-align: center;">
+        <img src="images/dash.png" alt="Dashboard" width="70%" />
+      </p>
 
       <h2>Supported Hardware</h2>
       <p>LIVI runs on:</p>
@@ -223,7 +230,7 @@
         Pre-built binaries for Linux, macOS, and Windows are available here:
         <a href="https://github.com/f-io/LIVI/releases">https://github.com/f-io/LIVI/releases</a>
       </p>
-      
+
       <h2>How it works</h2>
       <p>
         LIVI does not implement Carplay itself. It relies on compatible USB dongles that handle the
@@ -257,24 +264,30 @@
           alt="release"
           src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-electron-chromium.json"
         />
+        <img
+          alt="gstreamer"
+          src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/f-io/LIVI/version/.github/badges/main-gstreamer.json"
+        />
       </p>
 
       <h2>Screenshots</h2>
 
       <p style="text-align: center">
-        <img src="images/carplay.png" alt="CarPlay" width="58%" />
+        <img src="images/carplay.png" alt="CarPlay" width="42%" align="center">
+        &emsp;
+        <img src="images/aa.png" alt="Android Auto" width="41%" align="center">
       </p>
 
       <p style="text-align: center">
-        <img src="images/settings.png" alt="Settings" width="48%" align="top" />
+        <img src="images/settings.png" alt="Settings" width="42%" align="top" />
         &emsp;
-        <img src="images/media.png" alt="Media" width="48%" align="top" />
+        <img src="images/media.png" alt="Media" width="42%" align="top" />
       </p>
 
       <p style="text-align: center">
-        <img src="images/maps.png" alt="Maps (Cluster Stream)" width="48%" align="top" />
+        <img src="images/maps.png" alt="Maps (Cluster Stream)" width="42%" align="top" />
         &emsp;
-        <img src="images/telemetry.png" alt="Telemetry" width="48%" align="top" />
+        <img src="images/telemetry.png" alt="Telemetry" width="42%" align="top" />
       </p>
 
       <h2>Documentation</h2>

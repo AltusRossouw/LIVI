@@ -74,7 +74,7 @@ chmod +x LIVI-*-x86_64.AppImage
 
 Download the `-arm64.dmg`, open it, and drag **LIVI.app** into Applications.
 
-When launching the app for the first time, macOS may block it.  
+When launching the app for the first time, macOS may block it.
 In that case:
 
 1. Try to open the app once (it will be blocked)
@@ -180,19 +180,21 @@ Listed limitations are firmware-level restrictions and cannot be fixed by the ap
 ## Images
 
 <p align="center">
-  <img src="docs/images/carplay.png" alt="CarPlay" width="58%" />
+  <img src="docs/images/carplay.png" alt="CarPlay" width="42%" align="center" />
+  &emsp;
+  <img src="docs/images/aa.png" alt="Android Auto" width="42%" align="center" />
 </p>
 
 <p align="center">
-  <img src="docs/images/media.png" alt="Media" width="48%" align="top" />
+  <img src="docs/images/media.png" alt="Media" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/settings.png" alt="Settings" width="48%" align="top" />
+  <img src="docs/images/settings.png" alt="Settings" width="42%" align="top" />
 </p>
 
 <p align="center">
-  <img src="docs/images/maps.png" alt="Maps (Cluster Stream)" width="48%" align="top" />
+  <img src="docs/images/maps.png" alt="Maps (Cluster Stream)" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/telemetry.png" alt="Telemetry" width="48%" align="top" />
+  <img src="docs/images/telemetry.png" alt="Telemetry" width="42%" align="top" />
 </p>
 
 ## Credits

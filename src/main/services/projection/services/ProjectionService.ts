@@ -43,7 +43,8 @@ import {
 import {
   APP_START_TS,
   DEFAULT_MEDIA_DATA_RESPONSE,
-  DEFAULT_NAVIGATION_DATA_RESPONSE
+  DEFAULT_NAVIGATION_DATA_RESPONSE,
+  DEVTOOLS_IP_CANDIDATES
 } from './constants'
 import { FirmwareCheckResult, FirmwareUpdateService } from './FirmwareUpdateService'
 import { LogicalStreamKey, ProjectionAudio } from './ProjectionAudio'
@@ -965,17 +966,8 @@ export class ProjectionService {
   }
 
   private getDevToolsUrlCandidates(): string[] {
-    // Keep this list intentionally strict to avoid opening unrelated LAN gateways
-    // such as 192.168.0.1/192.168.1.1 from the user's home network.
-    // TODO Move default IP list to the constants
-    const ipSet = new Set<string>(['192.168.50.1', '192.168.43.1', '192.168.3.1'])
-
     const paths = ['/', '/index.html', '/cgi-bin/server.cgi?action=ls&path=/']
-    const out: string[] = []
-    for (const host of ipSet) {
-      for (const p of paths) out.push(`http://${host}${p}`)
-    }
-    return out
+    return DEVTOOLS_IP_CANDIDATES.flatMap((host) => paths.map((p) => `http://${host}${p}`))
   }
 
   private uploadIcons() {

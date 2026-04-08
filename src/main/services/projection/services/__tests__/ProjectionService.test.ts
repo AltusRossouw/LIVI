@@ -305,15 +305,9 @@ describe('ProjectionService', () => {
     const urls = svc.getDevToolsUrlCandidates()
 
     expect(urls).toEqual([
-      'http://192.168.50.1/',
-      'http://192.168.50.1/index.html',
-      'http://192.168.50.1/cgi-bin/server.cgi?action=ls&path=/',
       'http://192.168.43.1/',
       'http://192.168.43.1/index.html',
-      'http://192.168.43.1/cgi-bin/server.cgi?action=ls&path=/',
-      'http://192.168.3.1/',
-      'http://192.168.3.1/index.html',
-      'http://192.168.3.1/cgi-bin/server.cgi?action=ls&path=/'
+      'http://192.168.43.1/cgi-bin/server.cgi?action=ls&path=/'
     ])
   })
 
@@ -664,7 +658,7 @@ describe('ProjectionService', () => {
     expect(result.cgiOk).toBe(true)
     expect(result.webOk).toBe(false)
     expect(result.ok).toBe(false)
-    expect(result.urls).toHaveLength(9)
+    expect(result.urls).toHaveLength(3)
   })
 
   test('maps:request disables maps and clears cached resolution', async () => {

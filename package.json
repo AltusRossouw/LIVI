@@ -89,7 +89,7 @@
     "electron": "^41.2.0",
     "electron-builder": "^26.8.2",
     "esbuild": "^0.28.0",
-    "globals": "^17.4.0",
+    "globals": "^17.5.0",
     "husky": "^9.1.7",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",

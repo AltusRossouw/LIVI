@@ -323,13 +323,28 @@ jobs:
           path: dist/*.deb
           retention-days: 7
 
+      - name: Upload AppImage [linux-arm64]
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        uses: actions/upload-artifact@v6
+        with:
+          name: LIVI-${{ steps.pkg.outputs.version }}-linux-arm64.AppImage
+          path: dist/*.AppImage
+          retention-days: 7
+
+      - name: Upload deb [linux-arm64]
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        uses: actions/upload-artifact@v6
+        with:
+          name: LIVI-${{ steps.pkg.outputs.version }}-linux-arm64.deb
+          path: dist/*.deb
+          retention-days: 7
+
       - name: Upload Artifacts
-        if: matrix.os != 'linux' || matrix.arch != 'x64'
+        if: matrix.os != 'linux'
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.os == 'windows' && format('LIVI-{0}-windows-{1}-setup.exe', steps.pkg.outputs.version, matrix.arch) || format('LIVI-{0}-{1}-{2}.{3}', steps.pkg.outputs.version, matrix.os, matrix.arch, matrix.artifact_ext)}}
           path: |
-            dist/*.AppImage
             dist/*.dmg
             dist/*-setup.exe
           retention-days: 7

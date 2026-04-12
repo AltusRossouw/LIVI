@@ -46,29 +46,15 @@ _This install script is not actively tested on other Linux distributions._
 
 ## Linux (x86_64)
 
-This AppImage has been tested on **Debian Trixie (13)** with Wayland. No additional software is required — just download the `-x86_64.AppImage` and make it executable. Depending on your distro and how you run the app, you may need a udev rule to access the USB dongle. It presents as a composite (multi-class) USB device, and unlike single-class devices, its interfaces often require explicit permissions.
-
-```bash
-sudo bash -c '
-  RULE_FILE="/etc/udev/rules.d/99-LIVI.rules"
-  USER_NAME="${SUDO_USER:-$USER}"
-
-  echo "Creating udev rule for Carlinkit dongle (owner: $USER_NAME)"
-  echo "SUBSYSTEM==\"usb\", ATTR{idVendor}==\"1314\", ATTR{idProduct}==\"152*\", " \
-       "MODE=\"0660\", OWNER=\"$USER_NAME\"" \
-    > "$RULE_FILE"
-
-  echo "Reloading udev rules…"
-  udevadm control --reload-rules
-  udevadm trigger
-
-  echo "Done."
-'
-```
+This AppImage has been tested on Debian Trixie (13) with Wayland, Ubuntu/Kubuntu 25 and Fedora 44. No additional software is required, just download the `-x86_64.AppImage` and make it executable:
 
 ```bash
 chmod +x LIVI-*-x86_64.AppImage
 ```
+
+On first launch, LIVI will detect if the udev rule for the USB dongle is missing and prompt you to install it automatically.
+
+> **Ubuntu / Kubuntu users:** Due to AppArmor restrictions, use the `.deb` package instead of the AppImage. The `.deb` automatically configures all required permissions. Alternatively, the AppImage can be started with `--no-sandbox` as a workaround.
 
 ## Mac (arm64)
 

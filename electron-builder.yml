@@ -49,6 +49,7 @@ linux:
 
 deb:
   packageName: livi
+  artifactName: ${name}-${version}-linux-${arch}.${ext}
   synopsis: 'LIVI - Linux In-Vehicle Infotainment'
   appArmorProfile: assets/linux/livi.apparmor
   afterInstall: assets/linux/after-install.sh
@@ -104,7 +105,7 @@ win:
         - x64
   icon: icons/win/livi.ico
   executableName: LIVI
-  artifactName: ${name}-${version}-windows-${arch}-setup.${ext}
+  artifactName: ${name}-${version}-windows-${arch}.${ext}
   extraResources:
     - from: assets/gstreamer/windows-x64
       to: gstreamer/windows-x64

@@ -343,10 +343,10 @@ jobs:
         if: matrix.os != 'linux'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.os == 'windows' && format('LIVI-{0}-windows-{1}-setup.exe', steps.pkg.outputs.version, matrix.arch) || format('LIVI-{0}-{1}-{2}.{3}', steps.pkg.outputs.version, matrix.os, matrix.arch, matrix.artifact_ext)}}
+          name: ${{ matrix.os == 'windows' && format('LIVI-{0}-windows-{1}.exe', steps.pkg.outputs.version, matrix.arch) || format('LIVI-{0}-{1}-{2}.{3}', steps.pkg.outputs.version, matrix.os, matrix.arch, matrix.artifact_ext)}}
           path: |
             dist/*.dmg
-            dist/*-setup.exe
+            dist/*.exe
           retention-days: 7
 
       - name: Push badges to version branch

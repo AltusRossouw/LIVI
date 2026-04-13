@@ -63,6 +63,7 @@ class MockWorker {
   static instances: MockWorker[] = []
   public postMessage = jest.fn()
   public terminate = jest.fn()
+  public onerror: AnyFn | null = null
   private listeners: Array<(ev: MessageEvent<any>) => void> = []
 
   constructor(public url: string) {
@@ -79,6 +80,10 @@ class MockWorker {
 
   emit(data: unknown) {
     this.listeners.forEach((cb) => cb({ data } as MessageEvent))
+  }
+
+  triggerError(ev: unknown) {
+    this.onerror?.(ev)
   }
 }
 
@@ -778,6 +783,857 @@ describe('Projection page', () => {
     render(<Projection {...baseProps()} command={'home' as any} commandCounter={1} />)
 
     expect((window as any).projection.ipc.sendCommand).not.toHaveBeenCalled()
+  })
+
+  // ── IPC plugged / unplugged / failure events ──────────────────────────────
+
+  test('IPC plugged event marks dongle connected', () => {
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, { type: 'plugged' })
+    })
+
+    expect(statusState.setDongleConnected).toHaveBeenCalledWith(true)
+  })
+
+  test('IPC unplugged event clears all streaming state', () => {
+    const setReceivingVideo = jest.fn()
+    const setNavVideoOverlayActive = jest.fn()
+
+    render(<Projection {...baseProps({ setReceivingVideo, setNavVideoOverlayActive })} />)
+
+    act(() => {
+      onEventCb?.(null, { type: 'unplugged' })
+    })
+
+    expect(statusState.setStreaming).toHaveBeenCalledWith(false)
+    expect(statusState.setDongleConnected).toHaveBeenCalledWith(false)
+    expect(setReceivingVideo).toHaveBeenCalledWith(false)
+    expect(setNavVideoOverlayActive).toHaveBeenCalledWith(false)
+  })
+
+  test('IPC failure event clears all streaming state', () => {
+    const setReceivingVideo = jest.fn()
+    const setNavVideoOverlayActive = jest.fn()
+
+    render(<Projection {...baseProps({ setReceivingVideo, setNavVideoOverlayActive })} />)
+
+    act(() => {
+      onEventCb?.(null, { type: 'failure' })
+    })
+
+    expect(statusState.setStreaming).toHaveBeenCalledWith(false)
+    expect(statusState.setDongleConnected).toHaveBeenCalledWith(false)
+    expect(setReceivingVideo).toHaveBeenCalledWith(false)
+    expect(setNavVideoOverlayActive).toHaveBeenCalledWith(false)
+  })
+
+  // ── Audio command events ──────────────────────────────────────────────────
+
+  test('AudioPhonecallStop releases call attention and returns to previous route', async () => {
+    mockPathname = '/media'
+
+    const { rerender } = render(
+      <Projection
+        {...baseProps()}
+        settings={{ width: 800, height: 480, fps: 60, autoSwitchOnPhoneCall: true } as any}
+      />
+    )
+
+    // arm: switch to projection on call start
+    act(() => {
+      onEventCb?.(null, {
+        type: 'audio',
+        payload: { command: AudioCommand.AudioPhonecallStart }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    navigateMock.mockClear()
+    mockPathname = '/'
+
+    rerender(
+      <Projection
+        {...baseProps()}
+        settings={{ width: 800, height: 480, fps: 60, autoSwitchOnPhoneCall: true } as any}
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'audio',
+        payload: { command: AudioCommand.AudioPhonecallStop }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
+  })
+
+  test('AudioAttentionRinging triggers call attention switch when autoSwitchOnPhoneCall', async () => {
+    mockPathname = '/media'
+
+    render(
+      <Projection
+        {...baseProps()}
+        settings={{ width: 800, height: 480, fps: 60, autoSwitchOnPhoneCall: true } as any}
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'audio',
+        payload: { command: AudioCommand.AudioAttentionRinging }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+  })
+
+  test('AudioSiriStart triggers siri attention switch', async () => {
+    mockPathname = '/media'
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'audio',
+        payload: { command: AudioCommand.AudioSiriStart }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+  })
+
+  test('AudioSiriStop returns to previous route via debounce timer', async () => {
+    jest.useFakeTimers()
+    mockPathname = '/media'
+
+    const { rerender } = render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStart } })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    navigateMock.mockClear()
+    mockPathname = '/'
+    rerender(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStop } })
+    })
+
+    // timer not yet fired
+    expect(navigateMock).not.toHaveBeenCalled()
+
+    act(() => {
+      jest.advanceTimersByTime(200)
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
+
+    jest.useRealTimers()
+  })
+
+  // ── applyAttention: already on projection path ────────────────────────────
+
+  test('applyAttention does nothing when already on projection route', () => {
+    mockPathname = '/'
+
+    render(
+      <Projection
+        {...baseProps()}
+        settings={{ width: 800, height: 480, fps: 60, autoSwitchOnPhoneCall: true } as any}
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'audio',
+        payload: { command: AudioCommand.AudioPhonecallStart }
+      })
+    })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  // ── clearSiriReleaseTimer when timer is already set ───────────────────────
+
+  test('clearSiriReleaseTimer cancels pending siri debounce on second siri active', async () => {
+    jest.useFakeTimers()
+    mockPathname = '/media'
+
+    const { rerender } = render(<Projection {...baseProps()} />)
+
+    // First siri start → switch to projection
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStart } })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    navigateMock.mockClear()
+    mockPathname = '/'
+    rerender(<Projection {...baseProps()} />)
+
+    // Siri stop → sets debounce timer
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStop } })
+    })
+
+    // Siri start again before timer fires → clearSiriReleaseTimer runs with timer set
+    mockPathname = '/'
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStart } })
+    })
+
+    // Timer should have been cancelled, so no navigation after advance
+    act(() => jest.advanceTimersByTime(200))
+    expect(navigateMock).not.toHaveBeenCalledWith('/media', expect.anything())
+
+    jest.useRealTimers()
+  })
+
+  // ── mergeBoxInfo: string variants ────────────────────────────────────────
+
+  test('mergeBoxInfo merges when boxInfo payload arrives as JSON string', () => {
+    liviState.boxInfo = { existing: 'keep' }
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: {
+          dongleFwVersion: 'fw1',
+          boxInfo: '{"MDLinkType":"CarPlay"}'
+        }
+      })
+    })
+
+    expect(liviState.boxInfo).toMatchObject({ existing: 'keep', MDLinkType: 'CarPlay' })
+  })
+
+  test('mergeBoxInfo merges when existing boxInfo is a JSON string', () => {
+    liviState.boxInfo = '{"old":"data"}'
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: {
+          dongleFwVersion: 'fw2',
+          boxInfo: { MDLinkType: 'AndroidAuto' }
+        }
+      })
+    })
+
+    expect(liviState.boxInfo).toMatchObject({ old: 'data', MDLinkType: 'AndroidAuto' })
+  })
+
+  test('mergeBoxInfo returns prev when boxInfo payload is an empty string', () => {
+    liviState.boxInfo = { preserved: true }
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: { dongleFwVersion: 'fw3', boxInfo: '   ' }
+      })
+    })
+
+    expect(liviState.boxInfo).toMatchObject({ preserved: true })
+  })
+
+  // ── handleVideo: all branches ─────────────────────────────────────────────
+
+  test('handleVideo forwards valid buffer to video channel port', () => {
+    render(<Projection {...baseProps()} />)
+
+    const ipc = (window as any).projection.ipc
+
+    // Trigger render-ready → new handleVideo closure registered
+    act(() => {
+      MockWorker.instances[1]?.emit({ type: 'render-ready' })
+    })
+
+    // Get the latest registered callback (re-registered after render-ready)
+    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
+
+    const buf = new ArrayBuffer(8)
+
+    act(() => {
+      videoChunkFn?.({ chunk: { buffer: buf } })
+    })
+
+    // videoChannel.port1 is MockMessageChannel.instances[0].port1 (video channel is first)
+    const port1 = MockMessageChannel.instances[0]?.port1
+    expect(port1?.postMessage).toHaveBeenCalledWith(buf, [buf])
+  })
+
+  test('handleVideo skips when rendererError is set', () => {
+    const setReceivingVideo = jest.fn()
+    render(<Projection {...baseProps({ setReceivingVideo })} />)
+
+    const ipc = (window as any).projection.ipc
+
+    // Trigger render-error → rendererError state set, new handleVideo registered
+    act(() => {
+      MockWorker.instances[1]?.emit({ type: 'render-error', message: 'gpu fail' })
+    })
+
+    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
+    const port1 = MockMessageChannel.instances[0]?.port1
+    const callsBefore = port1?.postMessage.mock.calls.length ?? 0
+
+    act(() => {
+      videoChunkFn?.({ chunk: { buffer: new ArrayBuffer(4) } })
+    })
+
+    expect(port1?.postMessage.mock.calls.length).toBe(callsBefore)
+  })
+
+  test('handleVideo ignores non-object payload', () => {
+    render(<Projection {...baseProps()} />)
+
+    const ipc = (window as any).projection.ipc
+    act(() => {
+      MockWorker.instances[1]?.emit({ type: 'render-ready' })
+    })
+
+    const videoChunkFn: AnyFn = ipc.onVideoChunk.mock.calls.at(-1)?.[0]
+    const port1 = MockMessageChannel.instances[0]?.port1
+
+    act(() => {
+      videoChunkFn?.(null)
+      videoChunkFn?.('string')
+      videoChunkFn?.({ chunk: {} }) // object but no buffer
+    })
+
+    expect(port1?.postMessage).not.toHaveBeenCalled()
+  })
+
+  // ── handleAudio: PCM conversion ───────────────────────────────────────────
+
+  test('handleAudio converts int16 chunk to float32 and schedules setPcmData', () => {
+    jest.useFakeTimers()
+
+    render(<Projection {...baseProps()} />)
+
+    const ipc = (window as any).projection.ipc
+    const audioChunkFn: AnyFn = ipc.onAudioChunk.mock.calls[0]?.[0]
+
+    const int16 = new Int16Array([0, 16384, -16384, 32767])
+    const buf = int16.buffer
+
+    act(() => {
+      audioChunkFn?.({ chunk: { buffer: buf } })
+      jest.runAllTimers()
+    })
+
+    expect(liviState.setPcmData).toHaveBeenCalledTimes(1)
+    const f32: Float32Array = liviState.setPcmData.mock.calls[0][0]
+    expect(f32).toBeInstanceOf(Float32Array)
+    expect(f32.length).toBe(4)
+    expect(f32[0]).toBeCloseTo(0)
+    expect(f32[1]).toBeCloseTo(0.5, 1)
+
+    jest.useRealTimers()
+  })
+
+  test('handleAudio cleanup clears pending timers on unmount', () => {
+    jest.useFakeTimers()
+
+    const { unmount } = render(<Projection {...baseProps()} />)
+
+    const ipc = (window as any).projection.ipc
+    const audioChunkFn: AnyFn = ipc.onAudioChunk.mock.calls[0]?.[0]
+
+    const int16 = new Int16Array([1000])
+    act(() => {
+      audioChunkFn?.({ chunk: { buffer: int16.buffer } })
+    })
+
+    // Unmount before timer fires → cleanup cancels it
+    unmount()
+
+    act(() => {
+      jest.runAllTimers()
+    })
+
+    expect(liviState.setPcmData).not.toHaveBeenCalled()
+
+    jest.useRealTimers()
+  })
+
+  // ── projection worker: requestBuffer & audio messages ────────────────────
+
+  test('projection worker requestBuffer message calls clearRetryTimeout', () => {
+    jest.useFakeTimers()
+
+    const clearTimeoutSpy = jest.spyOn(window, 'clearTimeout')
+
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+
+    // Create pending retry timer via 'failure'
+    act(() => {
+      projectionWorker.emit({ type: 'failure' })
+    })
+
+    // requestBuffer clears it
+    act(() => {
+      projectionWorker.emit({ type: 'requestBuffer' })
+    })
+
+    expect(clearTimeoutSpy).toHaveBeenCalled()
+
+    clearTimeoutSpy.mockRestore()
+    jest.useRealTimers()
+  })
+
+  test('projection worker audio message calls clearRetryTimeout', () => {
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+
+    // Should not throw when no retry timer is set
+    act(() => {
+      projectionWorker.emit({ type: 'audio' })
+    })
+  })
+
+  // ── clearRetryTimeout with active timer ───────────────────────────────────
+
+  test('clearRetryTimeout clears an active retry timeout', () => {
+    jest.useFakeTimers()
+
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+
+    act(() => {
+      projectionWorker.emit({ type: 'failure' })
+    })
+
+    // USB unplug triggers clearRetryTimeout
+    act(() => {
+      usbCb?.(null, { type: 'unplugged' })
+    })
+
+    // Timer was cleared; reload should not fire
+    act(() => jest.advanceTimersByTime(5000))
+
+    jest.useRealTimers()
+  })
+
+  // ── requestVideoFocus blocked by attention ────────────────────────────────
+
+  test('requestVideoFocus does not auto-switch while attention (siri) is active', async () => {
+    mockPathname = '/media'
+
+    render(
+      <Projection
+        {...baseProps()}
+        settings={{ width: 800, height: 480, fps: 60, autoSwitchOnStream: true } as any}
+      />
+    )
+
+    // Arm siri attention (switches to projection)
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStart } })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    navigateMock.mockClear()
+
+    // requestVideoFocus while siri attention is active → blocked
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.requestVideoFocus }
+      })
+    })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  // ── releaseNaviFocus with mapsEnabled=false dismisses overlay ────────────
+
+  test('releaseNaviFocus with mapsEnabled=false calls setNavVideoOverlayActive(false)', () => {
+    mockPathname = '/media'
+    const setNavVideoOverlayActive = jest.fn()
+
+    render(
+      <Projection
+        {...baseProps({ setNavVideoOverlayActive })}
+        settings={
+          {
+            width: 800,
+            height: 480,
+            fps: 60,
+            mapsEnabled: false,
+            autoSwitchOnGuidance: true
+          } as any
+        }
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.releaseNaviFocus }
+      })
+    })
+
+    expect(setNavVideoOverlayActive).toHaveBeenCalledWith(false)
+  })
+
+  // ── releaseVideoFocus: maps back-navigation ───────────────────────────────
+
+  test('releaseVideoFocus with mapsEnabled navigates back from maps via lastNonMapsPathRef', async () => {
+    mockPathname = '/media'
+
+    const { rerender } = render(
+      <Projection
+        {...baseProps()}
+        settings={
+          {
+            width: 800,
+            height: 480,
+            fps: 60,
+            mapsEnabled: true,
+            autoSwitchOnGuidance: true,
+            autoSwitchOnStream: true
+          } as any
+        }
+      />
+    )
+
+    // requestNaviFocus stores lastNonMapsPathRef = '/media' and navigates to '/maps'
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.requestNaviFocus }
+      })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/maps', { replace: true }))
+
+    navigateMock.mockClear()
+    mockPathname = '/maps'
+
+    rerender(
+      <Projection
+        {...baseProps()}
+        settings={
+          {
+            width: 800,
+            height: 480,
+            fps: 60,
+            mapsEnabled: true,
+            autoSwitchOnGuidance: true,
+            autoSwitchOnStream: true
+          } as any
+        }
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.releaseVideoFocus }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
+  })
+
+  // ── releaseVideoFocus: blocked by attention ───────────────────────────────
+
+  test('releaseVideoFocus does not navigate when attention switch is active', async () => {
+    mockPathname = '/media'
+
+    const { rerender } = render(
+      <Projection
+        {...baseProps()}
+        settings={
+          {
+            width: 800,
+            height: 480,
+            fps: 60,
+            mapsEnabled: false,
+            autoSwitchOnStream: true,
+            autoSwitchOnPhoneCall: true
+          } as any
+        }
+      />
+    )
+
+    // requestVideoFocus: auto-switch
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.requestVideoFocus }
+      })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    // call attention fires on top of that
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioPhonecallStart } })
+    })
+
+    navigateMock.mockClear()
+    mockPathname = '/'
+    rerender(
+      <Projection
+        {...baseProps()}
+        settings={
+          {
+            width: 800,
+            height: 480,
+            fps: 60,
+            mapsEnabled: false,
+            autoSwitchOnStream: true,
+            autoSwitchOnPhoneCall: true
+          } as any
+        }
+      />
+    )
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: CommandMapping.releaseVideoFocus }
+      })
+    })
+
+    expect(navigateMock).not.toHaveBeenCalledWith('/media', expect.anything())
+  })
+
+  // ── projection worker: audioInfo / pcmData / command / unknown ───────────
+
+  test('projection worker audioInfo message calls setAudioInfo', () => {
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+
+    act(() => {
+      projectionWorker.emit({
+        type: 'audioInfo',
+        payload: { codec: 'pcm', sampleRate: 44100, channels: 1, bitDepth: 16 }
+      })
+    })
+
+    expect(liviState.setAudioInfo).toHaveBeenCalledWith({
+      codec: 'pcm',
+      sampleRate: 44100,
+      channels: 1,
+      bitDepth: 16
+    })
+  })
+
+  test('projection worker pcmData message calls setPcmData', () => {
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+    const buf = new Float32Array([0.1, 0.2]).buffer
+
+    act(() => {
+      projectionWorker.emit({ type: 'pcmData', payload: buf })
+    })
+
+    expect(liviState.setPcmData).toHaveBeenCalled()
+  })
+
+  test('projection worker command requestHostUI navigates to /media', async () => {
+    mockPathname = '/settings'
+
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+
+    act(() => {
+      projectionWorker.emit({
+        type: 'command',
+        message: { value: CommandMapping.requestHostUI }
+      })
+    })
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/media', { replace: true }))
+  })
+
+  test('IPC command with unrecognized value hits final break', () => {
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'command',
+        message: { value: 9999 }
+      })
+    })
+
+    // No throw, no navigation
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  // ── USB getDeviceInfo failure ─────────────────────────────────────────────
+
+  test('USB connect logs warning when getDeviceInfo throws', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+
+    ;(window as any).projection.usb.getDeviceInfo = jest
+      .fn()
+      .mockRejectedValue(new Error('no device'))
+
+    render(<Projection {...baseProps()} />)
+
+    await act(async () => {
+      await usbCb?.(null, { type: 'plugged' })
+    })
+
+    expect(warnSpy).toHaveBeenCalledWith('[CARPLAY] usb.getDeviceInfo() failed', expect.any(Error))
+
+    warnSpy.mockRestore()
+  })
+
+  // ── mergeBoxInfo edge cases ───────────────────────────────────────────────
+
+  test('mergeBoxInfo returns prev when boxInfo is an invalid JSON string', () => {
+    liviState.boxInfo = { preserved: true }
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: { dongleFwVersion: 'fw', boxInfo: '{invalid json' }
+      })
+    })
+
+    expect(liviState.boxInfo).toMatchObject({ preserved: true })
+  })
+
+  test('mergeBoxInfo sets prev to null when existing boxInfo is invalid JSON string', () => {
+    liviState.boxInfo = '{bad json'
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: { dongleFwVersion: 'fw', boxInfo: { MDLinkType: 'CarPlay' } }
+      })
+    })
+
+    expect(liviState.boxInfo).toMatchObject({ MDLinkType: 'CarPlay' })
+  })
+
+  test('mergeBoxInfo sets prev to null when existing boxInfo is an empty string', () => {
+    liviState.boxInfo = '   '
+
+    render(<Projection {...baseProps()} />)
+
+    act(() => {
+      onEventCb?.(null, {
+        type: 'dongleInfo',
+        payload: { dongleFwVersion: 'fw', boxInfo: { MDLinkType: 'CarPlay' } }
+      })
+    })
+
+    // prev was empty string → prev=null → result is next object
+    expect(liviState.boxInfo).toMatchObject({ MDLinkType: 'CarPlay' })
+  })
+
+  // ── projection worker: dongleInfo no-op case ─────────────────────────────
+
+  test('projection worker dongleInfo message is silently ignored', () => {
+    render(<Projection {...baseProps()} />)
+
+    // Should not throw
+    act(() => {
+      MockWorker.instances[0]?.emit({ type: 'dongleInfo', payload: {} })
+    })
+  })
+
+  // ── attention back-path cleared when user navigates manually ─────────────
+
+  test('pathname change while attention is armed clears attentionSwitchedByRef', async () => {
+    mockPathname = '/media'
+
+    const { rerender } = render(<Projection {...baseProps()} />)
+
+    // Arm siri attention
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStart } })
+    })
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/', { replace: true }))
+
+    // User manually navigates to '/settings' while siri is active
+    // → the pathname effect clears attentionSwitchedByRef
+    mockPathname = '/settings'
+    rerender(<Projection {...baseProps()} />)
+
+    navigateMock.mockClear()
+
+    // Siri inactive now: attentionSwitchedByRef is already null → no navigation back
+    act(() => {
+      onEventCb?.(null, { type: 'audio', payload: { command: AudioCommand.AudioSiriStop } })
+    })
+
+    // No back-navigation since attentionSwitchedByRef was cleared
+    expect(navigateMock).not.toHaveBeenCalledWith('/media', expect.anything())
+  })
+
+  // ── projection worker onerror handler ────────────────────────────────────
+
+  test('projection worker onerror logs to console.error', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(<Projection {...baseProps()} />)
+
+    const projectionWorker = MockWorker.instances[0]
+    projectionWorker.triggerError(new ErrorEvent('error', { message: 'worker crash' }))
+
+    expect(errorSpy).toHaveBeenCalledWith('Worker error:', expect.anything())
+
+    errorSpy.mockRestore()
+  })
+
+  // ── recalc runs when content-root element is present ─────────────────────
+
+  test('overlay offset recalc runs when content-root is in the DOM', () => {
+    const anchor = document.createElement('div')
+    anchor.id = 'content-root'
+    document.body.appendChild(anchor)
+
+    // No throw; recalc should execute the full body with a zero DOMRect
+    expect(() => {
+      render(<Projection {...baseProps()} />)
+    }).not.toThrow()
+
+    document.body.removeChild(anchor)
+  })
+
+  // ── navVideoOverlayActive pointerdown dismiss ─────────────────────────────
+
+  test('navVideoOverlayActive pointerdown dismisses overlay', () => {
+    mockPathname = '/media'
+    const setNavVideoOverlayActive = jest.fn()
+
+    render(<Projection {...baseProps({ setNavVideoOverlayActive })} navVideoOverlayActive={true} />)
+
+    act(() => {
+      const evt = document.createEvent('Event')
+      evt.initEvent('pointerdown', true, true)
+      window.dispatchEvent(evt)
+    })
+
+    expect(setNavVideoOverlayActive).toHaveBeenCalledWith(false)
   })
 })
 

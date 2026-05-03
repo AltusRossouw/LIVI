@@ -169,6 +169,7 @@ wpa_passphrase={PASSPHRASE}
 
 
 def setup_network_interface():
+    subprocess.run(["sudo", "iw", "reg", "set", COUNTRY_CODE], check=False)
     subprocess.run(["sudo", "ip", "link", "set", WIFI_IFACE, "up"], check=True)
     subprocess.run(["sudo", "ip", "addr", "flush", "dev", WIFI_IFACE], check=True)
     subprocess.run(["sudo", "ip", "addr", "add", f"{AP_IP}/24", "dev", WIFI_IFACE], check=True)

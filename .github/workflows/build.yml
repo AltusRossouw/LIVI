@@ -349,6 +349,25 @@ jobs:
             dist/*.exe
           retention-days: 7
 
+      - name: Read GStreamer asset version
+        id: gst
+        if: matrix.os == 'linux' && matrix.arch == 'x64' && (env.BUILD_BRANCH == 'main' || env.BUILD_BRANCH == 'dev')
+        shell: bash
+        run: |
+          for f in assets/gstreamer/linux-x64/version.txt \
+                   assets/gstreamer/macos-arm64/version.txt \
+                   assets/gstreamer/linux-arm64/version.txt \
+                   assets/gstreamer/windows-x64/version.txt; do
+            if [[ -f "$f" ]]; then
+              v="$(cat "$f")"
+              echo "version=$v" >> "$GITHUB_OUTPUT"
+              echo "Found GStreamer version $v in $f"
+              exit 0
+            fi
+          done
+          echo "version=" >> "$GITHUB_OUTPUT"
+          echo "No GStreamer version.txt found"
+
       - name: Push badges to version branch
         if: matrix.os == 'linux' && matrix.arch == 'x64' && (env.BUILD_BRANCH == 'main' || env.BUILD_BRANCH == 'dev')
         uses: ./.github/actions/badges
@@ -359,5 +378,6 @@ jobs:
           pnpm: ${{ steps.pnpm.outputs.pnpm }}
           coverage-main: ${{ steps.coverage.outputs.main }}
           coverage-renderer: ${{ steps.coverage.outputs.renderer }}
+          gstreamer: ${{ steps.gst.outputs.version }}
           repo: ${{ github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}

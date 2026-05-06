@@ -159,6 +159,7 @@ export class ProjectionService {
   private lastNaviVideoWidth?: number
   private lastNaviVideoHeight?: number
   private mapsRequested = false
+  private lastClusterCodec: 'h264' | 'h265' | 'vp9' | 'av1' | null = null
   private lastPluggedPhoneType?: PhoneType
   private aaPlaybackInferred: 1 | 2 = 1
   private pendingStartupConnectTarget: PendingStartupConnectTarget | null = null
@@ -528,11 +529,19 @@ export class ProjectionService {
     this.pendingStartupConnectTarget = null
   }
 
-  // 'video-codec' — phone announces H.264 vs H.265 at START_INDICATION.
-  private readonly onDriverVideoCodec = (codec: 'h264' | 'h265'): void => {
+  // 'video-codec' — phone announces which advertised codec it picked.
+  private readonly onDriverVideoCodec = (codec: 'h264' | 'h265' | 'vp9' | 'av1'): void => {
     const wc = this.webContents
     if (!wc || wc.isDestroyed?.()) return
     wc.send('projection-event', { type: 'video-codec', payload: { codec } })
+  }
+
+  // Cluster channel codec selection
+  private readonly onDriverClusterVideoCodec = (codec: 'h264' | 'h265' | 'vp9' | 'av1'): void => {
+    this.lastClusterCodec = codec
+    const wc = this.webContents
+    if (!wc || wc.isDestroyed?.()) return
+    wc.send('projection-event', { type: 'cluster-video-codec', payload: { codec } })
   }
 
   private attachDriverListeners(d: IPhoneDriver): void {
@@ -540,6 +549,7 @@ export class ProjectionService {
     d.on('failure', this.onDriverFailure)
     d.on('targeted-connect-dispatched', this.onDriverTargetedConnect)
     d.on('video-codec', this.onDriverVideoCodec)
+    d.on('cluster-video-codec', this.onDriverClusterVideoCodec)
   }
 
   private detachDriverListeners(d: IPhoneDriver): void {
@@ -547,6 +557,7 @@ export class ProjectionService {
     d.off('failure', this.onDriverFailure)
     d.off('targeted-connect-dispatched', this.onDriverTargetedConnect)
     d.off('video-codec', this.onDriverVideoCodec)
+    d.off('cluster-video-codec', this.onDriverClusterVideoCodec)
   }
 
   private subscribeConfigEvents(): void {
@@ -743,6 +754,17 @@ export class ProjectionService {
         this.lastNaviVideoWidth = undefined
         this.lastNaviVideoHeight = undefined
         return { ok: true, enabled: false }
+      }
+
+      // Re-emit the cached cluster codec
+      if (this.lastClusterCodec) {
+        const wc = this.webContents
+        if (wc && !wc.isDestroyed?.()) {
+          wc.send('projection-event', {
+            type: 'cluster-video-codec',
+            payload: { codec: this.lastClusterCodec }
+          })
+        }
       }
 
       try {
@@ -1444,6 +1466,7 @@ export class ProjectionService {
         this.lastVideoWidth = undefined
         this.lastVideoHeight = undefined
         this.lastPluggedPhoneType = undefined
+        this.lastClusterCodec = null
         this.aaPlaybackInferred = 1
 
         this.resetMediaSnapshot('session-start')

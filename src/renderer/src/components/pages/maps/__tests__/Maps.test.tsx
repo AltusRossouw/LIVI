@@ -1,5 +1,13 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { Maps } from '../Maps'
+
+const renderMaps = (path = '/maps') =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Maps />
+    </MemoryRouter>
+  )
 
 type AnyFn = (...args: any[]) => any
 
@@ -88,18 +96,28 @@ describe('Maps page', () => {
         requestMaps: jest.fn().mockResolvedValue(undefined),
         onMapsVideoChunk: jest.fn((cb: AnyFn) => {
           mapsVideoCb = cb
-        })
+        }),
+        onEvent: jest.fn(),
+        offEvent: jest.fn()
       }
     }
   })
 
   test('requests maps stream and initializes render worker', async () => {
-    const { unmount } = render(<Maps />)
+    const { unmount } = renderMaps()
+
+    await waitFor(() => {
+      expect(MockWorker.instances.length).toBe(1)
+    })
+
+    // requestMaps(true) is gated on render-ready
+    act(() => {
+      MockWorker.instances[0].emit({ type: 'render-ready' })
+    })
 
     await waitFor(() => {
       expect((window as any).projection.ipc.requestMaps).toHaveBeenCalledWith(true)
     })
-    expect(MockWorker.instances.length).toBe(1)
 
     unmount()
     await waitFor(() => {
@@ -108,7 +126,7 @@ describe('Maps page', () => {
   })
 
   test('forwards video chunks after render-ready', () => {
-    render(<Maps />)
+    renderMaps()
     const worker = MockWorker.instances[0]
 
     act(() => {
@@ -126,7 +144,7 @@ describe('Maps page', () => {
 
   test('shows renderer error and unsupported firmware hint', () => {
     liviState.boxInfo = { supportFeatures: '' }
-    render(<Maps />)
+    renderMaps()
 
     const worker = MockWorker.instances[0]
     act(() => {

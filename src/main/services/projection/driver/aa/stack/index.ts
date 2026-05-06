@@ -70,7 +70,13 @@ export class AAStack extends EventEmitter {
       this._activeSession = session
 
       session.on('video-frame', (buf: Buffer, ts: bigint) => this.emit('video-frame', buf, ts))
+      session.on('cluster-video-frame', (buf: Buffer, ts: bigint) =>
+        this.emit('cluster-video-frame', buf, ts)
+      )
       session.on('video-codec', (codec: VideoCodec) => this.emit('video-codec', codec))
+      session.on('cluster-video-codec', (codec: VideoCodec) =>
+        this.emit('cluster-video-codec', codec)
+      )
       session.on(
         'audio-frame',
         (buf: Buffer, ts: bigint, channel: AudioChannelType, channelId: number) =>
@@ -182,6 +188,10 @@ export class AAStack extends EventEmitter {
 
   requestKeyframe(): void {
     this._activeSession?.requestKeyframe()
+  }
+
+  requestClusterKeyframe(): void {
+    this._activeSession?.requestClusterKeyframe()
   }
 
   requestShutdown(): void {

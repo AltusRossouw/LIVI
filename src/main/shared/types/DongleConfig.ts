@@ -54,6 +54,11 @@ export type DongleConfig = {
   width: number
   height: number
   fps: number
+  mapsEnabled: boolean
+  mapsWidth?: number
+  mapsHeight?: number
+  mapsFps?: 30 | 60
+  mapsDpi?: number
   projectionSafeAreaTop: number
   projectionSafeAreaBottom: number
   projectionSafeAreaLeft: number
@@ -88,7 +93,6 @@ export type DongleConfig = {
   gnssGalileo: boolean
   gnssBeiDou: boolean
   autoConn: boolean
-  mapsEnabled: boolean
   audioTransferMode: boolean
   wifiType: '2.4ghz' | '5ghz'
   wifiChannel: number

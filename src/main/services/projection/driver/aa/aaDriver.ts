@@ -18,6 +18,7 @@ import {
   NavigationMetaType,
   PhoneType,
   Plugged,
+  Unplugged,
   VideoData
 } from '@projection/messages/readable'
 import {
@@ -56,7 +57,12 @@ import {
 } from './stack/index'
 
 /** Build VideoData message from a raw H.264 NAL unit. */
-function buildVideoDataMessage(buf: Buffer, width: number, height: number): VideoData {
+function buildVideoDataMessage(
+  buf: Buffer,
+  width: number,
+  height: number,
+  type: MessageType = MessageType.VideoData
+): VideoData {
   // VideoData wire layout (LIVI):
   //   u32 width, u32 height, u32 flags, u32 length, u32 unknown, then payload.
   const HEADER = 20
@@ -67,7 +73,7 @@ function buildVideoDataMessage(buf: Buffer, width: number, height: number): Vide
   data.writeUInt32LE(buf.length, 12)
   data.writeUInt32LE(0, 16) // unknown
   buf.copy(data, HEADER)
-  const header = new MessageHeader(data.length, MessageType.VideoData)
+  const header = new MessageHeader(data.length, type)
   return new VideoData(header, data)
 }
 
@@ -338,7 +344,12 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
       evConnectorTypes: cfg.evConnectorTypes,
       hevcSupported: this._hevcSupported,
       vp9Supported: this._vp9Supported,
-      av1Supported: this._av1Supported
+      av1Supported: this._av1Supported,
+      mapsEnabled: Boolean(cfg.mapsEnabled),
+      mapsWidth: cfg.mapsWidth,
+      mapsHeight: cfg.mapsHeight,
+      mapsFps: cfg.mapsFps,
+      mapsDpi: cfg.mapsDpi
     }
     const displayAR = cfg.width / cfg.height
     const tierAR = tierW / tierH
@@ -366,16 +377,30 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
       console.log(
         `[aaDriver] AAStack disconnected (${reason ?? 'no reason'}) — supervisor stays up for retry`
       )
-      // Drop any accumulated nav state so the next session starts fresh.
+      // Drop any accumulated nav state so the next session starts fresh
       this._naviBag = {}
       this._naviActive = false
       this._naviApp = undefined
+
+      const hdr = new MessageHeader(0, MessageType.Unplugged)
+      this.emit('message', new Unplugged(hdr) as Message)
     })
 
     aa.on('video-frame', (buf: Buffer, _ts: bigint) => {
       const w = aaCfg.videoWidth ?? 1280
       const h = aaCfg.videoHeight ?? 720
       this.emit('message', buildVideoDataMessage(buf, w, h) as Message)
+    })
+
+    aa.on('cluster-video-frame', (buf: Buffer, _ts: bigint) => {
+      const w = aaCfg.videoWidth ?? 1280
+      const h = aaCfg.videoHeight ?? 720
+      this.emit('message', buildVideoDataMessage(buf, w, h, MessageType.NaviVideoData) as Message)
+    })
+
+    aa.on('cluster-video-codec', (codec: VideoCodec) => {
+      console.log(`[aaDriver] cluster-video-codec=${codec} (phone selection)`)
+      this.emit('cluster-video-codec', codec)
     })
 
     aa.on('video-codec', (codec: VideoCodec) => {
@@ -768,6 +793,11 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
           return true
 
         case CommandMapping.releaseVideoFocus:
+          return true
+
+        case CommandMapping.requestNaviScreenFocus:
+          // Maps tab opened
+          this._aa.requestClusterKeyframe()
           return true
 
         default:

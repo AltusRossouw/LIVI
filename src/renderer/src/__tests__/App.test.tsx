@@ -26,7 +26,8 @@ jest.mock('../components/pages', () => ({
     >
       {String(props.receivingVideo)}
     </div>
-  )
+  ),
+  Maps: () => <div data-testid="maps" />
 }))
 
 jest.mock('../components/layouts/AppLayout', () => ({

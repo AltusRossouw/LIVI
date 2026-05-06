@@ -575,6 +575,7 @@ export class RendererWorker {
 
     if (this.awaitingValidKeyframe && !key) {
       console.debug('[RENDER.WORKER] Ignoring delta while awaiting keyframe...')
+      if (this.keyframeRetryTimer === null) this.startKeyframeRetry()
       return
     }
 

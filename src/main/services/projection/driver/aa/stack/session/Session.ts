@@ -49,19 +49,31 @@ import { decode, encode, loadProtos, type ProtoTypes } from '../proto/index.js'
 import { ControlChannel } from './ControlChannel.js'
 
 /** Per-frame chatter is suppressed for these channels under DEBUG=1.
- *  Set TRACE=1 to see them anyway. */
+ *  Set TRACE=1 to see them anyway. SENSOR is included because the phone
+ *  walks ~15 sensor types at session start, doubling the per-message log. */
 const isFrameChannel = (ch: number): boolean =>
   ch === CH.VIDEO ||
+  ch === CH.CLUSTER_VIDEO ||
   ch === CH.MEDIA_AUDIO ||
   ch === CH.SPEECH_AUDIO ||
   ch === CH.SYSTEM_AUDIO ||
   ch === CH.INPUT ||
-  ch === CH.MIC_INPUT
+  ch === CH.MIC_INPUT ||
+  ch === CH.SENSOR
 
 /** Ping/pong on the control channel runs every 1500 ms in both directions.
  *  Same idea as isFrameChannel — suppress under DEBUG, show under TRACE. */
 const isPingPong = (ch: number, msgId: number): boolean =>
   ch === CH.CONTROL && (msgId === CTRL_MSG.PING_REQUEST || msgId === CTRL_MSG.PING_RESPONSE)
+
+/** Map W×H pixels to AA's VideoCodecResolutionType enum. Returns null when
+ *  the dimensions don't match any known tier. */
+function resolutionFromDimensions(w: number, h: number): number | null {
+  if (w === 800 && h === 480) return VIDEO_RESOLUTION._800x480
+  if (w === 1280 && h === 720) return VIDEO_RESOLUTION._1280x720
+  if (w === 1920 && h === 1080) return VIDEO_RESOLUTION._1920x1080
+  return null
+}
 
 // ── Session state machine ─────────────────────────────────────────────────────
 const enum State {
@@ -102,6 +114,13 @@ export interface SessionConfig {
   hevcSupported?: boolean
   vp9Supported?: boolean
   av1Supported?: boolean
+  // When true the secondary (CLUSTER) video sink is advertised in the SDR.
+  mapsEnabled?: boolean
+  // Optional cluster spec
+  mapsWidth?: number
+  mapsHeight?: number
+  mapsFps?: 30 | 60
+  mapsDpi?: number
 }
 
 export type VideoCodec = 'h264' | 'h265' | 'vp9' | 'av1'
@@ -124,6 +143,7 @@ export class Session extends EventEmitter {
   private _proto!: ProtoTypes
   private _control!: ControlChannel
   private _video!: VideoChannel
+  private _cluster!: VideoChannel
   private _audio = new Map<number, AudioChannel>()
   private _input!: InputChannel
   private _media!: MediaInfoChannel
@@ -133,6 +153,8 @@ export class Session extends EventEmitter {
   private _videoCodecByIndex: VideoCodec[] = []
   private _videoCodec: VideoCodec | null = null
   private _phoneCodecLogged = false
+  private _clusterCodecByIndex: VideoCodec[] = []
+  private _clusterCodec: VideoCodec | null = null
 
   constructor(
     private readonly _sock: net.Socket,
@@ -347,6 +369,18 @@ export class Session extends EventEmitter {
       return
     }
 
+    if (channelId === CH.CLUSTER_VIDEO) {
+      if (msgId === AV_MSG.SETUP_REQUEST) {
+        this._handleAVSetupRequest(channelId, payload)
+        return
+      }
+      const rawPayload = Buffer.concat([Buffer.allocUnsafe(2), payload])
+      rawPayload.writeUInt16BE(msgId, 0)
+      const frame = { channelId, flags, msgId, payload, rawPayload }
+      this._cluster?.handleMessage(msgId, payload, frame)
+      return
+    }
+
     // Audio channels (media/speech/system) share AV wire shape with video.
     const audioCh = this._audio.get(channelId)
     if (audioCh && msgId !== AV_MSG.SETUP_REQUEST) {
@@ -479,14 +513,26 @@ export class Session extends EventEmitter {
       this._sendAA(ch, flags, msgId, data)
     )
 
-    this._video = new VideoChannel((ch, flags, msgId, data) =>
-      this._sendEncrypted(ch, flags, msgId, data)
+    this._video = new VideoChannel(
+      (ch, flags, msgId, data) => this._sendEncrypted(ch, flags, msgId, data),
+      CH.VIDEO
     )
 
     this._video.on('frame', (buf: Buffer, ts: bigint) => this.emit('video-frame', buf, ts))
 
     // Exit/Home on AA display — keep session alive so phone can re-request focus
     this._video.on('host-ui-requested', () => this.emit('host-ui-requested'))
+
+    // Cluster (secondary) display sink — phone may push a Maps overlay or
+    // navigation widget here when display_type=CLUSTER is advertised.
+    this._cluster = new VideoChannel(
+      (ch, flags, msgId, data) => this._sendEncrypted(ch, flags, msgId, data),
+      CH.CLUSTER_VIDEO
+    )
+
+    this._cluster.on('frame', (buf: Buffer, ts: bigint) =>
+      this.emit('cluster-video-frame', buf, ts)
+    )
 
     // Audio sinks: media (4), speech/guidance (5), system/notification (6)
     for (const channelId of [CH.MEDIA_AUDIO, CH.SPEECH_AUDIO, CH.SYSTEM_AUDIO]) {
@@ -757,6 +803,29 @@ export class Session extends EventEmitter {
         '[Session] keyframe requested via VideoFocusIndication(PROJECTED, unsolicited=false)'
       )
     }
+  }
+
+  // Same as above but for the secondary (cluster) display sink (ch=19).
+  requestClusterKeyframe(): void {
+    if (this._state !== State.RUNNING) return
+    // 1. Surrender focus: focus_mode=NATIVE(2), unsolicited=true
+    this._sendEncrypted(
+      CH.CLUSTER_VIDEO,
+      FRAME_FLAGS.ENC_SIGNAL,
+      AV_MSG.VIDEO_FOCUS_INDICATION,
+      Buffer.from([0x08, 0x02, 0x10, 0x01])
+    )
+    // 2. Re-acquire shortly after: focus_mode=PROJECTED(1), unsolicited=true
+    setTimeout(() => {
+      if (this._state !== State.RUNNING) return
+      this._sendEncrypted(
+        CH.CLUSTER_VIDEO,
+        FRAME_FLAGS.ENC_SIGNAL,
+        AV_MSG.VIDEO_FOCUS_INDICATION,
+        Buffer.from([0x08, 0x01, 0x10, 0x01])
+      )
+    }, 50)
+    if (DEBUG) console.log('[Session] cluster keyframe requested (NATIVE→PROJECTED toggle)')
   }
 
   // HU-initiated shutdown via ByeByeRequest
@@ -1072,6 +1141,65 @@ export class Session extends EventEmitter {
       }
     })
 
+    // ── Cluster Video (ch=19) — secondary display sink for Maps/Navi ──
+    // Spec defaults to the main panel (resolution / fps / dpi) and offers
+    // the same codec list — phone picks per channel independently. User can
+    // override the cluster spec via DongleConfig mapsWidth / mapsHeight /
+    // mapsFps / mapsDpi.
+    //
+    // CAR.SERVICE validates that every advertised display has a matching
+    // InputSourceService — without it the phone aborts with "No input for
+    // display N". Cluster is non-interactive so we register a stub input
+    // source with no touchscreen / keycodes but the matching display_id.
+    if (this._cfg.mapsEnabled) {
+      const mapsW = this._cfg.mapsWidth
+      const mapsH = this._cfg.mapsHeight
+      const clusterRes = mapsW && mapsH ? (resolutionFromDimensions(mapsW, mapsH) ?? vRes) : vRes
+      const clusterFps =
+        this._cfg.mapsFps === 60 ? VIDEO_FPS._60 : this._cfg.mapsFps === 30 ? VIDEO_FPS._30 : vFps
+      const clusterDpi = this._cfg.mapsDpi ?? dpi
+      const clusterBase = {
+        codecResolution: clusterRes,
+        frameRate: clusterFps,
+        widthMargin: 0,
+        heightMargin: 0,
+        density: clusterDpi,
+        uiConfig: { margins: { top: 0, bottom: 0, left: 0, right: 0 } }
+      }
+      const clusterConfigs: object[] = [
+        { ...clusterBase, videoCodecType: MEDIA_CODEC.VIDEO_H264_BP }
+      ]
+      this._clusterCodecByIndex = ['h264']
+      if (this._cfg.hevcSupported) {
+        clusterConfigs.push({ ...clusterBase, videoCodecType: MEDIA_CODEC.VIDEO_H265 })
+        this._clusterCodecByIndex.push('h265')
+      }
+      if (this._cfg.vp9Supported) {
+        clusterConfigs.push({ ...clusterBase, videoCodecType: MEDIA_CODEC.VIDEO_VP9 })
+        this._clusterCodecByIndex.push('vp9')
+      }
+      if (this._cfg.av1Supported) {
+        clusterConfigs.push({ ...clusterBase, videoCodecType: MEDIA_CODEC.VIDEO_AV1 })
+        this._clusterCodecByIndex.push('av1')
+      }
+      channels.push({
+        id: CH.CLUSTER_VIDEO,
+        mediaSinkService: {
+          availableType: MEDIA_CODEC.VIDEO_H264_BP,
+          availableWhileInCall: true,
+          videoConfigs: clusterConfigs,
+          displayType: DISPLAY_TYPE.CLUSTER,
+          displayId: 1
+        }
+      })
+      channels.push({
+        id: CH.CLUSTER_INPUT,
+        inputSourceService: {
+          displayId: 1
+        }
+      })
+    }
+
     // ── Media Audio (ch=4) ──
     channels.push({
       id: CH.MEDIA_AUDIO,
@@ -1382,6 +1510,24 @@ export class Session extends EventEmitter {
             `(offered: ${this._videoCodecByIndex.join(', ')})`
         )
       }
+    } else if (channelId === CH.CLUSTER_VIDEO) {
+      const want: VideoCodec =
+        codec === MEDIA_CODEC.VIDEO_H265
+          ? 'h265'
+          : codec === MEDIA_CODEC.VIDEO_VP9
+            ? 'vp9'
+            : codec === MEDIA_CODEC.VIDEO_AV1
+              ? 'av1'
+              : 'h264'
+      const idx = this._clusterCodecByIndex.indexOf(want)
+      if (idx >= 0) configIdx = idx
+      if (this._clusterCodec !== want) {
+        this._clusterCodec = want
+        this.emit('cluster-video-codec', want)
+        if (DEBUG) {
+          console.log(`[Session] cluster codec selected: ${want} (configIdx=${configIdx})`)
+        }
+      }
     }
     const respBuf = encode(this._proto.AVChannelSetupResponse, {
       mediaStatus: AV_SETUP_STATUS.OK,
@@ -1395,27 +1541,28 @@ export class Session extends EventEmitter {
       )
     }
 
-    if (channelId === CH.VIDEO) {
+    if (channelId === CH.VIDEO || channelId === CH.CLUSTER_VIDEO) {
       // VideoFocusIndication(PROJECTED, unsolicited=false) keyframe-request
       this._sendEncrypted(
-        CH.VIDEO,
+        channelId,
         FRAME_FLAGS.ENC_SIGNAL,
         AV_MSG.VIDEO_FOCUS_INDICATION,
         Buffer.from([0x08, 0x01])
       )
       if (DEBUG) {
-        console.log(
-          '[Session] VideoFocusIndication (PROJECTED, unsolicited=false) sent — requests fresh IDR'
-        )
+        const label = channelId === CH.CLUSTER_VIDEO ? 'cluster' : 'main'
+        console.log(`[Session] VideoFocusIndication ${label} (PROJECTED, unsolicited=false) sent`)
       }
 
-      // No AVChannelStartIndication — phone sends START_INDICATION when ready
-      this._transition(State.RUNNING)
-      this.emit('connected')
-      if (DEBUG)
-        console.log(
-          `[Session] Video channel ready — waiting for ${this._videoCodec ?? 'h264'} frames from phone`
-        )
+      if (channelId === CH.VIDEO) {
+        // No AVChannelStartIndication — phone sends START_INDICATION when ready
+        this._transition(State.RUNNING)
+        this.emit('connected')
+        if (DEBUG)
+          console.log(
+            `[Session] Video channel ready — waiting for ${this._videoCodec ?? 'h264'} frames from phone`
+          )
+      }
     }
   }
 
@@ -1451,11 +1598,8 @@ export class Session extends EventEmitter {
         Buffer.from([0x52, 0x02, 0x08, 0x00])
       )
       if (DEBUG) console.log('[Session] SensorBatch: NightMode=false sent')
-    } else {
-      if (DEBUG) {
-        console.log(`[Session] SensorStartRequest type=${sensorType} — no batch data for this type`)
-      }
     }
+    // No-batch sensor types (most of them) emit ack-only — silent under DEBUG.
   }
 
   // ── WiFi Projection channel (ch=14) ──────────────────────────────────────

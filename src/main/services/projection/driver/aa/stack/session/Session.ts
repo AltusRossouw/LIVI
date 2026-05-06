@@ -98,11 +98,13 @@ export interface SessionConfig {
   // FuelType (UNLEADED=1, DIESEL_2=4, ELECTRIC=10, …)
   fuelTypes?: number[]
   evConnectorTypes?: number[]
-  // True when the renderer's WebCodecs probe reported HEVC HW or SW
+  // Renderer WebCodecs probe results — only codecs flagged true are advertised.
   hevcSupported?: boolean
+  vp9Supported?: boolean
+  av1Supported?: boolean
 }
 
-export type VideoCodec = 'h264' | 'h265'
+export type VideoCodec = 'h264' | 'h265' | 'vp9' | 'av1'
 
 export class Session extends EventEmitter {
   // Events: 'video-frame', 'video-codec', 'audio-frame', 'audio-start', 'audio-stop',
@@ -130,6 +132,7 @@ export class Session extends EventEmitter {
   private _channelMap = new Map<number, number>() // channelId → service type
   private _videoCodecByIndex: VideoCodec[] = []
   private _videoCodec: VideoCodec | null = null
+  private _phoneCodecLogged = false
 
   constructor(
     private readonly _sock: net.Socket,
@@ -1037,41 +1040,28 @@ export class Session extends EventEmitter {
     const channels: object[] = []
 
     // ── Video (ch=3) ──
-    // Advertise H.264 always; H.265 only when the renderer's WebCodecs probe
-    // confirmed HEVC HW or SW support. Phone picks one config and reports the
-    // index back via START_INDICATION.
     const videoUiConfig = {
       margins: { top: insetTop, bottom: insetBottom, left: insetLeft, right: insetRight }
     }
+    const baseVideoConfig = {
+      codecResolution: vRes,
+      frameRate: vFps,
+      widthMargin,
+      heightMargin,
+      density: dpi,
+      uiConfig: videoUiConfig
+    }
     const videoConfigs: object[] = [
-      {
-        codecResolution: vRes,
-        frameRate: vFps,
-        widthMargin,
-        heightMargin,
-        density: dpi,
-        videoCodecType: MEDIA_CODEC.VIDEO_H264_BP,
-        uiConfig: videoUiConfig
-      }
+      { ...baseVideoConfig, videoCodecType: MEDIA_CODEC.VIDEO_H264_BP }
     ]
     this._videoCodecByIndex = ['h264']
     if (this._cfg.hevcSupported) {
-      videoConfigs.push({
-        codecResolution: vRes,
-        frameRate: vFps,
-        widthMargin,
-        heightMargin,
-        density: dpi,
-        videoCodecType: MEDIA_CODEC.VIDEO_H265,
-        uiConfig: videoUiConfig
-      })
+      videoConfigs.push({ ...baseVideoConfig, videoCodecType: MEDIA_CODEC.VIDEO_H265 })
       this._videoCodecByIndex.push('h265')
     }
+    this._phoneCodecLogged = false
     if (DEBUG) {
-      console.log(
-        `[Session] advertising codecs: ${this._videoCodecByIndex.join(', ')} ` +
-          `(hevcSupported=${!!this._cfg.hevcSupported})`
-      )
+      console.log(`[Session] advertising codecs: ${this._videoCodecByIndex.join(', ')}`)
     }
     channels.push({
       id: CH.VIDEO,
@@ -1370,13 +1360,27 @@ export class Session extends EventEmitter {
     // mediaStatus MUST be OK(2) — NONE(0) is treated as FAIL and drops the session.
     let configIdx = 0
     if (channelId === CH.VIDEO) {
-      const want: VideoCodec = codec === MEDIA_CODEC.VIDEO_H265 ? 'h265' : 'h264'
+      const want: VideoCodec =
+        codec === MEDIA_CODEC.VIDEO_H265
+          ? 'h265'
+          : codec === MEDIA_CODEC.VIDEO_VP9
+            ? 'vp9'
+            : codec === MEDIA_CODEC.VIDEO_AV1
+              ? 'av1'
+              : 'h264'
       const idx = this._videoCodecByIndex.indexOf(want)
       if (idx >= 0) configIdx = idx
       if (this._videoCodec !== want) {
         this._videoCodec = want
         this.emit('video-codec', want)
         if (DEBUG) console.log(`[Session] video codec selected: ${want} (configIdx=${configIdx})`)
+      }
+      if (!this._phoneCodecLogged) {
+        this._phoneCodecLogged = true
+        console.log(
+          `[Session] ★ phone picked video codec: ${want.toUpperCase()} ` +
+            `(offered: ${this._videoCodecByIndex.join(', ')})`
+        )
       }
     }
     const respBuf = encode(this._proto.AVChannelSetupResponse, {

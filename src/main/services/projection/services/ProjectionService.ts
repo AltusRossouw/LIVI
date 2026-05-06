@@ -121,6 +121,8 @@ export class ProjectionService {
     return this.aaDriver ?? this.dongleDriver
   }
   private hevcSupported = false
+  private vp9Supported = false
+  private av1Supported = false
   private webUsbDevice: WebUSBDevice | null = null
   private webContents: WebContents | null = null
   private config: ExtraConfig = DEFAULT_CONFIG as ExtraConfig
@@ -170,13 +172,29 @@ export class ProjectionService {
 
   private applyCodecCapabilities(payload: unknown): void {
     if (!payload || typeof payload !== 'object') return
-    const h265 = (payload as { h265?: { hw?: unknown; sw?: unknown } }).h265
-    if (!h265 || typeof h265 !== 'object') return
-    const supported = Boolean(h265.hw) || Boolean(h265.sw)
-    if (this.hevcSupported === supported) return
-    this.hevcSupported = supported
-    console.log(`[ProjectionService] hevc support reported by renderer: ${supported}`)
-    this.aaDriver?.setHevcSupported(supported)
+    const caps = payload as Record<string, { hw?: unknown; sw?: unknown } | undefined>
+    const isSupported = (c: { hw?: unknown; sw?: unknown } | undefined): boolean =>
+      !!c && (Boolean(c.hw) || Boolean(c.sw))
+
+    const hevc = isSupported(caps.h265)
+    const vp9 = isSupported(caps.vp9)
+    const av1 = isSupported(caps.av1)
+
+    if (this.hevcSupported !== hevc) {
+      this.hevcSupported = hevc
+      console.log(`[ProjectionService] hevc support reported by renderer: ${hevc}`)
+      this.aaDriver?.setHevcSupported(hevc)
+    }
+    if (this.vp9Supported !== vp9) {
+      this.vp9Supported = vp9
+      console.log(`[ProjectionService] vp9 support reported by renderer: ${vp9}`)
+      this.aaDriver?.setVp9Supported(vp9)
+    }
+    if (this.av1Supported !== av1) {
+      this.av1Supported = av1
+      console.log(`[ProjectionService] av1 support reported by renderer: ${av1}`)
+      this.aaDriver?.setAv1Supported(av1)
+    }
   }
 
   /** Read by AaDriver right before it starts the AAStack. */
@@ -1214,6 +1232,9 @@ export class ProjectionService {
       if (!this.aaDriver) {
         const aa = new AaDriver()
         this.aaDriver = aa
+        aa.setHevcSupported(this.hevcSupported)
+        aa.setVp9Supported(this.vp9Supported)
+        aa.setAv1Supported(this.av1Supported)
         // Stop driving the dongle while AA owns the session.
         this.detachDriverListeners(this.dongleDriver)
         this.attachDriverListeners(aa)

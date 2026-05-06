@@ -429,8 +429,12 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
       if (t === 'codec-capabilities') {
         const caps = (msg as { capabilities?: unknown }).capabilities
+        console.log('[Projection] codec-capabilities from worker:', caps)
         if (caps && typeof caps === 'object') {
-          void window.projection.ipc.reportCodecCapabilities(caps).catch(() => {})
+          window.projection.ipc
+            .reportCodecCapabilities(caps)
+            .then(() => console.log('[Projection] reportCodecCapabilities → ok'))
+            .catch((e) => console.error('[Projection] reportCodecCapabilities → error', e))
         }
       }
     }
@@ -757,7 +761,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
         case 'video-codec': {
           const payload = d.payload as { codec?: unknown } | undefined
           const codec = payload?.codec
-          if (codec === 'h264' || codec === 'h265') {
+          if (codec === 'h264' || codec === 'h265' || codec === 'vp9' || codec === 'av1') {
             if (codec !== videoCodecRef.current) {
               videoCodecRef.current = codec
               renderWorkerRef.current?.postMessage(new SetCodecEvent(codec))

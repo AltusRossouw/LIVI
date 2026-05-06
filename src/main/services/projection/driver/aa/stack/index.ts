@@ -62,12 +62,9 @@ export class AAStack extends EventEmitter {
 
   constructor(private readonly _cfg: AAStackConfig) {
     super()
-    const resolvedCfg: AAStackConfig = {
-      ..._cfg,
-      btMacAddress: _cfg.btMacAddress ?? detectBtMac(),
-      wifiBssid: _cfg.wifiBssid ?? detectWifiBssid()
-    }
-    this._server = new TcpServer(resolvedCfg)
+    _cfg.btMacAddress ??= detectBtMac()
+    _cfg.wifiBssid ??= detectWifiBssid()
+    this._server = new TcpServer(_cfg)
 
     this._server.on('session', (session: Session) => {
       this._activeSession = session

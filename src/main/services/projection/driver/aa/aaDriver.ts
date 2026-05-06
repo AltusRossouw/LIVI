@@ -243,6 +243,9 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
   private _naviActive = false
   private _naviApp: string | undefined
   private _hevcSupported = false
+  private _vp9Supported = false
+  private _av1Supported = false
+  private _aaCfg: AAStackConfig | null = null
 
   constructor(opts: AaDriverOptions = {}) {
     super()
@@ -253,6 +256,17 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
 
   setHevcSupported(supported: boolean): void {
     this._hevcSupported = supported
+    if (this._aaCfg) this._aaCfg.hevcSupported = supported
+  }
+
+  setVp9Supported(supported: boolean): void {
+    this._vp9Supported = supported
+    if (this._aaCfg) this._aaCfg.vp9Supported = supported
+  }
+
+  setAv1Supported(supported: boolean): void {
+    this._av1Supported = supported
+    if (this._aaCfg) this._aaCfg.av1Supported = supported
   }
 
   async start(cfg: DongleConfig): Promise<boolean> {
@@ -322,7 +336,9 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
       wifiChannel: cfg.wifiChannel,
       fuelTypes: mapCarTypeToFuelTypes(cfg.carType),
       evConnectorTypes: cfg.evConnectorTypes,
-      hevcSupported: this._hevcSupported
+      hevcSupported: this._hevcSupported,
+      vp9Supported: this._vp9Supported,
+      av1Supported: this._av1Supported
     }
     const displayAR = cfg.width / cfg.height
     const tierAR = tierW / tierH
@@ -335,6 +351,7 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
     this._touchW = tierW
     this._touchH = tierH
 
+    this._aaCfg = aaCfg
     const aa = new AAStack(aaCfg)
     this._aa = aa
 
@@ -607,6 +624,7 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
       console.warn(`[aaDriver] AAStack stop threw: ${(err as Error).message}`)
     }
     this._aa = null
+    this._aaCfg = null
 
     if (this._supervisor) {
       try {

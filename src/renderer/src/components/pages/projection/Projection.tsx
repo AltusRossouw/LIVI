@@ -124,9 +124,19 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     void window.projection.ipc.sendFrame().catch(() => {})
   }, [pathname])
 
+  const prevPathnameRef = useRef(pathname)
   useEffect(() => {
-    console.log('[CARPLAY] Dongle connected:', isDongleConnected)
-  }, [isDongleConnected])
+    const prev = prevPathnameRef.current
+    prevPathnameRef.current = pathname
+    if (pathname !== '/' || prev === '/') return
+    if (!isDongleConnected) return
+    window.projection.ipc.sendCommand('home')
+  }, [pathname, isDongleConnected])
+
+  useEffect(() => {
+    const mode = isAaActiveFlag ? 'AA-native' : 'dongle'
+    console.log(`[CARPLAY] phone connected (${mode}):`, isDongleConnected)
+  }, [isDongleConnected, isAaActiveFlag])
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null)

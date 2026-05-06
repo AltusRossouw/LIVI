@@ -1,8 +1,9 @@
 import MapOutlinedIcon from '@mui/icons-material/MapOutlined'
 import { Box, Typography, useTheme } from '@mui/material'
 import { createRenderWorker } from '@worker/createRenderWorker'
-import { InitEvent } from '@worker/render/RenderEvents'
+import { InitEvent, SetCodecEvent, type VideoCodec } from '@worker/render/RenderEvents'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router'
 import { useLiviStore, useStatusStore } from '../../../store/store'
 
 type BoxInfo = { supportFeatures?: unknown }
@@ -28,12 +29,15 @@ function parseBoxInfo(raw: unknown): BoxInfo | null {
   return null
 }
 
-export const Maps: React.FC = () => {
+export const Cluster: React.FC = () => {
   const theme = useTheme()
+  const location = useLocation()
+  const showCluster = location.pathname === '/cluster'
 
   const settings = useLiviStore((s) => s.settings)
   const boxInfoRaw = useLiviStore((s) => s.boxInfo)
   const isStreaming = useStatusStore((s) => s.isStreaming)
+  const isAaActive = useStatusStore((s) => s.isAaActive)
   const fps = settings?.fps
 
   const [renderReady, setRenderReady] = useState(false)
@@ -44,19 +48,17 @@ export const Maps: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderWorkerRef = useRef<Worker | null>(null)
   const offscreenCanvasRef = useRef<OffscreenCanvas | null>(null)
+  const clusterCodecRef = useRef<VideoCodec>('h264')
 
-  const mapsVideoChannel = useMemo(() => new MessageChannel(), [])
+  const clusterVideoChannel = useMemo(() => new MessageChannel(), [])
 
   useEffect(() => {
     const el = document.getElementById('content-root')
     if (!el) return
-
     const read = () => setNavHidden(el.getAttribute('data-nav-hidden') === '1')
     read()
-
     const mo = new MutationObserver(read)
     mo.observe(el, { attributes: true, attributeFilter: ['data-nav-hidden'] })
-
     return () => mo.disconnect()
   }, [])
 
@@ -78,6 +80,10 @@ export const Maps: React.FC = () => {
   }, [])
 
   const supportsNaviScreen = useMemo(() => {
+    // AA-native always exposes a cluster sink (ch=19, display_type=CLUSTER)
+    // when clusterEnabled is on — phone streams H.264 cluster frames there.
+    if (isAaActive) return true
+
     const box = parseBoxInfo(boxInfoRaw)
     if (!box) return false
 
@@ -96,29 +102,35 @@ export const Maps: React.FC = () => {
     }
 
     return false
-  }, [boxInfoRaw])
+  }, [boxInfoRaw, isAaActive])
 
-  // Request/Release maps stream
+  // Request/Release cluster stream + reset worker on disconnect
+  const wasStreamingRef = useRef(isStreaming)
   useEffect(() => {
-    let cancelled = false
-
-    const apply = async () => {
-      try {
-        const enabled = Boolean(isStreaming)
-        await window.projection.ipc.requestMaps(enabled)
-        if (cancelled) return
-      } catch {
-        // ignore
+    if (!isStreaming) {
+      void window.projection.ipc.requestCluster(false).catch(() => {})
+      if (wasStreamingRef.current) {
+        // Just transitioned from streaming → disconnected. Blank the worker.
+        clusterCodecRef.current = 'h264'
+        try {
+          renderWorkerRef.current?.postMessage({ type: 'reset' })
+        } catch {
+          /* worker not yet alive */
+        }
       }
+      wasStreamingRef.current = false
+      return
     }
-
-    void apply()
-
+    wasStreamingRef.current = true
+    if (!renderReady) {
+      void window.projection.ipc.requestCluster(false).catch(() => {})
+      return
+    }
+    void window.projection.ipc.requestCluster(true).catch(() => {})
     return () => {
-      cancelled = true
-      void window.projection.ipc.requestMaps(false).catch(() => {})
+      void window.projection.ipc.requestCluster(false).catch(() => {})
     }
-  }, [isStreaming])
+  }, [isStreaming, renderReady])
 
   // Init Render.worker
   useEffect(() => {
@@ -132,9 +144,9 @@ export const Maps: React.FC = () => {
     const w = createRenderWorker()
     renderWorkerRef.current = w
 
-    w.postMessage(new InitEvent(offscreenCanvasRef.current, mapsVideoChannel.port2, fps), [
+    w.postMessage(new InitEvent(offscreenCanvasRef.current, clusterVideoChannel.port2, fps), [
       offscreenCanvasRef.current,
-      mapsVideoChannel.port2
+      clusterVideoChannel.port2
     ])
 
     return () => {
@@ -142,7 +154,7 @@ export const Maps: React.FC = () => {
       renderWorkerRef.current = null
       offscreenCanvasRef.current = null
     }
-  }, [mapsVideoChannel, fps])
+  }, [clusterVideoChannel, fps])
 
   // Render.worker ready/error messages
   useEffect(() => {
@@ -157,6 +169,11 @@ export const Maps: React.FC = () => {
         setRenderReady(true)
         setRendererError(null)
         console.log('[MAPS] Render worker ready message received')
+        return
+      }
+
+      if (t === 'awaiting-keyframe' || t === 'request-keyframe') {
+        void window.projection.ipc.requestCluster(true).catch(() => {})
         return
       }
 
@@ -199,6 +216,25 @@ export const Maps: React.FC = () => {
     }
   }, [renderReady])
 
+  // Listen for cluster-video-codec events to switch the worker's parser
+  useEffect(() => {
+    const handler = (_evt: unknown, ...args: unknown[]) => {
+      const d = args[0] as { type?: string; payload?: { codec?: unknown } } | undefined
+      if (d?.type !== 'cluster-video-codec') return
+      const codec = d.payload?.codec
+      console.log(`[MAPS] cluster-video-codec event received: codec=${codec}`)
+      if (codec === 'h264' || codec === 'h265' || codec === 'vp9' || codec === 'av1') {
+        if (codec !== clusterCodecRef.current) {
+          console.log(`[MAPS] switching worker codec ${clusterCodecRef.current} → ${codec}`)
+          clusterCodecRef.current = codec
+          renderWorkerRef.current?.postMessage(new SetCodecEvent(codec))
+        }
+      }
+    }
+    window.projection.ipc.onEvent(handler)
+    return () => window.projection.ipc.offEvent(handler)
+  }, [])
+
   // Forward maps video chunks to Render.worker port
   useEffect(() => {
     const handleVideo = (payload: unknown) => {
@@ -209,12 +245,12 @@ export const Maps: React.FC = () => {
       const buf = m.chunk?.buffer
       if (!buf) return
 
-      mapsVideoChannel.port1.postMessage(buf, [buf])
+      clusterVideoChannel.port1.postMessage(buf, [buf])
     }
 
-    window.projection.ipc.onMapsVideoChunk(handleVideo)
+    window.projection.ipc.onClusterVideoChunk(handleVideo)
     return () => {}
-  }, [mapsVideoChannel, renderReady, rendererError])
+  }, [clusterVideoChannel, renderReady, rendererError])
 
   const canShowVideo = !rendererError
 
@@ -230,18 +266,24 @@ export const Maps: React.FC = () => {
         display: 'flex',
         justifyContent: 'stretch',
         alignItems: 'stretch',
-        backgroundColor: theme.palette.background.default
+        backgroundColor: theme.palette.background.default,
+        visibility: showCluster ? 'visible' : 'hidden',
+        opacity: showCluster ? 1 : 0,
+        pointerEvents: showCluster ? 'auto' : 'none',
+        transition: 'opacity 220ms ease',
+        zIndex: showCluster ? 5 : -1
       }}
     >
-      {!isStreaming && (
+      {!isStreaming && showCluster && (
         <Box
           sx={{
-            position: 'absolute',
+            position: 'fixed',
             inset: 0,
             display: 'grid',
             placeItems: 'center',
             textAlign: 'center',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            zIndex: 6
           }}
         >
           <MapOutlinedIcon sx={{ fontSize: 84, opacity: 0.55 }} />

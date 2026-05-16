@@ -115,13 +115,13 @@ const api = {
     getSysdefaultPrettyName: (): Promise<string> => ipcRenderer.invoke('get-sysdefault-mic-label'),
     uploadIcons: () => ipcRenderer.invoke('projection-upload-icons'),
     uploadLiviScripts: () => ipcRenderer.invoke('projection-upload-livi-scripts'),
-    listenForEvents: (callback: ApiCallback): void => {
+    listenForEvents: (callback: ApiCallback): (() => void) => {
       usbEventHandlers.push(callback)
       usbEventQueue.forEach(([evt, ...args]) => callback(evt, ...args))
       usbEventQueue = []
-    },
-    unlistenForEvents: (callback: ApiCallback): void => {
-      usbEventHandlers = usbEventHandlers.filter((cb) => cb !== callback)
+      return () => {
+        usbEventHandlers = usbEventHandlers.filter((cb) => cb !== callback)
+      }
     }
   },
 
@@ -177,13 +177,13 @@ const api = {
         data: Array.from(data)
       })
     },
-    onEvent: (callback: ApiCallback): void => {
+    onEvent: (callback: ApiCallback): (() => void) => {
       projectionEventHandlers.push(callback)
       projectionEventQueue.forEach(([evt, ...args]) => callback(evt, ...args))
       projectionEventQueue = []
-    },
-    offEvent: (callback: ApiCallback): void => {
-      projectionEventHandlers = projectionEventHandlers.filter((cb) => cb !== callback)
+      return () => {
+        projectionEventHandlers = projectionEventHandlers.filter((cb) => cb !== callback)
+      }
     },
     readMedia: (): Promise<unknown> => ipcRenderer.invoke('projection-media-read'),
     readNavigation: (): Promise<unknown> => ipcRenderer.invoke('projection-navigation-read'),

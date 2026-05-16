@@ -33,6 +33,7 @@ sudo apt-get install -y \
   xdg-user-dirs \
   cage \
   seatd \
+  wlr-randr \
   pipewire wireplumber pipewire-pulse
 
 echo "→ Adding $USER to required groups"
@@ -132,6 +133,26 @@ $KIOSK_MARKER
 if [ -z "\$WAYLAND_DISPLAY" ] && [ "\$(tty)" = "/dev/tty1" ]; then
   export ELECTRON_OZONE_PLATFORM_HINT=wayland
   export LIVI_KIOSK=1
+  LIVI_KIOSK_MODE="\${LIVI_KIOSK_MODE:-1920x1080@60}"
+
+  # Cage ignores video= cmdline; set the mode via wlr-randr.
+  # LIVI_KIOSK_MODE=native skips.
+  if [ "\$LIVI_KIOSK_MODE" != "native" ]; then
+    (
+      export XDG_RUNTIME_DIR=/run/user/\$(id -u)
+      for _ in \$(seq 1 40); do
+        if [ -S "\$XDG_RUNTIME_DIR/wayland-0" ]; then
+          OUT=\$(WAYLAND_DISPLAY=wayland-0 wlr-randr 2>/dev/null \\
+            | awk 'NR==1 {print \$1; exit}')
+          [ -n "\$OUT" ] && WAYLAND_DISPLAY=wayland-0 \\
+            wlr-randr --output "\$OUT" --mode "\$LIVI_KIOSK_MODE" 2>/dev/null
+          break
+        fi
+        sleep 0.25
+      done
+    ) &
+  fi
+
   exec cage -- "$APPIMAGE_PATH"
 fi
 EOF

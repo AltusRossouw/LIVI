@@ -37,8 +37,8 @@ export const Camera: React.FC<SettingsCustomPageProps<Config, string>> = ({ stat
         detectCameras(setCameraFound, safeCameraPersist, state).then(setCameras)
       }
     }
-    window.projection.usb.listenForEvents(usbHandler)
-    return () => window.projection.usb.unlistenForEvents(usbHandler)
+    const unsubscribe = window.projection.usb.listenForEvents(usbHandler)
+    return unsubscribe
   }, [safeCameraPersist, setCameraFound, state])
 
   const cameraOptions = useMemo<readonly { deviceId: string; label: string }[]>(

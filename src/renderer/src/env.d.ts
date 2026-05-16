@@ -124,8 +124,7 @@ declare global {
         getSysdefaultPrettyName(): Promise<string>
         uploadIcons(): Promise<void>
         uploadLiviScripts(): Promise<DevToolsUploadResult>
-        listenForEvents(callback: (event: unknown, ...args: unknown[]) => void): void
-        unlistenForEvents(callback: (event: unknown, ...args: unknown[]) => void): void
+        listenForEvents(callback: (event: unknown, ...args: unknown[]) => void): () => void
       }
 
       settings: {
@@ -152,8 +151,7 @@ declare global {
         sendCommand(key: string): void
         sendRawMessage(type: number, data: Uint8Array): void
 
-        onEvent(callback: (event: unknown, ...args: unknown[]) => void): void
-        offEvent(callback: (event: unknown, ...args: unknown[]) => void): void
+        onEvent(callback: (event: unknown, ...args: unknown[]) => void): () => void
 
         onTelemetry(handler: (payload: unknown) => void): void
         offTelemetry(handler: (payload: unknown) => void): void

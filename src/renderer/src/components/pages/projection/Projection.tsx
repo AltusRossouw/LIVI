@@ -430,11 +430,11 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
       if (t === 'codec-capabilities') {
         const caps = (msg as { capabilities?: unknown }).capabilities
-        console.log('[Projection] codec-capabilities from worker:', caps)
+        console.debug('[Projection] codec-capabilities from worker:', caps)
         if (caps && typeof caps === 'object') {
           window.projection.ipc
             .reportCodecCapabilities(caps)
-            .then(() => console.log('[Projection] reportCodecCapabilities → ok'))
+            .then(() => console.debug('[Projection] reportCodecCapabilities → ok'))
             .catch((e) => console.error('[Projection] reportCodecCapabilities → error', e))
         }
       }
@@ -688,8 +688,9 @@ const CarplayComponent: React.FC<CarplayProps> = ({
       else if (data.type === 'unplugged') onUsbDisconnect()
     }
 
+    let unsubscribe: (() => void) | undefined
     if (!aaActive) {
-      window.projection.usb.listenForEvents(usbHandler)
+      unsubscribe = window.projection.usb.listenForEvents(usbHandler)
       ;(async () => {
         const last = await window.projection.usb.getLastEvent()
         if (last) usbHandler(undefined, last as unknown)
@@ -698,7 +699,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
 
     return () => {
       disposed = true
-      window.projection.usb.unlistenForEvents?.(usbHandler)
+      unsubscribe?.()
       window.electron?.ipcRenderer.removeListener('usb-event', usbHandler)
     }
   }, [
@@ -1006,8 +1007,8 @@ const CarplayComponent: React.FC<CarplayProps> = ({
       }
     }
 
-    window.projection.ipc.onEvent(handler)
-    return () => window.projection.ipc.offEvent(handler)
+    const unsubscribe = window.projection.ipc.onEvent(handler)
+    return unsubscribe
   }, [
     gotoHostUI,
     setReceivingVideo,

@@ -3,12 +3,13 @@
 aa-bluetooth.py — Android Auto: WiFi AP + Bluetooth profile manager
 
 Startup sequence:
-  1. wifi_ap.setup_ap()  — kills NM/wpa_supplicant, brings up hostapd+dnsmasq
-  2. bluetoothd -P *     — drop-in disables BlueZ plugins - clean SDP
-  3. rfkill unblock      — unblock the radio
-  4. BlueZ D-Bus setup   — register AA RFCOMM profile, HFP HF, pairing agent
-                           Powered/Discoverable/Pairable.
-  5. RFCOMM WiFi exchange — Credential handshake on channel 8.
+  1. wifi_ap.setup_ap()       — kills NM/wpa_supplicant, brings up hostapd+dnsmasq
+  2. bluetoothd --noplugin=sap — drop-in only disables the sap plugin (frees RFCOMM
+                                channel 8 for AA-Custom-Profile)
+  3. rfkill unblock           — unblock the radio
+  4. BlueZ D-Bus setup        — register AA RFCOMM profile, HFP HF, pairing agent
+                                Powered/Discoverable/Pairable.
+  5. RFCOMM WiFi exchange     — Credential handshake on channel 8.
 """
 
 import os
@@ -64,7 +65,7 @@ def _busctl_get_property(path: str, iface: str, prop: str,
         return ""
 
 _DROPIN_DIR        = "/etc/systemd/system/bluetooth.service.d"
-_DROPIN_CFG        = os.path.join(_DROPIN_DIR, "livi-noplugins.conf")
+_DROPIN_CFG        = os.path.join(_DROPIN_DIR, "livi-no-sap.conf")
 
 def _find_bluetoothd() -> str:
     """Return the bluetoothd binary path from the running service unit."""
@@ -88,16 +89,33 @@ def _find_bluetoothd() -> str:
     raise RuntimeError("Cannot find bluetoothd binary")
 
 
-def _ensure_noplugins_dropin() -> bool:
-    """Write the `bluetoothd -P *` drop-in."""
+def _ensure_bluetoothd_dropin() -> bool:
+    """Write the `bluetoothd --noplugin=sap` drop-in."""
     bluetoothd = _find_bluetoothd()
     content = (
         "[Service]\n"
         "ExecStart=\n"
-        f"ExecStart={bluetoothd} -P *\n"
+        f"ExecStart={bluetoothd} --noplugin=sap\n"
     )
 
     restart_needed = False
+
+    if os.path.isdir(_DROPIN_DIR):
+        try:
+            for entry in os.listdir(_DROPIN_DIR):
+                if not entry.startswith("livi-") or not entry.endswith(".conf"):
+                    continue
+                path = os.path.join(_DROPIN_DIR, entry)
+                if os.path.abspath(path) == os.path.abspath(_DROPIN_CFG):
+                    continue
+                try:
+                    os.remove(path)
+                    dprint(f"[aa-bt] removed stale drop-in {path}")
+                    restart_needed = True
+                except OSError as e:
+                    dprint(f"[aa-bt] failed to remove {path}: {e}")
+        except OSError as e:
+            dprint(f"[aa-bt] could not list {_DROPIN_DIR}: {e}")
 
     try:
         current = open(_DROPIN_CFG).read() if os.path.exists(_DROPIN_CFG) else ""
@@ -108,10 +126,10 @@ def _ensure_noplugins_dropin() -> bool:
         os.makedirs(_DROPIN_DIR, exist_ok=True)
         with open(_DROPIN_CFG, "w") as f:
             f.write(content)
-        dprint(f"[aa-bt] wrote {_DROPIN_CFG} ({bluetoothd} -P *)")
+        dprint(f"[aa-bt] wrote {_DROPIN_CFG} ({bluetoothd} --noplugin=sap)")
         restart_needed = True
     else:
-        dprint(f"[aa-bt] bluetoothd -P * drop-in already in place ({bluetoothd})")
+        dprint(f"[aa-bt] bluetoothd --noplugin=sap drop-in already in place ({bluetoothd})")
 
     return restart_needed
 
@@ -181,8 +199,8 @@ def _ensure_main_conf_class() -> bool:
 
 
 def setup_bluetoothd_dropin():
-    """Ensure the -P * systemd drop-in AND main.conf Class are in place."""
-    dropin_changed = _ensure_noplugins_dropin()
+    """Ensure the bluetoothd systemd drop-in AND main.conf Class are in place."""
+    dropin_changed = _ensure_bluetoothd_dropin()
     class_changed = _ensure_main_conf_class()
     if dropin_changed or class_changed:
         dprint("[aa-bt] restarting bluetoothd to apply config changes …", flush=True)

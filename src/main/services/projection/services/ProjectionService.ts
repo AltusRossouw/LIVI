@@ -133,6 +133,7 @@ export class ProjectionService {
   private wirelessPhoneInRange = false
   private btInitialQueryDone = false
   private isSwitching = false
+  private sessionActiveSent: boolean | null = null
 
   private readonly onAaConnected = (): void => {
     this.refreshAaBtPairedList().catch(() => {})
@@ -241,11 +242,15 @@ export class ProjectionService {
       sup.on('stderr', (line) => console.warn(`[aa-bt!] ${line}`))
       sup.on('error', (err) => console.warn(`[aa-bt] supervisor error: ${err.message}`))
       this.aaBtSupervisor = sup
+      this.sessionActiveSent = null
       console.log('[ProjectionService] starting AA BT/Wi-Fi supervisor')
       sup.start(this.config)
       this.openAaBtSubscription()
       this.populateAaBtPairedListInitial()
-        .then(() => this.tryAutoConnect())
+        .then(() => {
+          this.emitTransportState()
+          return this.tryAutoConnect()
+        })
         .catch(() => {})
       return
     }
@@ -257,6 +262,7 @@ export class ProjectionService {
       this.closeAaBtSubscription()
       this.setWirelessPhoneInRange(false)
       this.btInitialQueryDone = false
+      this.sessionActiveSent = null
     }
   }
 
@@ -989,6 +995,22 @@ export class ProjectionService {
       type: 'transportState',
       payload: this.arbiter.getSnapshot()
     })
+    if (this.aaBtSupervisor) {
+      const aaActive = this.started && this.drivers.getAa() !== null
+      void this.setSessionActive(aaActive)
+    }
+  }
+
+  /** Tell the BT reconnect worker to pause while an AA session is active. */
+  private async setSessionActive(active: boolean): Promise<void> {
+    if (!this.aaBtSupervisor || this.sessionActiveSent === active) return
+    this.sessionActiveSent = active
+    try {
+      await this.aaBtSock.setSessionActive(active)
+    } catch (e) {
+      this.sessionActiveSent = null
+      console.warn(`[ProjectionService] setSessionActive(${active}) failed`, e)
+    }
   }
 
   public async switchTransport(): Promise<{ ok: boolean; active: Transport | null }> {
@@ -1005,6 +1027,11 @@ export class ProjectionService {
         const desired = this.arbiter.getOverride()
         if (!desired) break
 
+        const wasWireless =
+          this.started &&
+          this.drivers.getAa() !== null &&
+          this.drivers.getAa()?.isWiredMode() === false
+
         if (this.started) {
           try {
             await this.stop()
@@ -1013,8 +1040,16 @@ export class ProjectionService {
           }
         }
 
+        if (wasWireless) {
+          // Leaving wireless: kick the phone off the AP
+          await this.aaBtSock.deauthApClients().catch(() => {})
+        }
+
         if (desired.transport === 'aa' && desired.mode === 'wireless') {
           await this.bounceAaBtConnections()
+          // Give BlueZ a moment to commit the disconnect before we re-wake.
+          await new Promise((r) => setTimeout(r, 500))
+          await this.tryAutoConnect()
         }
 
         await this.autoStartIfNeeded()
@@ -1064,7 +1099,11 @@ export class ProjectionService {
     const connected = devices.find((d) => d.connected)?.mac ?? ''
     const wasSettled = this.btInitialQueryDone
     this.btInitialQueryDone = true
-    this.setWirelessPhoneInRange(connected !== '')
+    // During wired AA we deliberately don't auto-wake the phone, so it won't
+    // show as BT-connected. Treat any paired device as in-range.
+    const wiredAaActive = this.started && this.drivers.getAa()?.isWiredMode() === true
+    const offerable = connected !== '' || (wiredAaActive && devices.length > 0)
+    this.setWirelessPhoneInRange(offerable)
     if (!wasSettled) this.autoStartIfNeeded().catch(console.error)
 
     if (this.aaDriver) {
@@ -1126,6 +1165,11 @@ export class ProjectionService {
   // Pick a target from the paired list and fire a single Connect
   private async tryAutoConnect(): Promise<void> {
     if (!this.aaBtSupervisor) return
+    // Don't poke the phone over BT while a wired session is already running
+    if (this.started && this.drivers.getAa()?.isWiredMode() === true) {
+      console.log('[ProjectionService] autoconnect: skipped (wired AA session active)')
+      return
+    }
 
     let devices
     try {

@@ -39,6 +39,20 @@ function readBtMacFromHciconfig(iface = 'hci0'): string | null {
   }
 }
 
+function readBtMacFromBusctl(iface = 'hci0'): string | null {
+  try {
+    const out = execSync(
+      `busctl --system get-property org.bluez /org/bluez/${iface} org.bluez.Adapter1 Address 2>/dev/null`,
+      { encoding: 'utf8', timeout: 2000 }
+    )
+    // Output format: s "AA:BB:CC:DD:EE:FF"
+    const m = out.match(/"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})"/)
+    return m ? m[1]!.toUpperCase() : null
+  } catch {
+    return null
+  }
+}
+
 export function detectBtMac(iface?: string): string | undefined {
   if (process.env['AA_BT_MAC']) return process.env['AA_BT_MAC']
 
@@ -52,12 +66,19 @@ export function detectBtMac(iface?: string): string | undefined {
     }
   }
 
-  // Fallback: hciconfig (covers kernels that don't expose sysfs address)
+  // Pi OS / newer kernels don't expose hci0/address in sysfs — go via BlueZ D-Bus.
   const hciFace = iface ?? 'hci0'
-  const mac = readBtMacFromHciconfig(hciFace)
-  if (mac) {
-    console.log(`[hwaddr] BT MAC detected from hciconfig: ${mac} (${hciFace})`)
-    return mac
+  const macBusctl = readBtMacFromBusctl(hciFace)
+  if (macBusctl) {
+    console.log(`[hwaddr] BT MAC detected from busctl: ${macBusctl} (${hciFace})`)
+    return macBusctl
+  }
+
+  // Last resort: hciconfig (often not installed on modern distros).
+  const macHci = readBtMacFromHciconfig(hciFace)
+  if (macHci) {
+    console.log(`[hwaddr] BT MAC detected from hciconfig: ${macHci} (${hciFace})`)
+    return macHci
   }
 
   console.warn('[hwaddr] Could not detect BT MAC. Set AA_BT_MAC env var if needed.')

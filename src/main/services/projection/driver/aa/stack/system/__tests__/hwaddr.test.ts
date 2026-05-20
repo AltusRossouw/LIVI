@@ -45,15 +45,24 @@ describe('detectBtMac', () => {
     expect(detectBtMac()).toBe('11:22:33:44:55:66')
   })
 
-  test('falls back to hciconfig when sysfs has nothing', () => {
+  test('falls back to busctl when sysfs has nothing', () => {
     mockReaddirSync.mockReturnValueOnce([])
+    mockExecSync.mockReturnValueOnce('s "AA:BB:CC:DD:EE:FF"\n')
+    expect(detectBtMac()).toBe('AA:BB:CC:DD:EE:FF')
+  })
+
+  test('falls back to hciconfig when sysfs and busctl have nothing', () => {
+    mockReaddirSync.mockReturnValueOnce([])
+    mockExecSync.mockImplementationOnce(() => {
+      throw new Error('busctl missing')
+    })
     mockExecSync.mockReturnValueOnce('BD Address: AA:BB:CC:DD:EE:FF  ACL MTU: ...\n')
     expect(detectBtMac()).toBe('AA:BB:CC:DD:EE:FF')
   })
 
   test('returns undefined when nothing is detected', () => {
     mockReaddirSync.mockReturnValueOnce([])
-    mockExecSync.mockImplementationOnce(() => {
+    mockExecSync.mockImplementation(() => {
       throw new Error('not found')
     })
     expect(detectBtMac()).toBeUndefined()

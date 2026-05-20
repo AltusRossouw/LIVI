@@ -1126,6 +1126,11 @@ export class ProjectionService {
   // Pick a target from the paired list and fire a single Connect
   private async tryAutoConnect(): Promise<void> {
     if (!this.aaBtSupervisor) return
+    // Don't poke the phone over BT while a wired session is already running
+    if (this.started && this.drivers.getAa()?.isWiredMode() === true) {
+      console.log('[ProjectionService] autoconnect: skipped (wired AA session active)')
+      return
+    }
 
     let devices
     try {

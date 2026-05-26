@@ -150,7 +150,9 @@ export type Config = {
   voiceAssistantVolume: number
   callVolume: number
   audioOutputDevice?: string
+  audioOutputDeviceLabel?: string
   audioInputDevice?: string
+  audioInputDeviceLabel?: string
   visualAudioDelayMs: number
 
   // Decode / video

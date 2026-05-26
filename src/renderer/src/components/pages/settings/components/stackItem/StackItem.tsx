@@ -1,10 +1,12 @@
 import ArrowForwardIosOutlinedIcon from '@mui/icons-material/ArrowForwardIosOutlined'
 import Paper from '@mui/material/Paper'
 import { styled } from '@mui/material/styles'
+import { useLiviStore } from '@renderer/store/store'
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SelectNode } from '../../../../../routes/types'
 import { StackItemProps } from '../../type'
+import { findOptionForValue, withGhostOption } from '../ghostOption'
 import { getCachedOptions, resolveOptions } from '../selectOptionsCache'
 
 const Item = styled(Paper)(({ theme }) => {
@@ -110,7 +112,8 @@ export const StackItem = ({
   node,
   showValue,
   withForwardIcon,
-  onClick
+  onClick,
+  savedLabel
 }: StackItemProps) => {
   const { t } = useTranslation()
 
@@ -120,6 +123,8 @@ export const StackItem = ({
     ? node.valueTransform.format(viewValue)
     : `${viewValue}${node?.displayValueUnit ?? ''}`
 
+  // gst-device-monitor follow mode bumps this on every device add/remove
+  const audioDevicesRevision = useLiviStore((s) => s.audioDevicesRevision)
   const [dynamicOpts, setDynamicOpts] = useState(() =>
     node?.type === 'select' ? getCachedOptions(node as SelectNode) : undefined
   )
@@ -127,21 +132,40 @@ export const StackItem = ({
     if (node?.type !== 'select') return
     const sel = node as SelectNode
     if (!sel.loadOptions) return
-    if (getCachedOptions(sel)) return
     let alive = true
-    void resolveOptions(sel).then((opts) => {
+    void resolveOptions(sel, { force: true }).then((opts) => {
       if (alive) setDynamicOpts(opts)
     })
     return () => {
       alive = false
     }
-  }, [node])
+  }, [node, audioDevicesRevision])
 
   if (node?.type === 'select') {
     const sel = node as SelectNode
-    const pool = dynamicOpts ?? getCachedOptions(sel) ?? sel.options
-    const option = pool.find((o) => o.value === value)
-    displayValue = option ? (option.labelKey ? t(option.labelKey, option.label) : option.label) : ''
+    const cachedOrFresh = dynamicOpts ?? getCachedOptions(sel)
+    const formatOffline = (name: string): string => t('settings.audioDeviceOffline', { name })
+    const pickValue = value as string | number | undefined | null
+
+    if (sel.loadOptions && cachedOrFresh === undefined) {
+      // Pre-fetch: resolve from static options, else fall back to savedLabel
+      const staticHit = sel.options.find((o) => o.value === pickValue)
+      if (staticHit) {
+        displayValue = staticHit.labelKey ? t(staticHit.labelKey, staticHit.label) : staticHit.label
+      } else {
+        displayValue = savedLabel ?? ''
+      }
+    } else {
+      const pool = cachedOrFresh ?? sel.options
+      const augmented = withGhostOption(pool, pickValue, savedLabel, formatOffline)
+      const option = findOptionForValue(augmented, pickValue)
+      if (option) {
+        const rawLabel = option.labelKey ? t(option.labelKey, option.label) : option.label
+        displayValue = option.offline ? formatOffline(rawLabel) : rawLabel
+      } else {
+        displayValue = ''
+      }
+    }
   }
 
   if (displayValue === 'null' || displayValue === 'undefined') {

@@ -64,6 +64,16 @@ describe('AaBtSockClient.connect / disconnect / remove', () => {
     await expect(p).resolves.toEqual({ ok: true })
   })
 
+  test('connectFull writes "connect-full <mac>"', async () => {
+    const { client, nextSocket } = makeClient()
+    const p = client.connectFull('AA:BB', 500)
+    const sock = nextSocket()
+    sock.emit('connect')
+    expect(sock.write).toHaveBeenCalledWith('connect-full AA:BB\n')
+    sock.emit('data', Buffer.from(JSON.stringify({ ok: true }) + '\n'))
+    await expect(p).resolves.toEqual({ ok: true })
+  })
+
   test('disconnect writes "disconnect <mac>"', async () => {
     const { client, nextSocket } = makeClient()
     const p = client.disconnect('CC:DD', 500)

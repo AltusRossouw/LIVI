@@ -115,6 +115,7 @@ describe('setupLifecycle', () => {
     const projectionService = {
       beginShutdown: jest.fn(),
       disconnectPhone: jest.fn(() => Promise.resolve()),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -145,6 +146,7 @@ describe('setupLifecycle', () => {
     const projectionService = {
       beginShutdown: jest.fn(),
       disconnectPhone: jest.fn(() => Promise.resolve()),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -188,6 +190,7 @@ describe('setupLifecycle', () => {
         throw new Error('shutdown failed')
       }),
       disconnectPhone: jest.fn(() => Promise.resolve()),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -227,6 +230,7 @@ describe('setupLifecycle', () => {
             setTimeout(resolve, 5000)
           })
       ),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(() => Promise.resolve())
     }
 
@@ -273,6 +277,7 @@ describe('setupLifecycle', () => {
     const projectionService = {
       beginShutdown: jest.fn(),
       disconnectPhone: jest.fn(() => Promise.resolve()),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(
         () =>
           new Promise<void>((resolve) => {
@@ -319,6 +324,7 @@ describe('setupLifecycle', () => {
     const projectionService = {
       beginShutdown: jest.fn(),
       disconnectPhone: jest.fn(() => Promise.resolve()),
+      disconnectHostBtPhones: jest.fn(() => Promise.resolve()),
       stop: jest.fn(() => Promise.resolve())
     }
 

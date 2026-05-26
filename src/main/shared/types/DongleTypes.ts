@@ -6,6 +6,8 @@ export type DevListEntry = {
   time?: string
   rfcomm?: string | number
   source?: 'dongle' | 'host'
+  class?: number
+  connected?: boolean
 }
 
 export type BoxInfoPayload = {

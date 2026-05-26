@@ -2175,11 +2175,12 @@ describe('ProjectionService', () => {
     const send = jest.fn()
     svc.webContents = { send }
 
-    svc.driver.emit('message', new BluetoothPairedList('Device A\nDevice B'))
+    const raw = 'AA:BB:CC:DD:EE:FFDevice A\n11:22:33:44:55:66Device B\n'
+    svc.driver.emit('message', new BluetoothPairedList(raw))
 
     expect(send).toHaveBeenCalledWith('projection-event', {
       type: 'bluetoothPairedList',
-      payload: 'Device A\nDevice B'
+      payload: raw
     })
   })
 

@@ -937,6 +937,16 @@ def _device_connect(mac: str) -> tuple[bool, str]:
     return ok, err
 
 
+def _device_connect_full(mac: str) -> tuple[bool, str]:
+    """Connect all auto-connect profiles (A2DP + HFP + HSP). Used for audio devices."""
+    dprint(f"[aa-bt] connect-full → {mac} (Device1.Connect, all profiles)",
+          flush=True)
+    return _device_call(
+        _device_path(mac), "org.bluez.Device1", "Connect",
+        timeout=20.0,
+    )
+
+
 def _device_disconnect(mac: str) -> tuple[bool, str]:
     """BlueZ Device1.Disconnect — tears down the ACL."""
     return _device_call(_device_path(mac), "org.bluez.Device1", "Disconnect")
@@ -1005,8 +1015,9 @@ def _start_event_server() -> None:
                "path": "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF"},
               ...
            ]}
-      connect <mac>     → {"ok": true} or {"ok": false, "error": "..."}
-      disconnect <mac>  → {"ok": true} or {"ok": false, "error": "..."}
+      connect <mac>        → {"ok": true} or {"ok": false, "error": "..."}
+      connect-full <mac>   → {"ok": true} or {"ok": false, "error": "..."}
+      disconnect <mac>     → {"ok": true} or {"ok": false, "error": "..."}
       remove <mac>            → {"ok": true} or {"ok": false, "error": "..."}
       session-active <bool>   → {"ok": true, "active": true|false}
       deauth-ap               → {"ok": true, "count": N}  (kicks Wi-Fi clients)
@@ -1037,6 +1048,11 @@ def _start_event_server() -> None:
                 if not arg:
                     return {"ok": False, "error": "connect requires a MAC argument"}
                 ok, err = _device_connect(arg)
+                return {"ok": ok} if ok else {"ok": False, "error": err}
+            if cmd == "connect-full":
+                if not arg:
+                    return {"ok": False, "error": "connect-full requires a MAC argument"}
+                ok, err = _device_connect_full(arg)
                 return {"ok": ok} if ok else {"ok": False, "error": err}
             if cmd == "disconnect":
                 if not arg:
@@ -1110,9 +1126,22 @@ def _start_event_server() -> None:
     threading.Thread(target=_accept_loop, daemon=True, name="event-server").start()
 
 
+_transport_volume: dict[str, int] = {}
+
+
 def _subscribe_device_signals(bus: dbus.Bus) -> None:
     """Push a JSON event to subscribers when any Device1 property changes."""
     def _on_props_changed(interface, changed, invalidated, path=""):
+        if interface == "org.bluez.MediaTransport1" and "Volume" in changed:
+            new_v = int(changed["Volume"])
+            prev = _transport_volume.get(str(path))
+            _transport_volume[str(path)] = new_v
+            if prev is not None and new_v != prev:
+                _push_event({
+                    "event": "input",
+                    "command": "volumeUp" if new_v > prev else "volumeDown"
+                })
+            return
         if interface != "org.bluez.Device1":
             return
         if "Connected" not in changed and "Paired" not in changed:
@@ -1265,6 +1294,121 @@ class BLEAd(dbus.service.Object):
         pass
 
 
+# ── BlueZ media player (AVRCP target) ────────────────────────────────────────
+
+MEDIA_IFACE        = "org.bluez.Media1"
+MPRIS_ROOT_IFACE   = "org.mpris.MediaPlayer2"
+MEDIA_PLAYER_IFACE = "org.mpris.MediaPlayer2.Player"
+LIVI_PLAYER_PATH   = "/livi/bt/player"
+
+# AVC passthrough opcodes that arrive via Press()/Hold().
+_AVC_KEY_MAP = {
+    0x40: "powerToggle",
+    0x41: "volumeUp",
+    0x42: "volumeDown",
+    0x43: "mute",
+    0x44: "play",
+    0x45: "stop",
+    0x46: "pause",
+    0x48: "rewind",
+    0x49: "fastForward",
+    0x4B: "next",
+    0x4C: "previous",
+    0x4E: "stop",
+}
+
+
+class LiviMediaPlayer(dbus.service.Object):
+    def _emit(self, command: str) -> None:
+        _push_event({"event": "input", "command": command})
+
+    # ── org.mpris.MediaPlayer2 (root interface required by MPRIS 2.2) ──
+    @dbus.service.method(MPRIS_ROOT_IFACE)
+    def Raise(self): pass
+
+    @dbus.service.method(MPRIS_ROOT_IFACE)
+    def Quit(self): pass
+
+    # ── org.mpris.MediaPlayer2.Player ──
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def Play(self):         self._emit("play")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def Pause(self):        self._emit("pause")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def PlayPause(self):    self._emit("playPause")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def Stop(self):         self._emit("stop")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def Next(self):         self._emit("next")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE)
+    def Previous(self):     self._emit("previous")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE, in_signature="x")
+    def Seek(self, offset):
+        self._emit("fastForward" if int(offset) > 0 else "rewind")
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE, in_signature="ox")
+    def SetPosition(self, track_id, position): pass
+
+    @dbus.service.method(MEDIA_PLAYER_IFACE, in_signature="s")
+    def OpenUri(self, uri): pass
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        if interface == MPRIS_ROOT_IFACE:
+            return _MPRIS_ROOT_PROPS.get(prop, "")
+        if interface == MEDIA_PLAYER_IFACE:
+            return _MPRIS_PLAYER_PROPS.get(prop, "")
+        return ""
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        if interface == MPRIS_ROOT_IFACE:
+            return _MPRIS_ROOT_PROPS
+        if interface == MEDIA_PLAYER_IFACE:
+            return _MPRIS_PLAYER_PROPS
+        return {}
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ssv")
+    def Set(self, interface, prop, value): pass
+
+    @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
+    def PropertiesChanged(self, interface, changed, invalidated): pass
+
+
+_MPRIS_ROOT_PROPS = {
+    "CanQuit":             False,
+    "CanRaise":            False,
+    "HasTrackList":        False,
+    "Identity":            "LIVI",
+    "SupportedUriSchemes": dbus.Array([], signature="s"),
+    "SupportedMimeTypes":  dbus.Array([], signature="s"),
+}
+
+_MPRIS_PLAYER_PROPS = {
+    "PlaybackStatus": "Playing",
+    "LoopStatus":     "None",
+    "Rate":           1.0,
+    "Shuffle":        False,
+    "Metadata":       dbus.Dictionary({}, signature="sv"),
+    "Volume":         1.0,
+    "Position":       dbus.Int64(0),
+    "MinimumRate":    1.0,
+    "MaximumRate":    1.0,
+    "CanGoNext":      True,
+    "CanGoPrevious":  True,
+    "CanPlay":        True,
+    "CanPause":       True,
+    "CanSeek":        False,
+    "CanControl":     True,
+}
+
+
 class AAProfile(dbus.service.Object):
     """AA RFCOMM profile — runs the 5-stage WiFi handshake."""
 
@@ -1392,8 +1536,13 @@ def main():
     # ── 0. D-Bus main loop  ─────────────────
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
+    # wireless: full AA wireless stack (AP, AA profile, BLE adv, reconnect worker)
+    # monitor: only adapter + pairing + AVRCP MediaPlayer (no AP, no AA registration)
+    wireless_mode = os.environ.get('LIVI_MODE', 'wireless') == 'wireless'
+    dprint(f"[aa-bt] mode={'wireless' if wireless_mode else 'monitor'}", flush=True)
+
     # ── 1. WiFi AP ────────────────────────────────────────────────────────────
-    ap_ready = setup_ap()
+    ap_ready = setup_ap() if wireless_mode else False
     setup_bluetoothd_dropin()
     _power_on_bt()
 
@@ -1432,7 +1581,7 @@ def main():
     atexit.register(_atexit_cleanup)
 
     # ── 3. BlueZ ───────────────────────────────────────────────────────────────
-    bus = dbus.SystemBus(private=True)
+    bus = dbus.SystemBus()
     bluez = bus.get_object(BLUEZ_SERVICE, BLUEZ_OBJ)
 
     # Pre-power-off so the adapter is invisible during profile setup.
@@ -1447,91 +1596,92 @@ def main():
     except Exception as e:
         dprint(f"[aa-bt] could not pre-power-off adapter: {e} (continuing)", flush=True)
 
-    # Register AA RFCOMM profile.
     profile_manager = dbus.Interface(bluez, PROFILE_MANAGER)
     _bluez_handles["profile_manager"] = profile_manager
 
-    aa_obj = AAProfile(bus, "/livi/bt/aa")
-
-    def _register_aa_profile():
-        return profile_manager.RegisterProfile(aa_obj, AA_UUID, {
-            'Name':                  'Android Auto Wireless',
-            'Role':                  'server',
-            'Channel':               dbus.types.UInt16(8),
-            'RequireAuthentication': False,
-            'RequireAuthorization':  False,
-            'ServiceRecord':         AA_SDP_RECORD,
-        })
-
-    try:
-        profile_manager.UnregisterProfile("/livi/bt/aa")
-        dprint("[aa-bt] unregistered stale AA profile (previous run)")
-    except Exception:
-        pass
-
-    try:
-        _register_aa_profile()
-    except dbus.exceptions.DBusException as e:
-        if 'already registered' not in str(e).lower():
-            raise
-        dprint("[aa-bt] AA UUID held by stale bus — restarting bluetoothd to evict it")
-        subprocess.run(["systemctl", "restart", "bluetooth"], check=False)
-
-        rebound = False
-        deadline = time.monotonic() + 15.0
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            try:
-                bus = dbus.SystemBus(private=True)
-                bluez = bus.get_object(BLUEZ_SERVICE, BLUEZ_OBJ)
-                profile_manager = dbus.Interface(bluez, PROFILE_MANAGER)
-                _bluez_handles["profile_manager"] = profile_manager
-                # Smoke test — fails until BlueZ has fully come back.
-                dbus.Interface(bluez, dbus.PROPERTIES_IFACE).GetAll("org.bluez.AgentManager1")
-                rebound = True
-                break
-            except Exception:
-                continue
-        if not rebound:
-            dprint("[aa-bt] bluetoothd did not come back within 15s — giving up this spawn")
-            raise
-
+    if wireless_mode:
         aa_obj = AAProfile(bus, "/livi/bt/aa")
-        _register_aa_profile()
-    dprint("[aa-bt] registered AA RFCOMM profile (ch=8)")
+
+        def _register_aa_profile():
+            return profile_manager.RegisterProfile(aa_obj, AA_UUID, {
+                'Name':                  'Android Auto Wireless',
+                'Role':                  'server',
+                'Channel':               dbus.types.UInt16(8),
+                'RequireAuthentication': False,
+                'RequireAuthorization':  False,
+                'ServiceRecord':         AA_SDP_RECORD,
+            })
+
+        try:
+            profile_manager.UnregisterProfile("/livi/bt/aa")
+            dprint("[aa-bt] unregistered stale AA profile (previous run)")
+        except Exception:
+            pass
+
+        try:
+            _register_aa_profile()
+        except dbus.exceptions.DBusException as e:
+            if 'already registered' not in str(e).lower():
+                raise
+            dprint("[aa-bt] AA UUID held by stale bus — restarting bluetoothd to evict it")
+            subprocess.run(["systemctl", "restart", "bluetooth"], check=False)
+
+            rebound = False
+            deadline = time.monotonic() + 15.0
+            while time.monotonic() < deadline:
+                time.sleep(0.25)
+                try:
+                    bus = dbus.SystemBus(private=True)
+                    bluez = bus.get_object(BLUEZ_SERVICE, BLUEZ_OBJ)
+                    profile_manager = dbus.Interface(bluez, PROFILE_MANAGER)
+                    _bluez_handles["profile_manager"] = profile_manager
+                    # Smoke test — fails until BlueZ has fully come back.
+                    dbus.Interface(bluez, dbus.PROPERTIES_IFACE).GetAll("org.bluez.AgentManager1")
+                    rebound = True
+                    break
+                except Exception:
+                    continue
+            if not rebound:
+                dprint("[aa-bt] bluetoothd did not come back within 15s — giving up this spawn")
+                raise
+
+            aa_obj = AAProfile(bus, "/livi/bt/aa")
+            _register_aa_profile()
+        dprint("[aa-bt] registered AA RFCOMM profile (ch=8)")
 
     # ── BLE advertisement of the AA UUID ───────────────────────────────────────
-    ble_ad_obj = BLEAd(bus, "/livi/bt/ble")
-    _bluez_handles["ble_ad"] = ble_ad_obj
-    try:
-        objs = dbus.Interface(
-            bus.get_object(BLUEZ_SERVICE, "/"),
-            "org.freedesktop.DBus.ObjectManager",
-        ).GetManagedObjects()
-        ad_manager_path = next(
-            (p for p, ifaces in objs.items()
-             if "org.bluez.LEAdvertisingManager1" in ifaces),
-            None,
-        )
-        if ad_manager_path:
-            ad_manager = dbus.Interface(
-                bus.get_object(BLUEZ_SERVICE, ad_manager_path),
-                "org.bluez.LEAdvertisingManager1",
+    if wireless_mode:
+        ble_ad_obj = BLEAd(bus, "/livi/bt/ble")
+        _bluez_handles["ble_ad"] = ble_ad_obj
+        try:
+            objs = dbus.Interface(
+                bus.get_object(BLUEZ_SERVICE, "/"),
+                "org.freedesktop.DBus.ObjectManager",
+            ).GetManagedObjects()
+            ad_manager_path = next(
+                (p for p, ifaces in objs.items()
+                 if "org.bluez.LEAdvertisingManager1" in ifaces),
+                None,
             )
-            try:
-                ad_manager.UnregisterAdvertisement("/livi/bt/ble")
-            except dbus.exceptions.DBusException:
-                pass
-            ad_manager.RegisterAdvertisement(
-                "/livi/bt/ble", {},
-                reply_handler=lambda: dprint("[aa-bt] BLE advertisement registered (AA UUID)", flush=True),
-                error_handler=lambda e: dprint(f"[aa-bt] BLE advertisement register error: {e}", flush=True),
-            )
-            _bluez_handles["ad_manager"] = ad_manager
-        else:
-            dprint("[aa-bt] BLE advertising not available on this adapter — skipping")
-    except Exception as e:
-        dprint(f"[aa-bt] BLE advertisement setup failed: {e} (autoconnect may need manual kick)", flush=True)
+            if ad_manager_path:
+                ad_manager = dbus.Interface(
+                    bus.get_object(BLUEZ_SERVICE, ad_manager_path),
+                    "org.bluez.LEAdvertisingManager1",
+                )
+                try:
+                    ad_manager.UnregisterAdvertisement("/livi/bt/ble")
+                except dbus.exceptions.DBusException:
+                    pass
+                ad_manager.RegisterAdvertisement(
+                    "/livi/bt/ble", {},
+                    reply_handler=lambda: dprint("[aa-bt] BLE advertisement registered (AA UUID)", flush=True),
+                    error_handler=lambda e: dprint(f"[aa-bt] BLE advertisement register error: {e}", flush=True),
+                )
+                _bluez_handles["ad_manager"] = ad_manager
+            else:
+                dprint("[aa-bt] BLE advertising not available on this adapter — skipping")
+        except Exception as e:
+            dprint(f"[aa-bt] BLE advertisement setup failed: {e} (autoconnect may need manual kick)", flush=True)
 
     # HFP Hands-Free profile — car kit role (LIVI = HF, Phone = AG)
     try:
@@ -1618,9 +1768,12 @@ def main():
     _adapter_set("Alias",               BTNAME)
     _adapter_set("DiscoverableTimeout", dbus.UInt32(0))
     _adapter_set("Powered",             True)
-    # Only enable Discoverable/Pairable if the AP up and running
-    if ap_ready:
+    # Wireless mode: open BT pairing once the AP is up so phones can join.
+    # Monitor mode: just stay Pairable so users can pair an existing radio.
+    if wireless_mode and ap_ready:
         _adapter_set("Discoverable",    True)
+        _adapter_set("Pairable",        True)
+    elif not wireless_mode:
         _adapter_set("Pairable",        True)
     else:
         dprint("[aa-bt] AP not ready — leaving BT non-discoverable/non-pairable")
@@ -1633,10 +1786,24 @@ def main():
     _start_event_server()
     _subscribe_device_signals(bus)
 
-    # ── Start BT reconnect worker ─────────────────────────────────────────────
-    t = threading.Thread(target=_bt_reconnect_worker, daemon=True)
-    t.start()
-    dprint("[aa-bt] BT reconnect worker started (5s interval)")
+    # ── BlueZ media player (AVRCP target) ───────────────────────────────────
+    try:
+        livi_player = LiviMediaPlayer(bus, LIVI_PLAYER_PATH)
+        media_iface = dbus.Interface(
+            bus.get_object(BLUEZ_SERVICE, ADAPTER_PATH), MEDIA_IFACE
+        )
+        media_iface.RegisterPlayer(LIVI_PLAYER_PATH, _MPRIS_PLAYER_PROPS)
+        _bluez_handles["livi_player"] = livi_player
+        _bluez_handles["media_iface"] = media_iface
+        dprint(f"[aa-bt] media player registered at {LIVI_PLAYER_PATH}", flush=True)
+    except Exception as e:
+        dprint(f"[aa-bt] media player setup failed: {e}", flush=True)
+
+    # ── Start BT reconnect worker (wireless-only) ───────────────────────────
+    if wireless_mode:
+        t = threading.Thread(target=_bt_reconnect_worker, daemon=True)
+        t.start()
+        dprint("[aa-bt] BT reconnect worker started (5s interval)")
 
     print()
     print("=== LIVI Android Auto stack running ===")

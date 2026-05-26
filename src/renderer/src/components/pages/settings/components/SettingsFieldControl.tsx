@@ -1,11 +1,13 @@
 import RestartAltOutlinedIcon from '@mui/icons-material/RestartAltOutlined'
 import { IconButton, MenuItem, Select, Slider, Switch, TextField } from '@mui/material'
+import { useLiviStore } from '@renderer/store/store'
 import { themeColors } from '@renderer/themeColors'
 import type { Config } from '@shared/types'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SettingsNode } from '../../../../routes'
 import type { SelectOption } from '../../../../routes/types'
+import { extractBtMac, withGhostOption } from './ghostOption'
 import NumberSpinner from './numberSpinner/numberSpinner'
 import { getCachedOptions, resolveOptions } from './selectOptionsCache'
 
@@ -13,6 +15,8 @@ type Props<T> = {
   node: SettingsNode<Config>
   value: T
   onChange: (v: T) => void
+  savedLabel?: string
+  onLabelChange?: (label: string) => void
 }
 
 const clampInt = (n: number, min: number, max: number) =>
@@ -41,7 +45,13 @@ const marks = [
   { value: 100, label: '100%' }
 ]
 
-export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) => {
+export const SettingsFieldControl = <T,>({
+  node,
+  value,
+  onChange,
+  savedLabel,
+  onLabelChange
+}: Props<T>) => {
   switch (node.type) {
     case 'string':
       return (
@@ -120,6 +130,8 @@ export const SettingsFieldControl = <T,>({ node, value, onChange }: Props<T>) =>
           node={node}
           value={value as unknown as string | number}
           onChange={onChange as (v: unknown) => void}
+          savedLabel={savedLabel}
+          onLabelChange={onLabelChange}
         />
       )
 
@@ -178,10 +190,13 @@ type DynamicSelectProps = {
   node: Extract<SettingsNode<Config>, { type: 'select' }>
   value: string | number
   onChange: (v: unknown) => void
+  savedLabel?: string
+  onLabelChange?: (label: string) => void
 }
 
-function DynamicSelect({ node, value, onChange }: DynamicSelectProps) {
+function DynamicSelect({ node, value, onChange, savedLabel, onLabelChange }: DynamicSelectProps) {
   const { t } = useTranslation()
+  const audioDevicesRevision = useLiviStore((s) => s.audioDevicesRevision)
   const [options, setOptions] = useState<SelectOption[]>(
     () => getCachedOptions(node) ?? node.options
   )
@@ -189,21 +204,74 @@ function DynamicSelect({ node, value, onChange }: DynamicSelectProps) {
   useEffect(() => {
     if (!node.loadOptions) return
     let alive = true
-    void resolveOptions(node).then((opts) => {
-      if (alive) setOptions(opts)
+    void resolveOptions(node, { force: true }).then((opts) => {
+      if (!alive) return
+      setOptions(opts)
+      // Migrate stored id to live id when MAC matches but profile suffix changed
+      const valueMac = extractBtMac(value)
+      if (valueMac) {
+        const liveMatch = opts.find(
+          (o) => !o.offline && extractBtMac(o.value) === valueMac && o.value !== value
+        )
+        if (liveMatch) onChange(liveMatch.value)
+      }
+      if (onLabelChange && value !== '' && value !== undefined && value !== null && !savedLabel) {
+        const match = opts.find((o) => o.value === value)
+        if (match) {
+          const live = match.labelKey ? t(match.labelKey, match.label) : match.label
+          if (live) onLabelChange(live)
+        }
+      }
     })
     return () => {
       alive = false
     }
-  }, [node])
+  }, [node, audioDevicesRevision])
 
-  const inList = options.some((o) => o.value === value)
+  const formatOffline = (name: string): string => t('settings.audioDeviceOffline', { name })
+  const renderedOptions = withGhostOption(options, value, savedLabel, formatOffline)
+  const inList = renderedOptions.some((o) => o.value === value)
+
+  const handlePick = (next: string | number): void => {
+    onChange(next)
+
+    // Offline BT entry → trigger BlueZ Connect
+    const pickedOption = renderedOptions.find((o) => o.value === next)
+    if (pickedOption?.offline && typeof next === 'string') {
+      const mac = extractBtMac(next)
+      if (mac) {
+        const ipc = window.projection?.ipc
+        if (ipc && typeof ipc.connectBluetoothPairedDevice === 'function') {
+          void ipc.connectBluetoothPairedDevice(mac).catch(() => {})
+        }
+      }
+    }
+
+    if (!onLabelChange) return
+    const pickedLive = options.find((o) => o.value === next)
+    const sourceOption = pickedLive ?? pickedOption
+    if (!sourceOption) return
+    const liveLabel = sourceOption.labelKey
+      ? t(sourceOption.labelKey, sourceOption.label)
+      : sourceOption.label
+    onLabelChange(liveLabel)
+  }
+
+  const labelFor = (o: SelectOption): string => {
+    const raw = o.labelKey ? t(o.labelKey, o.label) : o.label
+    return o.offline ? t('settings.audioDeviceOffline', { name: raw }) : raw
+  }
+
+  const selectedValue = inList ? value : ''
+  const selectedOption = renderedOptions.find((o) => o.value === selectedValue)
 
   return (
     <Select
       size="small"
       variant="outlined"
-      value={inList ? value : ''}
+      value={selectedValue}
+      displayEmpty
+      renderValue={() => (selectedOption ? labelFor(selectedOption) : '')}
       sx={{
         minWidth: 200,
         '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
@@ -211,13 +279,12 @@ function DynamicSelect({ node, value, onChange }: DynamicSelectProps) {
           borderWidth: '1px'
         }
       }}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => handlePick(e.target.value as string | number)}
     >
-      {options.map((o) => {
-        const label = o.labelKey ? t(o.labelKey, o.label) : o.label
+      {renderedOptions.map((o) => {
         return (
           <MenuItem key={String(o.value)} value={o.value}>
-            {label}
+            {labelFor(o)}
           </MenuItem>
         )
       })}

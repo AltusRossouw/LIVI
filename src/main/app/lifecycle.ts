@@ -86,6 +86,14 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
         await sleep(75)
       })
 
+      await measureStep('projection.disconnectHostBtPhones()', async () => {
+        await withTimeout(
+          'projection.disconnectHostBtPhones()',
+          projectionService.disconnectHostBtPhones(),
+          1500
+        )
+      })
+
       await measureStep('telemetrySocket.disconnect()', async () => {
         await withTimeout(
           'telemetrySocket.disconnect()',

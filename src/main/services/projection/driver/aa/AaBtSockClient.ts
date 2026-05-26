@@ -78,7 +78,7 @@ export class AaBtSockClient {
     })
   }
 
-  /** Enumerate all paired BT devices known to BlueZ. */
+  // Enumerate all paired BT devices known to BlueZ
   async listPaired(timeoutMs = 5000): Promise<PairedDevice[]> {
     const resp = (await this.request('list_paired', timeoutMs)) as ListPairedResponse
     if (!resp.ok) {
@@ -87,22 +87,27 @@ export class AaBtSockClient {
     return resp.devices
   }
 
-  /** Initiate a BT connection to the given MAC (BlueZ Device1.Connect). */
+  // Initiate a BT connection to the given MAC (BlueZ Device1.Connect)
   async connect(mac: string, timeoutMs = 32000): Promise<ActionResponse> {
     return (await this.request(`connect ${mac}`, timeoutMs)) as ActionResponse
   }
 
-  /** Tear down the BT connection (BlueZ Device1.Disconnect). */
+  // Connect all auto-connect profiles (A2DP + HFP + HSP)
+  async connectFull(mac: string, timeoutMs = 32000): Promise<ActionResponse> {
+    return (await this.request(`connect-full ${mac}`, timeoutMs)) as ActionResponse
+  }
+
+  // Tear down the BT connection (BlueZ Device1.Disconnect)
   async disconnect(mac: string, timeoutMs = 10000): Promise<ActionResponse> {
     return (await this.request(`disconnect ${mac}`, timeoutMs)) as ActionResponse
   }
 
-  /** Unpair / forget the device (BlueZ Adapter1.RemoveDevice). */
+  // Unpair / forget the device (BlueZ Adapter1.RemoveDevice)
   async remove(mac: string, timeoutMs = 10000): Promise<ActionResponse> {
     return (await this.request(`remove ${mac}`, timeoutMs)) as ActionResponse
   }
 
-  /** Tell the BT reconnect worker to pause (true) or resume (false). */
+  // Tell the BT reconnect worker to pause (true) or resume (false)
   async setSessionActive(active: boolean, timeoutMs = 5000): Promise<ActionResponse> {
     return (await this.request(
       `session-active ${active ? 'true' : 'false'}`,
@@ -110,14 +115,14 @@ export class AaBtSockClient {
     )) as ActionResponse
   }
 
-  /** Kick every associated Wi-Fi station off the AP. */
+  // Kick every associated Wi-Fi station off the AP
   async deauthApClients(timeoutMs = 5000): Promise<ActionResponse> {
     return (await this.request('deauth-ap', timeoutMs)) as ActionResponse
   }
 
-  /** Open a event subscription. */
+  // Open a event subscription
   subscribe(
-    onEvent: (ev: { event: string; mac?: string; path?: string }) => void,
+    onEvent: (ev: { event: string; mac?: string; path?: string; command?: string }) => void,
     onClose?: () => void
   ): { close: () => void } {
     const sock = net.createConnection(this.path)

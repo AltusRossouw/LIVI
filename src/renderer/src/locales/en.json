@@ -135,6 +135,7 @@
     "audioInputDevice": "Audio Input",
     "audioInputDeviceDescription": "Pick the microphone source.",
     "audioDeviceSystemDefault": "System default",
+    "audioDeviceOffline": "{{name}} (offline)",
     "hwAcceleration": "HW Acceleration",
     "video": "Video",
     "width": "Width",

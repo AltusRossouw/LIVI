@@ -41,7 +41,13 @@ describe('BtDeviceList', () => {
     saveSettings: (settings: unknown) => Promise<void> | void
     boxInfo?: {
       btMacAddr?: string
-      DevList?: Array<{ id: string; type?: string; index?: number | string }>
+      DevList?: Array<{
+        id: string
+        type?: string
+        index?: number | string
+        class?: number
+        source?: 'dongle' | 'host'
+      }>
     }
   }) => {
     mockUseLiviStore.mockImplementation((selector) => selector(state))
@@ -247,14 +253,16 @@ describe('BtDeviceList', () => {
       saveSettings: saveSettingsMock,
       boxInfo: {
         btMacAddr: '',
-        DevList: [{ id: 'AA:AA:AA:AA:AA:AA', type: 'AndroidAuto', index: 1 }]
+        DevList: [
+          { id: 'AA:AA:AA:AA:AA:AA', type: 'AndroidAuto', index: 1, source: 'dongle' as const }
+        ]
       }
     }
 
     mockUseLiviStore.mockImplementation((selector) => selector(state))
     const view = render(<BtDeviceList />)
 
-    expect(screen.getByText('Android Auto')).toBeInTheDocument()
+    expect(screen.getByText('Device A (D)')).toBeInTheDocument()
 
     state = {
       ...state,
@@ -266,7 +274,7 @@ describe('BtDeviceList', () => {
 
     view.rerender(<BtDeviceList />)
 
-    expect(screen.getByText('Android Auto')).toBeInTheDocument()
+    expect(screen.getByText('Device A (D)')).toBeInTheDocument()
   })
 
   test('disables buttons while a device switch is pending', async () => {
@@ -341,7 +349,6 @@ describe('BtDeviceList', () => {
     })
 
     expect(screen.getByText('Device A')).toBeInTheDocument()
-    expect(screen.getByText('CarPlay')).toBeInTheDocument()
   })
 
   test('falls back to index 999 when DevList entry has no index', () => {
@@ -365,6 +372,43 @@ describe('BtDeviceList', () => {
     const names = screen.getAllByText(/Device [AB]/).map((el) => el.textContent?.trim())
 
     expect(names).toEqual(['Device B', 'Device A'])
+  })
+
+  test('lists phones and hides audio devices (CoD Major Class 0x04)', () => {
+    renderWithState({
+      bluetoothPairedDevices: [
+        { mac: 'AA:AA:AA:AA:AA:AA', name: 'Pixel 8' },
+        { mac: 'BB:BB:BB:BB:BB:BB', name: 'EPOS ADAPT 660 AMC' }
+      ],
+      forgetBluetoothPairedDevice: removeMock,
+      connectBluetoothPairedDevice: connectMock,
+      saveSettings: saveSettingsMock,
+      boxInfo: {
+        btMacAddr: '',
+        DevList: [
+          { id: 'AA:AA:AA:AA:AA:AA', type: 'AndroidAuto', index: 1, class: 0x5a020c },
+          { id: 'BB:BB:BB:BB:BB:BB', type: 'Unknown', index: 2, class: 0x240404 }
+        ]
+      }
+    })
+
+    expect(screen.getByText('Pixel 8')).toBeInTheDocument()
+    expect(screen.queryByText('EPOS ADAPT 660 AMC')).not.toBeInTheDocument()
+  })
+
+  test('devices without CoD class are treated as phones (kept in the list)', () => {
+    renderWithState({
+      bluetoothPairedDevices: [{ mac: 'AA:AA:AA:AA:AA:AA', name: 'Pixel 8' }],
+      forgetBluetoothPairedDevice: removeMock,
+      connectBluetoothPairedDevice: connectMock,
+      saveSettings: saveSettingsMock,
+      boxInfo: {
+        btMacAddr: '',
+        DevList: [{ id: 'AA:AA:AA:AA:AA:AA', type: 'AndroidAuto', index: 1 }]
+      }
+    })
+
+    expect(screen.getByText('Pixel 8')).toBeInTheDocument()
   })
 
   test('falls back to "Unknown device" when device name is blank', () => {

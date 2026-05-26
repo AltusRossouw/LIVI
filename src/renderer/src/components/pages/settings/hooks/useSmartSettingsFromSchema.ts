@@ -32,6 +32,16 @@ function hasTransform(node: unknown): node is NodeWithTransform {
   )
 }
 
+type NodeWithLabelPath = { labelPath?: string }
+
+function hasLabelPath(node: unknown): node is NodeWithLabelPath {
+  return (
+    typeof node === 'object' &&
+    node !== null &&
+    typeof (node as Record<string, unknown>).labelPath === 'string'
+  )
+}
+
 const walkSchema = (
   node: SettingsNode<Config>,
   settings: unknown,
@@ -44,6 +54,10 @@ const walkSchema = (
 
       if (hasTransform(node)) {
         overrides[node.path] = { transform: node.transform }
+      }
+
+      if (hasLabelPath(node) && node.labelPath && node.labelPath.length > 0) {
+        initial[node.labelPath] = getValueByPath(settings, node.labelPath)
       }
     }
   } else {

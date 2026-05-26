@@ -14,6 +14,15 @@ inputs:
   pnpm:
     required: true
     description: 'pnpm version'
+  electron:
+    required: true
+    description: 'Electron semver (e.g. 42.2.0)'
+  chromium:
+    required: true
+    description: 'Chromium version embedded in Electron'
+  electron-date:
+    required: true
+    description: 'Electron release date (de-DE formatted)'
   repo:
     required: true
     description: 'owner/repo'
@@ -43,56 +52,16 @@ runs:
         VERSION: ${{ inputs.version }}
         NODE_VERSION: ${{ inputs.node }}
         PNPM_VERSION: ${{ inputs.pnpm }}
+        ELECTRON_SEMVER: ${{ inputs.electron }}
+        CHROMIUM_VER: ${{ inputs.chromium }}
+        ELECTRON_DATE_DE: ${{ inputs.electron-date }}
         GH_REPO: ${{ inputs.repo }}
         GH_TOKEN: ${{ inputs.token }}
         MAIN_COVERAGE: ${{ inputs.coverage-main }}
         RENDERER_COVERAGE: ${{ inputs.coverage-renderer }}
         GSTREAMER_VERSION: ${{ inputs.gstreamer }}
       run: |
-        set -euxo pipefail
-
-        echo "::group::ELECTRON_SEMVER probe"
-        ELECTRON_SEMVER="$(node -e "try{console.log(require('./node_modules/electron/package.json').version)}catch(e){try{console.log(require('./package.json').devDependencies.electron)}catch(e){console.log('unknown')}}")"
-        echo "ELECTRON_SEMVER='${ELECTRON_SEMVER}'"
-        export ELECTRON_SEMVER
-        echo "::endgroup::"
-
-        echo "::group::CHROMIUM_VER probe"
-        CHROMIUM_RAW="$(ELECTRON_RUN_AS_NODE=1 node -e "
-          const { execFileSync } = require('child_process');
-          const e = require('electron');
-          const out = execFileSync(
-            e,
-            ['-e', 'process.stdout.write(process.versions.chrome || \"unknown\")'],
-            { encoding: 'utf8' }
-          );
-          process.stdout.write((out || 'unknown').trim());
-        " 2>&1)" || CHROMIUM_RAW="<probe-failed>"
-        echo "CHROMIUM_RAW='${CHROMIUM_RAW}'"
-        CHROMIUM_VER="$(printf '%s' "$CHROMIUM_RAW" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tail -n 1 || true)"
-        CHROMIUM_VER="${CHROMIUM_VER:-unknown}"
-        echo "CHROMIUM_VER='${CHROMIUM_VER}'"
-        echo "::endgroup::"
-
-        echo "::group::ELECTRON_DATE_DE probe"
-        ELECTRON_DATE_DE="$(node -e "
-          const cp = require('child_process');
-          const v = (process.env.ELECTRON_SEMVER || '').trim().replace(/^v/i,'');
-          try {
-            const out = cp.execSync('pnpm view electron@'+v+' time --json',{stdio:['ignore','pipe','ignore']}).toString();
-            const map = JSON.parse(out)||{};
-            const iso = map[v];
-            if (!iso) { console.log('unknown'); process.exit(0); }
-            const d = new Date(iso);
-            console.log(new Intl.DateTimeFormat('de-DE',
-              { timeZone:'Europe/Berlin', day:'2-digit', month:'2-digit', year:'numeric' }
-            ).format(d));
-          } catch { console.log('unknown'); }
-        ")"
-        echo "ELECTRON_DATE_DE='${ELECTRON_DATE_DE}'"
-        echo "::endgroup::"
-
-        echo "GSTREAMER_VERSION=${GSTREAMER_VERSION}"
+        set -euo pipefail
 
         rm -rf temp-badges
         mkdir temp-badges

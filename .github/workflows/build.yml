@@ -368,6 +368,46 @@ jobs:
           echo "version=" >> "$GITHUB_OUTPUT"
           echo "No GStreamer version.txt found"
 
+      - name: Read electron release metadata
+        id: electron
+        if: matrix.os == 'linux' && matrix.arch == 'x64' && (env.BUILD_BRANCH == 'main' || env.BUILD_BRANCH == 'dev')
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Electron version from the installed package.
+          SEMVER="$(node -e "console.log(require('./node_modules/electron/package.json').version)")"
+          echo "semver=${SEMVER}" >> "$GITHUB_OUTPUT"
+
+          # Chromium version + release date come from electron's official release feed
+          FEED="$(curl -fsSL "https://releases.electronjs.org/releases.json" || echo '[]')"
+
+          CHROMIUM="$(printf '%s' "$FEED" | SEMVER="$SEMVER" node -e "
+            let d=''; process.stdin.on('data', c => d+=c); process.stdin.on('end', () => {
+              try {
+                const r = JSON.parse(d).find(x => x.version === process.env.SEMVER);
+                process.stdout.write((r && r.chrome) || 'unknown');
+              } catch { process.stdout.write('unknown'); }
+            });
+          ")"
+          echo "chromium=${CHROMIUM}" >> "$GITHUB_OUTPUT"
+
+          DATE_DE="$(printf '%s' "$FEED" | SEMVER="$SEMVER" node -e "
+            let d=''; process.stdin.on('data', c => d+=c); process.stdin.on('end', () => {
+              try {
+                const r = JSON.parse(d).find(x => x.version === process.env.SEMVER);
+                const iso = r && (r.fullDate || r.date);
+                if (!iso) { process.stdout.write('unknown'); return; }
+                process.stdout.write(new Intl.DateTimeFormat('de-DE', {
+                  timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric'
+                }).format(new Date(iso)));
+              } catch { process.stdout.write('unknown'); }
+            });
+          ")"
+          echo "date=${DATE_DE}" >> "$GITHUB_OUTPUT"
+
+          echo "electron ${SEMVER} / chromium ${CHROMIUM} / released ${DATE_DE}"
+
       - name: Push badges to version branch
         if: matrix.os == 'linux' && matrix.arch == 'x64' && (env.BUILD_BRANCH == 'main' || env.BUILD_BRANCH == 'dev')
         uses: ./.github/actions/badges
@@ -376,6 +416,9 @@ jobs:
           version: ${{ steps.pkg.outputs.version }}
           node: ${{ steps.pnpm.outputs.node }}
           pnpm: ${{ steps.pnpm.outputs.pnpm }}
+          electron: ${{ steps.electron.outputs.semver }}
+          chromium: ${{ steps.electron.outputs.chromium }}
+          electron-date: ${{ steps.electron.outputs.date }}
           coverage-main: ${{ steps.coverage.outputs.main }}
           coverage-renderer: ${{ steps.coverage.outputs.renderer }}
           gstreamer: ${{ steps.gst.outputs.version }}

@@ -78,13 +78,13 @@ jobs:
             add('linux', 'ubuntu-latest', 'x64', 'AppImage');
             add('linux', 'ubuntu-24.04-arm', 'arm64', 'AppImage');
             add('macos', 'macos-latest', 'arm64', 'dmg');
-            add('windows', 'windows-latest', 'x64', 'exe');
+            add('windows', 'windows-2025-vs2026', 'x64', 'exe');
           } else {
             // manual: only selected
             if (inputs.linux_x64) add('linux', 'ubuntu-latest', 'x64', 'AppImage');
             if (inputs.linux_arm64) add('linux', 'ubuntu-24.04-arm', 'arm64', 'AppImage');
             if (inputs.macos_arm64) add('macos', 'macos-latest', 'arm64', 'dmg');
-            if (inputs.windows_x64) add('windows', 'windows-latest', 'x64', 'exe');
+            if (inputs.windows_x64) add('windows', 'windows-2025-vs2026', 'x64', 'exe');
           }
 
           const matrixObj = { include };

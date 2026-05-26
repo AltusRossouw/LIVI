@@ -216,6 +216,10 @@ export interface CarplayStore {
   bluetoothPairedDevices: BluetoothPairedDevice[]
   setBluetoothPairedList: (raw: string) => void
 
+  // Bumped on every audio-device topology change from gst-device-monitor
+  audioDevicesRevision: number
+  bumpAudioDevicesRevision: () => void
+
   // Local edits (pending apply)
   bluetoothPairedDirty: boolean
   bluetoothPairedDeleteNeedsRestart: boolean
@@ -290,6 +294,10 @@ export const useLiviStore = create<CarplayStore>((set, get) => {
     bluetoothPairedDevices: [],
     bluetoothPairedDirty: false,
     bluetoothPairedDeleteNeedsRestart: false,
+
+    audioDevicesRevision: 0,
+    bumpAudioDevicesRevision: () =>
+      set((s) => ({ audioDevicesRevision: s.audioDevicesRevision + 1 })),
 
     setBluetoothPairedList: (raw) => {
       const clean = String(raw ?? '').replace(/\0+$/g, '')

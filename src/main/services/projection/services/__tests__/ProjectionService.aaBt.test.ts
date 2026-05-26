@@ -11,6 +11,7 @@ const aaBtSockMock = {
     async () => [] as Array<{ mac: string; name?: string; connected?: boolean; trusted?: boolean }>
   ),
   connect: jest.fn(async (_mac: string) => ({ ok: true })),
+  connectFull: jest.fn(async (_mac: string) => ({ ok: true })),
   remove: jest.fn(async (_mac: string) => ({ ok: true })),
   subscribe: jest.fn((_onEvent: (e: unknown) => void, _onClose?: () => void) => ({
     close: jest.fn()

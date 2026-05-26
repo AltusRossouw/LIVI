@@ -115,6 +115,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
   const setAudioInfo = useLiviStore((s) => s.setAudioInfo)
   const setPcmData = useLiviStore((s) => s.setPcmData)
   const setBluetoothPairedList = useLiviStore((s) => s.setBluetoothPairedList)
+  const bumpAudioDevicesRevision = useLiviStore((s) => s.bumpAudioDevicesRevision)
   const isAaActiveFlag = useStatusStore((s) => s.isAaActive)
   const negotiatedWidth = useLiviStore((s) => s.negotiatedWidth)
   const negotiatedHeight = useLiviStore((s) => s.negotiatedHeight)
@@ -758,6 +759,10 @@ const CarplayComponent: React.FC<CarplayProps> = ({
           setBluetoothPairedList(raw)
           break
         }
+        case 'audioDevicesChanged': {
+          bumpAudioDevicesRevision()
+          break
+        }
         case 'video-codec': {
           const payload = d.payload as { codec?: unknown } | undefined
           const codec = payload?.codec
@@ -1013,6 +1018,7 @@ const CarplayComponent: React.FC<CarplayProps> = ({
     rendererError,
     setAudioInfo,
     setBluetoothPairedList,
+    bumpAudioDevicesRevision,
     settings.cluster?.main,
     settings.cluster?.dash,
     settings.cluster?.aux

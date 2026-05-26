@@ -1,19 +1,16 @@
 import { DEBUG } from '@main/constants'
-import { execFile } from 'child_process'
+import { type ChildProcess, execFile, spawn } from 'child_process'
 import { gstEnv, resolveBinary, resolveGStreamerRoot } from './gstreamer'
 
 export type AudioDeviceKind = 'sink' | 'source'
 
 export type AudioDevice = {
-  // Verbatim value from the `device=` / `device-name=` parameter in the
-  // gst-launch line that gst-device-monitor prints. Passed straight back
-  // into pulsesink / wasapisink / osxaudiosink so the type (string vs uint)
-  // is correct per platform.
   id: string
   // Human-friendly name for the dropdown
   name: string
   // True if the OS reports this as the default device
   isDefault: boolean
+  offline?: boolean
 }
 
 const ENUMERATE_TIMEOUT_MS = 4_000
@@ -112,4 +109,96 @@ function matchProp(block: string, key: string): string | null {
   const m = block.match(re)
   if (!m) return null
   return m[1].replace(/^"(.*)"$/, '$1')
+}
+
+const TOPOLOGY_EVENT_RE = /^\s*Device\s+\S+\s*:\s*$/m
+const DEBOUNCE_MS = 250
+const RESTART_DELAY_MS = 2_000
+
+export type AudioDeviceMonitorHandle = { stop: () => void }
+
+// Spawn gst-device-monitor -f; call onChange (debounced) per device change
+export function startAudioDeviceMonitor(onChange: () => void): AudioDeviceMonitorHandle {
+  let root: string | null = null
+  let bin: string | null = null
+  try {
+    root = resolveGStreamerRoot()
+    bin = resolveBinary('gst-device-monitor-1.0')
+  } catch (e) {
+    if (DEBUG) console.warn('[AudioDeviceEnumerator] gst lookup failed', e)
+  }
+  if (!root || !bin) {
+    if (DEBUG) console.warn('[AudioDeviceEnumerator] GStreamer bundle missing — monitor disabled')
+    return { stop: () => {} }
+  }
+  const monitorRoot = root
+  const monitorBin = bin
+
+  let stopped = false
+  let child: ChildProcess | null = null
+  let restartTimer: ReturnType<typeof setTimeout> | null = null
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+  const fire = (): void => {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      if (!stopped) {
+        try {
+          onChange()
+        } catch (e) {
+          if (DEBUG) console.warn('[AudioDeviceEnumerator] onChange threw', e)
+        }
+      }
+    }, DEBOUNCE_MS)
+  }
+
+  const spawnMonitor = (): void => {
+    if (stopped) return
+    const proc = spawn(monitorBin, ['-f', 'Audio/Sink', 'Audio/Source'], {
+      env: gstEnv(monitorRoot),
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    child = proc
+
+    let buf = ''
+    proc.stdout?.setEncoding('utf8')
+    proc.stdout?.on('data', (chunk: string) => {
+      buf += chunk
+      let nl: number
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl)
+        buf = buf.slice(nl + 1)
+        if (TOPOLOGY_EVENT_RE.test(line + '\n')) {
+          if (DEBUG) console.log(`[AudioDeviceEnumerator] monitor event: ${line.trim()}`)
+          fire()
+        }
+      }
+    })
+    proc.on('error', (err) => {
+      if (DEBUG) console.warn('[AudioDeviceEnumerator] monitor process error', err.message)
+    })
+    proc.on('exit', () => {
+      child = null
+      if (stopped) return
+      restartTimer = setTimeout(spawnMonitor, RESTART_DELAY_MS)
+    })
+  }
+
+  spawnMonitor()
+
+  return {
+    stop: () => {
+      stopped = true
+      if (debounceTimer) clearTimeout(debounceTimer)
+      if (restartTimer) clearTimeout(restartTimer)
+      if (child && !child.killed) {
+        try {
+          child.kill()
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  }
 }

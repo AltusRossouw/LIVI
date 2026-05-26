@@ -4,12 +4,17 @@ import { getSecondaryWindow } from '@main/window/secondaryWindows'
 import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@shared/assets/carIcons'
 import type { Config, DevListEntry } from '@shared/types'
 import { PhoneWorkMode } from '@shared/types'
+import { isInputCommand } from '@shared/types/InputCommand'
 import type { NavLocale } from '@shared/utils'
 import { isClusterDisplayed, translateNavigation } from '@shared/utils'
 import { app, WebContents } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import { type Device, usb, WebUSBDevice } from 'usb'
+import {
+  type AudioDeviceMonitorHandle,
+  startAudioDeviceMonitor
+} from '../../audio/AudioDeviceEnumerator'
 import { StatusFileWriter } from '../../status/StatusFileWriter'
 import { isCarlinkitDongle } from '../../usb/constants'
 import { AaBtSockClient } from '../driver/aa/AaBtSockClient'
@@ -76,6 +81,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
 }
 
+// 0x04 = Audio/Video CoD major class
+function isPhoneLikeCod(cod: number | undefined): boolean {
+  if (typeof cod !== 'number' || cod <= 0) return true
+  return ((cod >> 8) & 0x1f) !== 0x04
+}
+
 /** appearanceMode → initial NIGHT_DATA bit for AA. 'auto' = no override (undefined). */
 function deriveInitialNightMode(mode: string | undefined): boolean | undefined {
   if (mode === 'night') return true
@@ -122,14 +133,20 @@ export class ProjectionService {
   private lastVideoHeight?: number
   private dongleFwVersion?: string
   private boxInfo?: unknown
+  private hostDevList: DevListEntry[] = []
+  private dongleDevList: DevListEntry[] = []
+  private hostPairedRaw = ''
+  private donglePairedRaw = ''
   private lastDongleInfoEmitKey = ''
   private lastAudioMetaEmitKey = ''
   private firmware = new FirmwareUpdateService()
   private readonly aaBtSock = new AaBtSockClient()
   private aaBtSubscription: { close: () => void } | null = null
+  private audioMonitor: AudioDeviceMonitorHandle | null = null
   private readonly statusFile = new StatusFileWriter()
 
   private aaBtSupervisor: AaBluetoothSupervisor | null = null
+  private aaBtSupervisorMode: 'wireless' | 'monitor' | null = null
   private wirelessPhoneInRange = false
   private btInitialQueryDone = false
   private isSwitching = false
@@ -230,11 +247,28 @@ export class ProjectionService {
     const inChanged = next.audioInputDevice !== prev?.audioInputDevice
     if (outChanged || inChanged) {
       this.audio.onAudioDeviceChanged()
+      this.connectConfiguredAudioDevices().catch(() => {})
     }
   }
 
   private syncAaBtSupervisor(): void {
-    const want = this.config.wirelessEnabled === true && process.platform === 'linux'
+    // BT stack runs on Linux whenever the host has a BlueZ adapter, regardless
+    // of wirelessEnabled. The mode (wireless / monitor) is passed via env to
+    // the python supervisor, toggling wirelessEnabled restarts it.
+    const want = process.platform === 'linux'
+    const desiredMode = this.config.wirelessEnabled === true ? 'wireless' : 'monitor'
+
+    if (want && this.aaBtSupervisor && this.aaBtSupervisorMode !== desiredMode) {
+      console.log(
+        `[ProjectionService] restarting AA BT supervisor (mode ${this.aaBtSupervisorMode} → ${desiredMode})`
+      )
+      const sup = this.aaBtSupervisor
+      this.aaBtSupervisor = null
+      this.aaBtSupervisorMode = null
+      sup.stop().catch((e) => console.warn('[ProjectionService] supervisor stop threw', e))
+      this.closeAaBtSubscription()
+      this.sessionActiveSent = null
+    }
 
     if (want && !this.aaBtSupervisor) {
       const sup = new AaBluetoothSupervisor({ maxRestarts: 5 })
@@ -242,22 +276,27 @@ export class ProjectionService {
       sup.on('stderr', (line) => console.warn(`[aa-bt!] ${line}`))
       sup.on('error', (err) => console.warn(`[aa-bt] supervisor error: ${err.message}`))
       this.aaBtSupervisor = sup
+      this.aaBtSupervisorMode = desiredMode
       this.sessionActiveSent = null
-      console.log('[ProjectionService] starting AA BT/Wi-Fi supervisor')
+      console.log(`[ProjectionService] starting AA BT supervisor (mode=${desiredMode})`)
       sup.start(this.config)
       this.openAaBtSubscription()
       this.populateAaBtPairedListInitial()
         .then(() => {
           this.emitTransportState()
+          // Phone wake and audio reconnect in parallel so the native probe
+          // sees Connected:true before its 15s deadline expires
+          this.connectConfiguredAudioDevices().catch(() => {})
           return this.tryAutoConnect()
         })
         .catch(() => {})
       return
     }
     if (!want && this.aaBtSupervisor) {
-      console.log('[ProjectionService] stopping AA BT/Wi-Fi supervisor')
+      console.log('[ProjectionService] stopping AA BT supervisor')
       const sup = this.aaBtSupervisor
       this.aaBtSupervisor = null
+      this.aaBtSupervisorMode = null
       sup.stop().catch((e) => console.warn('[ProjectionService] supervisor stop threw', e))
       this.closeAaBtSubscription()
       this.setWirelessPhoneInRange(false)
@@ -341,10 +380,11 @@ export class ProjectionService {
     if (msg instanceof BoxInfo) {
       const settings = msg.settings as { DevList?: Array<Record<string, unknown>> }
       if (Array.isArray(settings.DevList)) {
-        settings.DevList = settings.DevList.map((entry) => ({
-          ...entry,
+        this.dongleDevList = settings.DevList.map((entry) => ({
+          ...(entry as DevListEntry),
           source: 'dongle' as const
         }))
+        settings.DevList = this.mergedDevList() as unknown as Array<Record<string, unknown>>
       }
       this.boxInfo = mergePreferExisting(this.boxInfo, msg.settings)
       this.emitDongleInfoIfChanged()
@@ -364,10 +404,8 @@ export class ProjectionService {
     if (!this.webContents) return
 
     if (msg instanceof BluetoothPairedList) {
-      this.emitProjectionEvent({
-        type: 'bluetoothPairedList',
-        payload: msg.data
-      })
+      this.donglePairedRaw = msg.data
+      this.emitCombinedBtPairedList()
       return
     }
 
@@ -720,9 +758,12 @@ export class ProjectionService {
   public beginShutdown(): void {
     this.shuttingDown = true
     this.unsubscribeConfigEvents()
+    this.audioMonitor?.stop()
+    this.audioMonitor = null
     if (this.aaBtSupervisor) {
       const sup = this.aaBtSupervisor
       this.aaBtSupervisor = null
+      this.aaBtSupervisorMode = null
       sup.stop().catch(() => {})
     }
   }
@@ -796,7 +837,7 @@ export class ProjectionService {
       isStarted: () => this.started,
       hasWebUsbDevice: () => this.webUsbDevice !== null,
       sendBluetoothPairedList: (text) => this.dongleDriver.sendBluetoothPairedList(text),
-      connectAaBt: (mac) => this.aaBtSock.connect(mac),
+      connectAaBt: (mac) => this.aaBtSock.connectFull(mac),
       removeAaBt: (mac) => this.aaBtSock.remove(mac),
       refreshAaBtPaired: () => {
         this.refreshAaBtPairedList().catch(() => {})
@@ -828,6 +869,9 @@ export class ProjectionService {
     registerProjectionIpc(ipcHost)
 
     this.subscribeConfigEvents()
+    this.audioMonitor = startAudioDeviceMonitor(() => {
+      this.emitProjectionEvent({ type: 'audioDevicesChanged' })
+    })
   }
 
   private async reloadConfigFromDisk(): Promise<void> {
@@ -1064,6 +1108,26 @@ export class ProjectionService {
     return { ok: true, active: this.getActiveTransport() }
   }
 
+  public async disconnectHostBtPhones(): Promise<void> {
+    if (process.platform !== 'linux') return
+    let devices
+    try {
+      devices = await this.aaBtSock.listPaired()
+    } catch {
+      return
+    }
+    for (const d of devices) {
+      if (!d.connected) continue
+      if (!isPhoneLikeCod(d.class)) continue
+      try {
+        console.log(`[ProjectionService] shutdown disconnect ${d.mac}`)
+        await this.aaBtSock.disconnect(d.mac)
+      } catch (e) {
+        console.warn('[ProjectionService] shutdown BT disconnect threw', e)
+      }
+    }
+  }
+
   private async bounceAaBtConnections(): Promise<void> {
     if (process.platform !== 'linux') return
     let devices
@@ -1074,6 +1138,8 @@ export class ProjectionService {
     }
     for (const d of devices) {
       if (!d.connected) continue
+      // Only bounce phones; audio devices keep their A2DP link
+      if (!isPhoneLikeCod(d.class)) continue
       try {
         console.log(`[ProjectionService] bounce BT ${d.mac} to retrigger wireless AA`)
         await this.aaBtSock.disconnect(d.mac)
@@ -1096,45 +1162,44 @@ export class ProjectionService {
       return
     }
 
-    const connected = devices.find((d) => d.connected)?.mac ?? ''
+    const phones = devices.filter((d) => isPhoneLikeCod(d.class))
+    const connected = phones.find((d) => d.connected)?.mac ?? ''
     const wasSettled = this.btInitialQueryDone
     this.btInitialQueryDone = true
-    // During wired AA we deliberately don't auto-wake the phone, so it won't
-    // show as BT-connected. Treat any paired device as in-range.
+    // Wired AA doesn't wake the phone over BT — treat any paired phone as in-range
     const wiredAaActive = this.started && this.drivers.getAa()?.isWiredMode() === true
-    const offerable = connected !== '' || (wiredAaActive && devices.length > 0)
+    const offerable = connected !== '' || (wiredAaActive && phones.length > 0)
     this.setWirelessPhoneInRange(offerable)
     if (!wasSettled) this.autoStartIfNeeded().catch(console.error)
 
-    if (this.aaDriver) {
-      const entries: DevListEntry[] = devices.map((d) => ({
+    // Ignore transient empty responses to avoid UI flicker
+    if (devices.length === 0 && this.hostDevList.length > 0) {
+      console.warn('[ProjectionService] empty paired list, keeping last known host entries')
+    } else {
+      this.hostDevList = devices.map((d) => ({
         id: d.mac,
         name: d.name || d.mac,
-        type: 'AndroidAuto',
-        source: 'host'
+        type: isPhoneLikeCod(d.class) ? 'AndroidAuto' : '',
+        source: 'host',
+        class: d.class,
+        connected: d.connected
       }))
+      this.hostPairedRaw = devices.length
+        ? devices.map((d) => `${d.mac}${d.name ?? ''}`).join('\n') + '\n'
+        : ''
+    }
+
+    const prev = isRecord(this.boxInfo) ? this.boxInfo : {}
+    const boxUpdate: Record<string, unknown> = { ...prev, DevList: this.mergedDevList() }
+    if (this.aaDriver) {
+      boxUpdate.btMacAddr = connected
       if (connected && this.config.lastConnectedAaBtMac !== connected) {
         configEvents.emit('requestSave', { lastConnectedAaBtMac: connected })
       }
-
-      const prev = isRecord(this.boxInfo) ? this.boxInfo : {}
-      this.boxInfo = {
-        ...prev,
-        DevList: entries,
-        btMacAddr: connected
-      }
-      this.emitDongleInfoIfChanged()
-
-      if (this.webContents) {
-        const raw = devices.length
-          ? devices.map((d) => `${d.mac}${d.name ?? ''}`).join('\n') + '\n'
-          : ''
-        this.emitProjectionEvent({
-          type: 'bluetoothPairedList',
-          payload: raw
-        })
-      }
     }
+    this.boxInfo = boxUpdate
+    this.emitDongleInfoIfChanged()
+    this.emitCombinedBtPairedList()
   }
 
   private async populateAaBtPairedListInitial(): Promise<void> {
@@ -1162,6 +1227,95 @@ export class ProjectionService {
     )
   }
 
+  private extractBluezMac(deviceName: string | undefined | null): string | null {
+    if (!deviceName) return null
+    // bluez_output uses underscores, bluez_input uses colons
+    const m = deviceName.match(/^bluez_(?:output|input|sink|source)\.([0-9A-Fa-f_:]{17})/)
+    return m ? m[1]!.replace(/_/g, ':').toUpperCase() : null
+  }
+
+  // Host wins on MAC collision so a natively paired phone keeps no (D) suffix
+  private mergedDevList(): DevListEntry[] {
+    const norm = (id: string | undefined): string => (id ?? '').toUpperCase()
+    const hostMacs = new Set(this.hostDevList.map((e) => norm(e.id)))
+    const dongleUnique = this.dongleDevList.filter((e) => !hostMacs.has(norm(e.id)))
+    return [...this.hostDevList, ...dongleUnique]
+  }
+
+  private emitCombinedBtPairedList(): void {
+    if (!this.webContents) return
+    const parse = (raw: string): Array<{ mac: string; line: string }> => {
+      const out: Array<{ mac: string; line: string }> = []
+      for (const line of raw.split('\n')) {
+        const trimmed = line.replace(/\r$/, '').replace(/\0+$/g, '')
+        if (trimmed.length < 17) continue
+        const mac = trimmed.slice(0, 17).toUpperCase()
+        if (!mac.includes(':')) continue
+        out.push({ mac, line: trimmed })
+      }
+      return out
+    }
+    const dongle = parse(this.donglePairedRaw)
+    const dongleMacs = new Set(dongle.map((d) => d.mac))
+    const host = parse(this.hostPairedRaw).filter((h) => !dongleMacs.has(h.mac))
+    const all = [...dongle, ...host]
+    const raw = all.length ? all.map((d) => d.line).join('\n') + '\n' : ''
+    this.emitProjectionEvent({ type: 'bluetoothPairedList', payload: raw })
+  }
+
+  private async connectConfiguredAudioDevices(): Promise<void> {
+    if (!this.aaBtSupervisor) return
+    const macs = new Set<string>()
+    const outMac = this.extractBluezMac(this.config.audioOutputDevice)
+    const inMac = this.extractBluezMac(this.config.audioInputDevice)
+    if (outMac) macs.add(outMac)
+    if (inMac) macs.add(inMac)
+    if (macs.size === 0) return
+
+    let paired
+    try {
+      paired = await this.aaBtSock.listPaired()
+    } catch {
+      return
+    }
+    for (const mac of macs) {
+      const dev = paired.find((d) => d.mac.toUpperCase() === mac)
+      if (!dev) {
+        console.log(`[ProjectionService] audio device ${mac} not paired, skipping autoconnect`)
+        continue
+      }
+      if (dev.connected) {
+        console.log(`[ProjectionService] audio device ${mac} already connected`)
+        continue
+      }
+      // Device1.Connect (all profiles) with retry — device may not be ready yet
+      const maxAttempts = 4
+      const retryDelayMs = 4000
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        console.log(
+          `[ProjectionService] connecting audio device ${mac} (A2DP + HFP) attempt ${attempt}/${maxAttempts}`
+        )
+        let resp: { ok: boolean; error?: string }
+        try {
+          resp = await this.aaBtSock.connectFull(mac)
+        } catch (e) {
+          console.warn(`[ProjectionService] audio device ${mac} connect threw`, e)
+          break
+        }
+        if (resp.ok) {
+          console.log(`[ProjectionService] audio device ${mac} connected`)
+          break
+        }
+        console.warn(
+          `[ProjectionService] audio device ${mac} connect failed (attempt ${attempt}): ${resp.error}`
+        )
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, retryDelayMs))
+        }
+      }
+    }
+  }
+
   // Pick a target from the paired list and fire a single Connect
   private async tryAutoConnect(): Promise<void> {
     if (!this.aaBtSupervisor) return
@@ -1177,12 +1331,14 @@ export class ProjectionService {
     } catch {
       return
     }
-    if (devices.some((d) => d.connected)) return
+    // Audio devices being connected doesn't count — we still want to wake the phone
+    const phones = devices.filter((d) => isPhoneLikeCod(d.class))
+    if (phones.some((d) => d.connected)) return
 
     const lastMac = this.config.lastConnectedAaBtMac
-    const preferred = lastMac ? devices.find((d) => d.mac === lastMac) : null
-    const trusted = devices.filter((d) => d.trusted)
-    const target = preferred || trusted[0] || devices[0]
+    const preferred = lastMac ? phones.find((d) => d.mac === lastMac) : null
+    const trusted = phones.filter((d) => d.trusted)
+    const target = preferred || trusted[0] || phones[0]
     if (!target) {
       console.log(
         `[ProjectionService] autoconnect: no candidate (paired=${devices.length}, lastMac=${lastMac ?? '∅'})`
@@ -1202,13 +1358,30 @@ export class ProjectionService {
     }
   }
 
+  private dispatchRemoteInput(command: string): void {
+    if (!isInputCommand(command)) {
+      console.warn(`[ProjectionService] remote input: unknown command "${command}"`)
+      return
+    }
+    if (!this.started) return
+    try {
+      this.driver.handleInput(command)
+    } catch (e) {
+      console.warn(`[ProjectionService] remote input "${command}" failed`, e)
+    }
+  }
+
   // Open the long-lived aa-bt event subscription
   private openAaBtSubscription(): void {
     if (this.aaBtSubscription) return
     const open = (): void => {
       if (!this.aaBtSupervisor) return
       this.aaBtSubscription = this.aaBtSock.subscribe(
-        () => {
+        (ev) => {
+          if (ev.event === 'input' && ev.command) {
+            this.dispatchRemoteInput(ev.command)
+            return
+          }
           this.refreshAaBtPairedList().catch(() => {})
         },
         () => {
@@ -1424,6 +1597,8 @@ export class ProjectionService {
         console.warn('[ProjectionService] webUsbDevice.reset() failed (ignored)', e)
       }
 
+      const wasDongleSession = this.driver instanceof DongleDriver
+
       try {
         await this.driver.close()
       } catch (e) {
@@ -1431,6 +1606,12 @@ export class ProjectionService {
       }
 
       this.drivers.releaseAa()
+
+      if (wasDongleSession) {
+        // Dongle gone — drop its stale DevList
+        this.dongleDevList = []
+        this.donglePairedRaw = ''
+      }
 
       this.webUsbDevice = null
       this.audio.resetForSessionStop()

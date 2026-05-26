@@ -35,7 +35,7 @@ import {
   SendViewArea
 } from '@projection/messages/sendable'
 import type { Config } from '@shared/types'
-import { DEFAULT_CONFIG, MicType, PhoneWorkMode } from '@shared/types'
+import { InputCommand, MicType, PhoneWorkMode } from '@shared/types'
 import type { CommandValue } from '@shared/types/ProjectionEnums'
 import { matchFittingAAResolution } from '@shared/utils'
 import EventEmitter from 'events'
@@ -342,6 +342,22 @@ export class DongleDriver extends EventEmitter {
 
   public sendGnssData = async (nmeaText: string): Promise<boolean> => {
     return this.send(new SendGnssData(nmeaText))
+  }
+
+  handleInput = (command: InputCommand): void => {
+    const map: Partial<Record<InputCommand, CommandValue>> = {
+      [InputCommand.Play]: 'play',
+      [InputCommand.Pause]: 'pause',
+      [InputCommand.PlayPause]: 'playPause',
+      [InputCommand.Next]: 'next',
+      [InputCommand.Previous]: 'prev'
+    }
+    const value = map[command]
+    if (!value) {
+      if (DEBUG) console.log(`[DongleDriver] handleInput: no dongle mapping for ${command}`)
+      return
+    }
+    void this.send(new SendCommand(value))
   }
 
   // isolate framing/decoding

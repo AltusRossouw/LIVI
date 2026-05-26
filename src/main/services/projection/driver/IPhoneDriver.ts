@@ -1,5 +1,6 @@
 import type { EventEmitter } from 'node:events'
 import type { Config } from '@shared/types'
+import type { InputCommand } from '@shared/types/InputCommand'
 import type { Message } from '../messages/readable.js'
 import type { SendableMessage } from '../messages/sendable.js'
 
@@ -33,6 +34,9 @@ export interface IPhoneDriver extends EventEmitter {
 
   /** Send a message towards the phone. Resolves `true` if dispatched. */
   send(msg: SendableMessage): Promise<boolean>
+
+  /** Forward an abstract input command (from BT AVRCP, CAN bridge, etc.) */
+  handleInput(command: InputCommand): void
 }
 
 export type DriverMessageEvent = (msg: Message) => void

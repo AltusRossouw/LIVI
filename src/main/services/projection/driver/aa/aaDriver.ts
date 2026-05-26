@@ -19,6 +19,7 @@ import {
 } from '@projection/messages/sendable'
 import type { Config } from '@shared/types'
 import { CarType } from '@shared/types/Config'
+import { InputCommand } from '@shared/types/InputCommand'
 import { CommandMapping, MultiTouchAction, TouchAction } from '@shared/types/ProjectionEnums'
 import {
   computeAndroidAutoDpi,
@@ -664,6 +665,34 @@ export class AaDriver extends EventEmitter implements IPhoneDriver {
       return true
     }
     return false
+  }
+
+  handleInput(command: InputCommand): void {
+    const map: Partial<Record<InputCommand, number>> = {
+      [InputCommand.Play]: BUTTON_KEY.MEDIA_PLAY,
+      [InputCommand.Pause]: BUTTON_KEY.MEDIA_PAUSE,
+      [InputCommand.PlayPause]: BUTTON_KEY.MEDIA_PLAY_PAUSE,
+      [InputCommand.Stop]: BUTTON_KEY.MEDIA_STOP,
+      [InputCommand.Next]: BUTTON_KEY.MEDIA_NEXT,
+      [InputCommand.Previous]: BUTTON_KEY.MEDIA_PREV,
+      [InputCommand.FastForward]: BUTTON_KEY.MEDIA_FAST_FWD,
+      [InputCommand.Rewind]: BUTTON_KEY.MEDIA_REWIND,
+      [InputCommand.VolumeUp]: BUTTON_KEY.VOLUME_UP,
+      [InputCommand.VolumeDown]: BUTTON_KEY.VOLUME_DOWN,
+      [InputCommand.Mute]: BUTTON_KEY.VOLUME_MUTE,
+      [InputCommand.AcceptCall]: BUTTON_KEY.PHONE_ACCEPT,
+      [InputCommand.RejectCall]: BUTTON_KEY.PHONE_DECLINE,
+      [InputCommand.HookSwitch]: BUTTON_KEY.HEADSETHOOK,
+      [InputCommand.VoiceAssistant]: BUTTON_KEY.SEARCH
+    }
+    const keyCode = map[command]
+    if (keyCode === undefined) {
+      if (DEBUG) console.log(`[AaDriver] handleInput: no AA mapping for ${command}`)
+      return
+    }
+    if (!this._aa) return
+    this._aa.sendButton(keyCode, true)
+    this._aa.sendButton(keyCode, false)
   }
 }
 

@@ -16,6 +16,8 @@ type Props<T, K> = {
   onChange: (v: T) => void
   onClick?: () => void
   onItemNavigate?: (segment: string) => void
+  savedLabel?: string
+  onLabelChange?: (label: string) => void
 }
 
 export const SettingsFieldRow = <T, K>({
@@ -24,7 +26,9 @@ export const SettingsFieldRow = <T, K>({
   state,
   onChange,
   onClick,
-  onItemNavigate
+  onItemNavigate,
+  savedLabel,
+  onLabelChange
 }: Props<T, K>) => {
   const { t } = useTranslation()
   const label = node.labelKey ? t(node.labelKey, node.label) : node.label
@@ -51,6 +55,7 @@ export const SettingsFieldRow = <T, K>({
         onClick={onClick}
         node={node}
         value={getValueByPath(state, node.path)}
+        savedLabel={savedLabel}
         showValue={node.displayValue}
       >
         <Typography>{label}</Typography>
@@ -60,7 +65,13 @@ export const SettingsFieldRow = <T, K>({
 
   return (
     <SettingsItemRow label={label}>
-      <SettingsFieldControl node={node} value={value} onChange={onChange} />
+      <SettingsFieldControl
+        node={node}
+        value={value}
+        onChange={onChange}
+        savedLabel={savedLabel}
+        onLabelChange={onLabelChange}
+      />
     </SettingsItemRow>
   )
 }

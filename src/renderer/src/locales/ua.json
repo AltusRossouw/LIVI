@@ -135,6 +135,7 @@
     "audioInputDevice": "Аудіовхід",
     "audioInputDeviceDescription": "Виберіть джерело мікрофона.",
     "audioDeviceSystemDefault": "За замовчуванням",
+    "audioDeviceOffline": "{{name}} (офлайн)",
     "hwAcceleration": "Апаратне прискорення",
     "video": "Відео",
     "width": "Ширина",

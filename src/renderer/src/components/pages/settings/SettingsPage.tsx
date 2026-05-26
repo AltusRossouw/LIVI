@@ -53,6 +53,14 @@ export function SettingsPage() {
   const showRestart = restartAvailable && (Boolean(needsRestart) || Boolean(btDirty))
 
   if ('path' in node && node.page) {
+    const labelPath = node.type === 'select' ? node.labelPath : undefined
+    const savedLabel = labelPath
+      ? (getValueByPath(state, labelPath) as string | undefined)
+      : undefined
+    const onLabelChange = labelPath
+      ? (label: string) => handleFieldChange(labelPath, label)
+      : undefined
+
     return (
       <SettingsLayout title={title} showRestart={showRestart} onRestart={handleRestart}>
         <Box
@@ -67,6 +75,8 @@ export function SettingsPage() {
             node={node}
             value={getValueByPath(state, node.path)}
             onChange={(v) => handleFieldChange(node.path, v)}
+            savedLabel={savedLabel}
+            onLabelChange={onLabelChange}
           />
         </Box>
       </SettingsLayout>
@@ -111,6 +121,14 @@ export function SettingsPage() {
           return <KeyBindingRow key={`${_path}:${child.label}`} node={child} />
         }
 
+        const childLabelPath = child.type === 'select' ? child.labelPath : undefined
+        const childSavedLabel = childLabelPath
+          ? (getValueByPath(state, childLabelPath) as string | undefined)
+          : undefined
+        const childOnLabelChange = childLabelPath
+          ? (label: string) => handleFieldChange(childLabelPath, label)
+          : undefined
+
         return (
           <SettingsFieldRow
             key={_path}
@@ -120,6 +138,8 @@ export function SettingsPage() {
             onChange={(v) => handleFieldChange(_path, v)}
             onClick={child.page ? () => navigate(_path) : undefined}
             onItemNavigate={(segment) => navigate(segment)}
+            savedLabel={childSavedLabel}
+            onLabelChange={childOnLabelChange}
           />
         )
       })}

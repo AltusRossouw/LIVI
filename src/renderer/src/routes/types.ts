@@ -63,12 +63,15 @@ export type SelectOption = {
   label: string // TODO deleted in favor of i18n
   labelKey?: string
   value: string | number
+  offline?: boolean
 }
 
 export type SelectNode = BaseFieldNode & {
   type: 'select'
   options: SelectOption[]
   loadOptions?: () => Promise<SelectOption[]>
+  // Companion config path that mirrors the picked option's label
+  labelPath?: string
 }
 
 export type ToggleNode = BaseFieldNode & {

@@ -8,16 +8,30 @@ type Props<T> = {
   node: SettingsNode<Config>
   value: T
   onChange: (v: T) => void
+  savedLabel?: string
+  onLabelChange?: (label: string) => void
 }
 
-export const SettingsFieldPage = <T,>({ node, value, onChange }: Props<T>) => {
+export const SettingsFieldPage = <T,>({
+  node,
+  value,
+  onChange,
+  savedLabel,
+  onLabelChange
+}: Props<T>) => {
   const { t } = useTranslation()
   const description = node.page?.labelDescription
     ? t(node.page?.labelDescription)
     : node.page?.description
   return (
     <>
-      <SettingsFieldControl node={node} value={value} onChange={onChange} />
+      <SettingsFieldControl
+        node={node}
+        value={value}
+        onChange={onChange}
+        savedLabel={savedLabel}
+        onLabelChange={onLabelChange}
+      />
 
       {description && (
         <Typography color="text.secondary" sx={{ mb: 2 }}>

@@ -137,10 +137,12 @@ const api = {
   },
 
   audio: {
-    listSinks: (): Promise<Array<{ id: string; name: string; isDefault: boolean }>> =>
-      ipcRenderer.invoke('audio:listSinks'),
-    listSources: (): Promise<Array<{ id: string; name: string; isDefault: boolean }>> =>
-      ipcRenderer.invoke('audio:listSources')
+    listSinks: (): Promise<
+      Array<{ id: string; name: string; isDefault: boolean; offline?: boolean }>
+    > => ipcRenderer.invoke('audio:listSinks'),
+    listSources: (): Promise<
+      Array<{ id: string; name: string; isDefault: boolean; offline?: boolean }>
+    > => ipcRenderer.invoke('audio:listSources')
   },
 
   ipc: {

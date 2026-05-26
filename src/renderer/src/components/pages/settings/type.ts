@@ -9,6 +9,7 @@ export interface StackItemProps {
   showValue?: boolean
   onClick?: () => void
   node?: SettingsNode<Config>
+  savedLabel?: string
 }
 
 export type SettingsCustomPageProps<TState = Config, TValue = unknown> = {

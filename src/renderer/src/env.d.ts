@@ -135,8 +135,12 @@ declare global {
         ): () => void
       }
       audio: {
-        listSinks(): Promise<Array<{ id: string; name: string; isDefault: boolean }>>
-        listSources(): Promise<Array<{ id: string; name: string; isDefault: boolean }>>
+        listSinks(): Promise<
+          Array<{ id: string; name: string; isDefault: boolean; offline?: boolean }>
+        >
+        listSources(): Promise<
+          Array<{ id: string; name: string; isDefault: boolean; offline?: boolean }>
+        >
       }
       ipc: {
         start(): Promise<void>
@@ -170,6 +174,8 @@ declare global {
         requestCluster(enabled: boolean): Promise<{ ok: boolean; enabled: boolean }>
         onClusterVideoChunk(handler: (payload: unknown) => void): void
         onClusterResolution(handler: (payload: unknown) => void): void
+
+        connectBluetoothPairedDevice(mac: string): Promise<{ ok: boolean }>
 
         switchTransport(): Promise<{ ok: boolean; active: 'dongle' | 'aa' | 'cp' | null }>
         getTransportState(): Promise<{

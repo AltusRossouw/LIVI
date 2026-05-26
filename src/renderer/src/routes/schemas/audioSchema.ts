@@ -21,14 +21,20 @@ async function loadAudioOutputDevices(): Promise<SelectOption[]> {
   const api = window.projection?.audio
   if (!api?.listSinks) return [systemDefaultOption]
   const list = await api.listSinks()
-  return [systemDefaultOption, ...list.map((d) => ({ value: d.id, label: d.name }))]
+  return [
+    systemDefaultOption,
+    ...list.map((d) => ({ value: d.id, label: d.name, offline: d.offline }))
+  ]
 }
 
 async function loadAudioInputDevices(): Promise<SelectOption[]> {
   const api = window.projection?.audio
   if (!api?.listSources) return [systemDefaultOption]
   const list = await api.listSources()
-  return [systemDefaultOption, ...list.map((d) => ({ value: d.id, label: d.name }))]
+  return [
+    systemDefaultOption,
+    ...list.map((d) => ({ value: d.id, label: d.name, offline: d.offline }))
+  ]
 }
 
 export const audioSchema: SettingsNode<Config> = {
@@ -103,6 +109,7 @@ export const audioSchema: SettingsNode<Config> = {
       label: 'Audio Output',
       labelKey: 'settings.audioOutputDevice',
       path: 'audioOutputDevice',
+      labelPath: 'audioOutputDeviceLabel',
       displayValue: true,
       options: [systemDefaultOption],
       loadOptions: loadAudioOutputDevices,
@@ -118,6 +125,7 @@ export const audioSchema: SettingsNode<Config> = {
       label: 'Audio Input',
       labelKey: 'settings.audioInputDevice',
       path: 'audioInputDevice',
+      labelPath: 'audioInputDeviceLabel',
       displayValue: true,
       options: [systemDefaultOption],
       loadOptions: loadAudioInputDevices,

@@ -289,6 +289,13 @@ export class TransportArbiter {
 
   // Switch ------------------------------------------------------------------
 
+  // Force the override to a specific candidate (used by device-list connect)
+  setOverride(candidate: Candidate): void {
+    this.override = candidate
+    this.resetNativeProbeDefer()
+    this.deps.onChange()
+  }
+
   prepareSwitch(): { ok: boolean; target: Candidate | null } {
     const detected = this.detectedCandidates()
     if (detected.length < 2) return { ok: false, target: this.currentCandidate() }

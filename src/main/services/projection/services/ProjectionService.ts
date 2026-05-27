@@ -837,7 +837,7 @@ export class ProjectionService {
       isStarted: () => this.started,
       hasWebUsbDevice: () => this.webUsbDevice !== null,
       sendBluetoothPairedList: (text) => this.dongleDriver.sendBluetoothPairedList(text),
-      connectAaBt: (mac) => this.aaBtSock.connectFull(mac),
+      connectAaBt: (mac) => this.connectPairedDevice(mac),
       removeAaBt: (mac) => this.aaBtSock.remove(mac),
       refreshAaBtPaired: () => {
         this.refreshAaBtPairedList().catch(() => {})
@@ -1109,6 +1109,54 @@ export class ProjectionService {
       this.isSwitching = false
     }
     return { ok: true, active: this.getActiveTransport() }
+  }
+
+  // Device-list connect entry: phone → switch to wireless AA targeting this MAC
+  public async connectPairedDevice(mac: string): Promise<{ ok: boolean; error?: string }> {
+    let devices
+    try {
+      devices = await this.aaBtSock.listPaired()
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+    const upper = mac.toUpperCase()
+    const dev = devices.find((d) => d.mac.toUpperCase() === upper)
+
+    if (!dev || !isPhoneLikeCod(dev.class)) {
+      return await this.aaBtSock.connectFull(mac)
+    }
+
+    if (this.isSwitching) return { ok: false, error: 'switch in progress' }
+    this.isSwitching = true
+    try {
+      const wasWireless =
+        this.started &&
+        this.drivers.getAa() !== null &&
+        this.drivers.getAa()?.isWiredMode() === false
+
+      if (this.started) {
+        try {
+          await this.stop()
+        } catch (e) {
+          console.warn('[ProjectionService] connectPairedDevice: stop threw (ignored)', e)
+        }
+      }
+      if (wasWireless) {
+        await this.aaBtSock.deauthApClients().catch(() => {})
+      }
+
+      this.applyConfigPatch({ ...this.config, lastConnectedAaBtMac: mac })
+      this.arbiter.setOverride({ transport: 'aa', mode: 'wireless' })
+
+      await this.bounceAaBtConnections()
+      await new Promise((r) => setTimeout(r, 500))
+      await this.tryAutoConnect({ force: true })
+      await this.autoStartIfNeeded()
+
+      return { ok: true }
+    } finally {
+      this.isSwitching = false
+    }
   }
 
   public async disconnectHostBtPhones(): Promise<void> {

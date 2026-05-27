@@ -72,17 +72,19 @@ echo "→ Creating autostart entry"
 AUTOSTART_DIR="$USER_HOME/.config/autostart"
 mkdir -p "$AUTOSTART_DIR"
 
+AUTOSTART_LOG="$APPIMAGE_DIR/LIVI.log"
 cat > "$AUTOSTART_DIR/LIVI.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=LIVI
-Exec=$APPIMAGE_PATH
+Exec=sh -c '"$APPIMAGE_PATH" >"$AUTOSTART_LOG" 2>&1'
 Icon=${ICON_DEST:-livi}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 Categories=AudioVideo;
 EOF
 echo "Autostart entry at $AUTOSTART_DIR/LIVI.desktop"
+echo "Autostart log at $AUTOSTART_LOG"
 
 # Create Desktop shortcut
 echo "→ Creating desktop shortcut"

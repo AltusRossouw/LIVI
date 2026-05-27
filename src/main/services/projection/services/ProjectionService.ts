@@ -1324,6 +1324,11 @@ export class ProjectionService {
       console.log('[ProjectionService] autoconnect: skipped (wired AA session active)')
       return
     }
+    // Same when a wired phone is plugged but the AA session hasn't started yet
+    if (this.arbiter.getSnapshot().wiredPhoneDetected) {
+      console.log('[ProjectionService] autoconnect: skipped (wired phone detected)')
+      return
+    }
 
     let devices
     try {

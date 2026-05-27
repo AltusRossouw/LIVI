@@ -9,7 +9,7 @@
     "Lasse Heitgres"
   ],
   "homepage": "https://f-io.dev",
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@11.4.0",
   "scripts": {
     "prepare": "husky",
     "dev": "vite",
@@ -67,7 +67,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.4.16",
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

@@ -14,6 +14,7 @@ function freshHost() {
   return {
     start: jest.fn(async () => undefined),
     stop: jest.fn(async () => undefined),
+    restartSession: jest.fn(async () => undefined),
     pickPreferredTransport: jest.fn(() => 'dongle' as 'dongle' | 'aa' | null),
     applyCodecCapabilities: jest.fn()
   }
@@ -48,20 +49,11 @@ describe('lifecycle ipc', () => {
     expect(host.stop).toHaveBeenCalled()
   })
 
-  test('projection-restart calls stop then start', async () => {
+  test('projection-restart delegates to host.restartSession', async () => {
     const host = freshHost()
     registerLifecycleIpc(host)
     await handlers.get('projection-restart')!(null)
-    expect(host.stop).toHaveBeenCalled()
-    expect(host.start).toHaveBeenCalled()
-  })
-
-  test('projection-restart swallows a thrown stop()', async () => {
-    const host = freshHost()
-    host.stop.mockRejectedValueOnce(new Error('not running'))
-    registerLifecycleIpc(host)
-    await expect(handlers.get('projection-restart')!(null)).resolves.toBeUndefined()
-    expect(host.start).toHaveBeenCalled()
+    expect(host.restartSession).toHaveBeenCalled()
   })
 
   test('projection-codec-capabilities forwards payload', async () => {

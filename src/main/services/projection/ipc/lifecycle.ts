@@ -3,7 +3,7 @@ import type { ProjectionIpcHost } from './types'
 
 type Deps = Pick<
   ProjectionIpcHost,
-  'start' | 'stop' | 'pickPreferredTransport' | 'applyCodecCapabilities'
+  'start' | 'stop' | 'restartSession' | 'pickPreferredTransport' | 'applyCodecCapabilities'
 >
 
 export function registerLifecycleIpc(host: Deps): void {
@@ -14,14 +14,7 @@ export function registerLifecycleIpc(host: Deps): void {
     return host.stop()
   })
 
-  registerIpcHandle('projection-restart', async () => {
-    try {
-      await host.stop()
-    } catch (e) {
-      console.warn('[projection-ipc] restart: stop threw (ignored)', e)
-    }
-    return host.start()
-  })
+  registerIpcHandle('projection-restart', async () => host.restartSession())
 
   registerIpcHandle('projection-codec-capabilities', async (_evt, caps: unknown) => {
     host.applyCodecCapabilities(caps)

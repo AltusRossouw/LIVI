@@ -34,6 +34,7 @@ export interface ProjectionIpcHost {
   // Lifecycle / transport
   start(): Promise<void>
   stop(): Promise<void>
+  restartSession(): Promise<void>
   pickPreferredTransport(): Transport | null
   switchTransport(): Promise<{ ok: boolean; active: Transport | null }>
   getTransportState(): TransportSnapshot

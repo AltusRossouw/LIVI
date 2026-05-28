@@ -827,6 +827,7 @@ export class ProjectionService {
     const ipcHost: ProjectionIpcHost = {
       start: () => this.start(),
       stop: () => this.stop(),
+      restartSession: () => this.restartSession(),
       pickPreferredTransport: () => this.pickPreferredTransport(),
       switchTransport: () => this.switchTransport(),
       getTransportState: () => this.getTransportState(),
@@ -1109,6 +1110,28 @@ export class ProjectionService {
       this.isSwitching = false
     }
     return { ok: true, active: this.getActiveTransport() }
+  }
+
+  // Restart the session to apply a config change that needs fresh negotiation
+  public async restartSession(): Promise<void> {
+    const wasWired = this.started && this.drivers.getAa()?.isWiredMode() === true
+    const wasWireless = this.started && this.drivers.getAa()?.isWiredMode() === false
+
+    try {
+      await this.stop()
+    } catch (e) {
+      console.warn('[ProjectionService] restartSession: stop threw (ignored)', e)
+    }
+
+    if (wasWired) return
+
+    if (wasWireless) {
+      await this.bounceAaBtConnections()
+      await new Promise((r) => setTimeout(r, 500))
+      await this.tryAutoConnect({ force: true })
+    }
+
+    await this.autoStartIfNeeded()
   }
 
   // Device-list connect entry: phone → switch to wireless AA targeting this MAC

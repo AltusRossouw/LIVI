@@ -64,7 +64,7 @@
     "stream-browserify": "^3.0.0",
     "usb": "^2.17.0",
     "vite-plugin-esmodule": "^1.5.0",
-    "zustand": "^5.0.13"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

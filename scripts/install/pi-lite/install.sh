@@ -35,7 +35,9 @@ sudo apt-get install -y \
   seatd \
   wlr-randr \
   uhubctl \
-  pipewire wireplumber pipewire-pulse
+  pipewire wireplumber pipewire-pulse \
+  python3-dbus python3-gi \
+  bluez hostapd dnsmasq-base iw rfkill
 
 echo "→ Adding $USER to required groups"
 WANTED_GROUPS=(video render input plugdev)
@@ -154,7 +156,7 @@ if [ -z "\$WAYLAND_DISPLAY" ] && [ "\$(tty)" = "/dev/tty1" ]; then
     ) &
   fi
 
-  exec cage -- "$APPIMAGE_PATH"
+  exec cage -- "$APPIMAGE_PATH" >"$APPIMAGE_DIR/LIVI.log" 2>&1
 fi
 EOF
 else

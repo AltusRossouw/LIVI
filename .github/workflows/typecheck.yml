@@ -51,7 +51,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev
+            build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile
@@ -110,7 +111,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev
+            build-essential python3 python3-dev libusb-1.0-0-dev libudev-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Install dependencies from lockfile
         run: pnpm install --frozen-lockfile

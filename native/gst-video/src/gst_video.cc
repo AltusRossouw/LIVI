@@ -1,6 +1,7 @@
 #include <node_api.h>
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
+#include <gst/base/gstbasesink.h>
 #include <gst/video/videooverlay.h>
 #include <cstring>
 #include <initializer_list>
@@ -136,6 +137,23 @@ static bool is_hw_decoder(const char* name) {
   return true;
 }
 
+static bool factory_exists(const char* name) {
+  GstElementFactory* f = name && *name ? gst_element_factory_find(name) : nullptr;
+  if (f) {
+    gst_object_unref(f);
+    return true;
+  }
+  return false;
+}
+
+// Primary software decoder per codec, used to report SW availability
+static const char* sw_decoder_for(const std::string& c) {
+  if (c == "h265") return "avdec_h265";
+  if (c == "vp9") return "vp9dec";
+  if (c == "av1") return "dav1ddec";
+  return "avdec_h264";
+}
+
 // Best available decoder per codec, HW-first then software fallback. Adapts at
 // runtime: Pi5 stateless v4l2sl, Pi4 v4l2, x86 VA-API, mac vtdec, win d3d11
 static const char* decoder_for(const std::string& c) {
@@ -196,8 +214,8 @@ static napi_value Version(napi_env env, napi_callback_info info) {
   return result;
 }
 
-// probeCodecs() -> { h264: {available, hw}, h265: {...}, vp9, av1 }
-// available = a decoder exists; hw = the chosen decoder is hardware-accelerated
+// probeCodecs() -> { h264: {hw, sw}, h265: {...}, vp9, av1 }
+// hw = a hardware decoder exists; sw = a software decoder exists
 static napi_value ProbeCodecs(napi_env env, napi_callback_info info) {
   ensure_init();
   napi_value obj;
@@ -205,17 +223,15 @@ static napi_value ProbeCodecs(napi_env env, napi_callback_info info) {
   const char* codecs[] = {"h264", "h265", "vp9", "av1"};
   for (const char* c : codecs) {
     const char* dec = decoder_for(c);
-    GstElementFactory* f = gst_element_factory_find(dec);
-    bool available = (f != nullptr);
-    if (f) gst_object_unref(f);
-    bool hw = available && is_hw_decoder(dec);
+    bool hw = factory_exists(dec) && is_hw_decoder(dec);
+    bool sw = factory_exists(sw_decoder_for(c));
 
     napi_value entry, b;
     napi_create_object(env, &entry);
-    napi_get_boolean(env, available, &b);
-    napi_set_named_property(env, entry, "available", b);
     napi_get_boolean(env, hw, &b);
     napi_set_named_property(env, entry, "hw", b);
+    napi_get_boolean(env, sw, &b);
+    napi_set_named_property(env, entry, "sw", b);
     napi_set_named_property(env, obj, c, entry);
   }
   return obj;

@@ -25,6 +25,25 @@
           "sources": [ "src/gst_video.cc" ],
           "cflags": [ "<!@(pkg-config --cflags gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)" ],
           "libraries": [ "<!@(pkg-config --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0)" ]
+        } ],
+        [ "OS=='win'", {
+          "sources": [ "src/gst_video.cc" ],
+          "include_dirs": [
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/include/gstreamer-1.0",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/include/glib-2.0",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/glib-2.0/include"
+          ],
+          "libraries": [
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/gstreamer-1.0.lib",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/gstapp-1.0.lib",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/gstvideo-1.0.lib",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/gstbase-1.0.lib",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/gobject-2.0.lib",
+            "$(GSTREAMER_1_0_ROOT_MSVC_X86_64)/lib/glib-2.0.lib"
+          ],
+          "msvs_settings": {
+            "VCCLCompilerTool": { "ExceptionHandling": 1 }
+          }
         } ]
       ]
     }

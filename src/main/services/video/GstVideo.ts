@@ -1,8 +1,10 @@
 import { BrowserWindow, type WebContents } from 'electron'
+import path from 'path'
+import { resolveGStreamerRoot } from '../audio/gstreamer'
 
 export type GstVideoCodec = 'h264' | 'h265' | 'vp9' | 'av1'
 
-export type GstCodecSupport = { available: boolean; hw: boolean }
+export type GstCodecSupport = { hw: boolean; sw: boolean }
 export type GstCodecProbe = Record<GstVideoCodec, GstCodecSupport>
 
 interface GstAddon {
@@ -18,9 +20,26 @@ interface GstAddon {
 let addon: GstAddon | null = null
 let loadFailed = false
 
+// Windows has no system GStreamer
+function prepareWindowsRuntime(): void {
+  if (process.platform !== 'win32') return
+  const root = resolveGStreamerRoot()
+  if (!root) return
+  process.env.PATH = `${path.join(root, 'bin')};${process.env.PATH ?? ''}`
+  process.env.GST_PLUGIN_SYSTEM_PATH = ''
+  process.env.GST_PLUGIN_PATH = path.join(root, 'lib', 'gstreamer-1.0')
+  process.env.GST_PLUGIN_SCANNER = path.join(
+    root,
+    'libexec',
+    'gstreamer-1.0',
+    'gst-plugin-scanner.exe'
+  )
+}
+
 function load(): GstAddon | null {
   if (addon || loadFailed) return addon
   try {
+    prepareWindowsRuntime()
     addon = require('gst-video') as GstAddon
     console.log('[GstVideo]', addon.version())
   } catch (e) {
@@ -31,9 +50,9 @@ function load(): GstAddon | null {
 }
 
 // Which codecs the bundled/loaded GStreamer can decode on this platform,
-// and whether the decoder is hardware-accelerated.
+// and whether the decoder is hardware-accelerated
 export function probeGstCodecs(): GstCodecProbe {
-  const none: GstCodecSupport = { available: false, hw: false }
+  const none: GstCodecSupport = { hw: false, sw: false }
   const a = load()
   if (!a) return { h264: none, h265: none, vp9: none, av1: none }
   try {

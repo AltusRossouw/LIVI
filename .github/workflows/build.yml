@@ -313,6 +313,50 @@ jobs:
       # ----------------------------
       # Windows x64
       # ----------------------------
+      - name: Install GStreamer (runtime + devel) [windows-x64]
+        if: matrix.os == 'windows' && matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # GStreamer uses GNOME-style versioning: even minor = stable, odd = dev.
+          $listing = (Invoke-WebRequest -Uri 'https://gstreamer.freedesktop.org/data/pkg/windows/' -UseBasicParsing).Content
+          $versions = [regex]::Matches($listing, 'href="([0-9]+\.[0-9]+\.[0-9]+)/"') |
+            ForEach-Object { [Version]$_.Groups[1].Value } |
+            Where-Object { $_.Minor % 2 -eq 0 } |
+            Sort-Object
+          if (-not $versions -or $versions.Count -eq 0) {
+            throw 'Failed to resolve latest stable GStreamer version from windows listing'
+          }
+          $gstVersion = $versions[-1].ToString()
+          Write-Host "Resolved Windows GStreamer: $gstVersion"
+
+          $url = "https://gstreamer.freedesktop.org/data/pkg/windows/$gstVersion/msvc/gstreamer-1.0-msvc-x86_64-$gstVersion.exe"
+          curl.exe -L $url -o 'gstreamer-msvc-x86_64.exe'
+
+          $p = Start-Process `
+            -FilePath '.\gstreamer-msvc-x86_64.exe' `
+            -ArgumentList @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/TYPE=devel') `
+            -PassThru
+          if (-not $p.WaitForExit(180000)) {
+            try { $p.Kill() } catch {}
+            throw 'GStreamer installer timed out after 3 minutes'
+          }
+          if ($p.ExitCode -ne 0) {
+            throw "GStreamer installer failed with exit code $($p.ExitCode)"
+          }
+
+          $root = "$env:ProgramFiles\gstreamer\1.0\msvc_x86_64"
+          if (-not (Test-Path "$root\lib\gstreamer-1.0.lib")) {
+            throw "GStreamer dev libs not found at $root"
+          }
+          # Export the 8.3 short path so the space in "Program Files" cannot break
+          # the include/lib paths binding.gyp feeds to MSBuild
+          $shortRoot = (New-Object -ComObject Scripting.FileSystemObject).GetFolder($root).ShortPath
+          Write-Host "GStreamer MSVC root (8.3): $shortRoot"
+          "GSTREAMER_1_0_ROOT_MSVC_X86_64=$shortRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$root\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
       - name: Install deps (pnpm) [windows-x64]
         if: matrix.os == 'windows' && matrix.arch == 'x64'
         shell: pwsh

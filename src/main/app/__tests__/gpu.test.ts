@@ -50,13 +50,9 @@ describe('gpu module', () => {
 
     expect(mockedAppendSwitch).toHaveBeenCalledWith('ignore-gpu-blocklist')
     expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-gpu-rasterization')
-    expect(mockedAppendSwitch).toHaveBeenCalledWith(
-      'disable-features',
-      'UseChromeOSDirectVideoDecoder'
-    )
   })
 
-  test('on linux x64 import applies gpu toggles, linux preset and webgpu flags', () => {
+  test('on linux x64 import applies gpu toggles and linux preset', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' })
     Object.defineProperty(process, 'arch', { value: 'x64' })
 
@@ -64,13 +60,7 @@ describe('gpu module', () => {
 
     expect(mockedAppendSwitch).toHaveBeenCalledWith('ignore-gpu-blocklist')
     expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-gpu-rasterization')
-    expect(mockedAppendSwitch).toHaveBeenCalledWith(
-      'disable-features',
-      'UseChromeOSDirectVideoDecoder'
-    )
     expect(mockedLinuxPresetAngleVulkan).toHaveBeenCalledTimes(1)
-    expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-unsafe-webgpu')
-    expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-dawn-features', 'allow_unsafe_apis')
   })
 
   test('on linux non-x64 import does not apply linux gpu preset side effects', () => {
@@ -80,20 +70,17 @@ describe('gpu module', () => {
     loadGpuModule()
 
     expect(mockedLinuxPresetAngleVulkan).not.toHaveBeenCalled()
-    expect(mockedAppendSwitch).not.toHaveBeenCalledWith('enable-unsafe-webgpu')
-    expect(mockedAppendSwitch).not.toHaveBeenCalledWith('enable-dawn-features', 'allow_unsafe_apis')
+    expect(mockedAppendSwitch).not.toHaveBeenCalled()
   })
 
-  test('on darwin import applies webgpu flags only', () => {
+  test('on darwin import applies no startup gpu side effects', () => {
     Object.defineProperty(process, 'platform', { value: 'darwin' })
     Object.defineProperty(process, 'arch', { value: 'arm64' })
 
     loadGpuModule()
 
     expect(mockedLinuxPresetAngleVulkan).not.toHaveBeenCalled()
-    expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-unsafe-webgpu')
-    expect(mockedAppendSwitch).toHaveBeenCalledWith('enable-dawn-features', 'allow_unsafe_apis')
-    expect(mockedAppendSwitch).not.toHaveBeenCalledWith('ignore-gpu-blocklist')
+    expect(mockedAppendSwitch).not.toHaveBeenCalled()
   })
 
   test('on unsupported platform import does not apply startup gpu side effects', () => {

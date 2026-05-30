@@ -200,15 +200,9 @@ export class ProjectionService {
     const prev = this.config
     this.config = { ...this.config, ...next }
 
-    const hwToggled =
-      typeof next.hwAcceleration === 'boolean' && next.hwAcceleration !== prev?.hwAcceleration
     const prevClusterActive = isClusterDisplayed(prev)
     const nextClusterActive = isClusterDisplayed(this.config)
     const clusterToggled = prevClusterActive !== nextClusterActive
-
-    if (hwToggled) {
-      this.recomputeCodecCapabilities()
-    }
 
     if (clusterToggled && !nextClusterActive) {
       this.clusterRequested = false
@@ -326,11 +320,9 @@ export class ProjectionService {
   private recomputeCodecCapabilities(): void {
     const caps = this.lastCodecCaps
     if (!caps) return
-    const useHw = Boolean(this.config.hwAcceleration)
-    const isSupported = (c: { hw?: unknown; sw?: unknown } | undefined): boolean => {
-      if (!c) return false
-      return useHw ? Boolean(c.hw) || Boolean(c.sw) : Boolean(c.sw)
-    }
+    // applyGstCodecCaps already drops optional codecs without a HW decoder to
+    // undefined, so a present entry means the codec is advertised
+    const isSupported = (c: { hw?: unknown; sw?: unknown } | undefined): boolean => Boolean(c)
 
     const hevc = isSupported(caps.h265)
     const vp9 = isSupported(caps.vp9)
@@ -338,23 +330,17 @@ export class ProjectionService {
 
     if (this.hevcSupported !== hevc) {
       this.hevcSupported = hevc
-      console.log(
-        `[ProjectionService] hevc support: ${hevc} (useHw=${useHw}, hw=${Boolean(caps.h265?.hw)}, sw=${Boolean(caps.h265?.sw)})`
-      )
+      console.log(`[ProjectionService] hevc support: ${hevc}`)
       this.aaDriver?.setHevcSupported(hevc)
     }
     if (this.vp9Supported !== vp9) {
       this.vp9Supported = vp9
-      console.log(
-        `[ProjectionService] vp9 support: ${vp9} (useHw=${useHw}, hw=${Boolean(caps.vp9?.hw)}, sw=${Boolean(caps.vp9?.sw)})`
-      )
+      console.log(`[ProjectionService] vp9 support: ${vp9}`)
       this.aaDriver?.setVp9Supported(vp9)
     }
     if (this.av1Supported !== av1) {
       this.av1Supported = av1
-      console.log(
-        `[ProjectionService] av1 support: ${av1} (useHw=${useHw}, hw=${Boolean(caps.av1?.hw)}, sw=${Boolean(caps.av1?.sw)})`
-      )
+      console.log(`[ProjectionService] av1 support: ${av1}`)
       this.aaDriver?.setAv1Supported(av1)
     }
   }

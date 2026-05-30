@@ -1,5 +1,3 @@
-/// <reference types="@webgpu/types" />
-
 import type { ElectronAPI } from '@electron-toolkit/preload'
 import type { Config, DongleFirmwareAction } from '@shared/types'
 import type { MultiTouchPoint } from '@shared/types/TouchTypes'

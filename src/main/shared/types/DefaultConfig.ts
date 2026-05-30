@@ -35,7 +35,6 @@ export const DEFAULT_CONFIG: Config = {
   autoConn: true,
   UseBTPhone: false,
   disableAudioOutput: false,
-  hwAcceleration: false,
   dashboardMediaInfo: true,
   dashboardVehicleInfo: true,
   dashboardRouteInfo: true,

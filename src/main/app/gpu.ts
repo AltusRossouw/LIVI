@@ -1,22 +1,13 @@
 import { app } from 'electron'
 import { linuxPresetAngleVulkan } from '../utils'
 
-// Linux x64 -> ANGLE + Vulkan + WebGPU
+// Linux x64 -> ANGLE + Vulkan for the UI compositor
 if (process.platform === 'linux' && process.arch === 'x64') {
   commonGpuToggles()
   linuxPresetAngleVulkan()
-  app.commandLine.appendSwitch('enable-unsafe-webgpu')
-  app.commandLine.appendSwitch('enable-dawn-features', 'allow_unsafe_apis')
-}
-
-// macOS: WebGPU
-if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('enable-unsafe-webgpu')
-  app.commandLine.appendSwitch('enable-dawn-features', 'allow_unsafe_apis')
 }
 
 export function commonGpuToggles() {
   app.commandLine.appendSwitch('ignore-gpu-blocklist')
   app.commandLine.appendSwitch('enable-gpu-rasterization')
-  app.commandLine.appendSwitch('disable-features', 'UseChromeOSDirectVideoDecoder')
 }

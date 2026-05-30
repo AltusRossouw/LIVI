@@ -324,12 +324,6 @@ export const videoSchema: SettingsNode<Config> = {
           ]
         }
       ]
-    },
-    {
-      type: 'checkbox',
-      label: 'HW Acceleration',
-      labelKey: 'settings.hwAcceleration',
-      path: 'hwAcceleration'
     }
   ]
 }

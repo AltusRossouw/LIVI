@@ -68,7 +68,6 @@ export const requiresRestartParams: (keyof Config)[] = [
   'mediaDelay',
   'wifiType',
   'disableAudioOutput',
-  'hwAcceleration',
   'dashboardMediaInfo',
   'dashboardVehicleInfo',
   'dashboardRouteInfo',

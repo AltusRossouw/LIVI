@@ -32,17 +32,7 @@ export function setFeatureFlags(flags: string[]) {
 export function linuxPresetAngleVulkan() {
   app.commandLine.appendSwitch('use-gl', 'angle')
   app.commandLine.appendSwitch('use-angle', 'vulkan')
-  setFeatureFlags([
-    'Vulkan',
-    'VulkanFromANGLE',
-    'DefaultANGLEVulkan',
-    'UnsafeWebGPU',
-    'AcceleratedVideoDecodeLinuxZeroCopyGL',
-    'AcceleratedVideoEncoder',
-    'VaapiIgnoreDriverChecks',
-    'UseMultiPlaneFormatForHardwareVideo',
-    'PlatformHEVCDecoderSupport'
-  ])
+  setFeatureFlags(['Vulkan', 'VulkanFromANGLE', 'DefaultANGLEVulkan'])
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
 }
 

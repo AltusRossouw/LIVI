@@ -156,9 +156,6 @@ export type Config = {
   audioInputDeviceLabel?: string
   visualAudioDelayMs: number
 
-  // Decode / video
-  hwAcceleration: boolean
-
   // Dashboard widgets
   dashboardMediaInfo: boolean
   dashboardVehicleInfo: boolean

@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
+#include <wlr/backend/wayland.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_cursor.h>
@@ -26,7 +27,6 @@
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
-#include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer.h>
@@ -88,10 +88,13 @@ struct tinywl_server {
 	struct wl_list outputs;
 	struct wl_listener new_output;
 
-	/* LIVI: the bottom video plane, the UI on top, and the output dimensions */
+	// LIVI: the bottom video plane, the UI on top, and the output dimensions
 	struct tinywl_toplevel *video_toplevel;
 	struct tinywl_toplevel *ui_toplevel;
 	int32_t output_width, output_height;
+
+	// LIVI: magenta backdrop (LIVI_DEBUG_BG)
+	struct wlr_scene_rect *debug_bg;
 };
 
 struct tinywl_output {
@@ -108,7 +111,7 @@ struct tinywl_toplevel {
 	struct tinywl_server *server;
 	struct wlr_xdg_toplevel *xdg_toplevel;
 	struct wlr_scene_tree *scene_tree;
-	bool is_video; /* LIVI: the bottom fullscreen video plane */
+	bool is_video;
 	struct wl_listener map;
 	struct wl_listener unmap;
 	struct wl_listener commit;
@@ -136,11 +139,9 @@ struct tinywl_keyboard {
 };
 
 static void focus_toplevel(struct tinywl_toplevel *toplevel) {
-	/* Note: this function only deals with keyboard focus. */
 	if (toplevel == NULL) {
 		return;
 	}
-	/* LIVI: the video plane is never focused; it stays at the bottom. */
 	if (toplevel->is_video) {
 		return;
 	}
@@ -555,6 +556,10 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 		wlr_xdg_toplevel_set_size(ui->xdg_toplevel,
 			output->server->output_width, output->server->output_height);
 	}
+	if (output->server->debug_bg) {
+		wlr_scene_rect_set_size(output->server->debug_bg,
+			output->server->output_width, output->server->output_height);
+	}
 }
 
 static void output_destroy(struct wl_listener *listener, void *data) {
@@ -597,6 +602,14 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
 
+	// Match the installed LIVI.desktop (basename "LIVI") so the host taskbar shows
+	// its icon; override with LIVI_OUTPUT_APP_ID if the .desktop name differs
+	if (wlr_output_is_wl(wlr_output)) {
+		wlr_wl_output_set_title(wlr_output, "LIVI");
+		const char *app_id = getenv("LIVI_OUTPUT_APP_ID");
+		wlr_wl_output_set_app_id(wlr_output, app_id ? app_id : "LIVI");
+	}
+
 	/* LIVI: remember the output dimensions to size the video plane */
 	server->output_width = wlr_output->width;
 	server->output_height = wlr_output->height;
@@ -620,6 +633,13 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 		wlr_output);
 	struct wlr_scene_output *scene_output = wlr_scene_output_create(server->scene, wlr_output);
 	wlr_scene_output_layout_add_output(server->scene_layout, l_output, scene_output);
+
+	if (getenv("LIVI_DEBUG_BG") && server->debug_bg == NULL) {
+		float magenta[4] = {0.55f, 0.0f, 0.55f, 1.0f};
+		server->debug_bg = wlr_scene_rect_create(&server->scene->tree,
+			server->output_width, server->output_height, magenta);
+		wlr_scene_node_lower_to_bottom(&server->debug_bg->node);
+	}
 }
 
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
@@ -631,6 +651,9 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 		/* LIVI: pin the video plane to the bottom-left, never focus it */
 		wlr_scene_node_set_position(&toplevel->scene_tree->node, 0, 0);
 		wlr_scene_node_lower_to_bottom(&toplevel->scene_tree->node);
+		if (toplevel->server->debug_bg) {
+			wlr_scene_node_lower_to_bottom(&toplevel->server->debug_bg->node);
+		}
 		return;
 	}
 
@@ -805,7 +828,7 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 }
 
 int main(int argc, char *argv[]) {
-	wlr_log_init(WLR_DEBUG, NULL);
+	wlr_log_init(getenv("LIVI_WLR_DEBUG") ? WLR_DEBUG : WLR_INFO, NULL);
 	char *startup_cmd = NULL;
 
 	int c;
@@ -838,11 +861,8 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	// This already creates wl_shm + linux-dmabuf
 	wlr_renderer_init_wl_display(server.renderer, server.wl_display);
-
-	/* Advertise linux-dmabuf so clients (waylandsink) can hand us their decoded
-	 * dmabuf zero-copy; the scene graph imports it as a texture. */
-	wlr_linux_dmabuf_v1_create_with_renderer(server.wl_display, 4, server.renderer);
 
 	server.allocator = wlr_allocator_autocreate(server.backend,
 		server.renderer);

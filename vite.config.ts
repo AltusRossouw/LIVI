@@ -76,7 +76,7 @@ export default defineConfig({
     react({}),
     electron({
       main: {
-        entry: 'src/main/index.ts',
+        entry: resolve(__dirname, 'src/main/index.ts'),
         vite: {
           plugins: [copyAaResourcesPlugin()],
           resolve: {

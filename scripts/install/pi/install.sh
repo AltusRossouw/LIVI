@@ -82,6 +82,7 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 Categories=AudioVideo;
+StartupWMClass=LIVI
 EOF
 echo "Autostart entry at $AUTOSTART_DIR/LIVI.desktop"
 echo "Autostart log at $AUTOSTART_LOG"
@@ -105,6 +106,7 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 Categories=AudioVideo;
 StartupNotify=false
+StartupWMClass=LIVI
 EOF
 
 chmod +x "$DESKTOP_DIR/LIVI.desktop"

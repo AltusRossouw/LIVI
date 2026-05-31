@@ -328,6 +328,17 @@ done
 # All libs
 copy_all_pending_libs
 
+# Make the bundle relocatable
+if command -v patchelf >/dev/null 2>&1; then
+  echo "Patching RPATHs to \$ORIGIN (relocatable bundle)"
+  for f in "$OUT"/lib/*.so*;               do [ -f "$f" ] && patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || true; done
+  for f in "$OUT"/lib/gstreamer-1.0/*.so;  do [ -f "$f" ] && patchelf --set-rpath '$ORIGIN/..' "$f" 2>/dev/null || true; done
+  for f in "$OUT"/bin/*;                   do [ -f "$f" ] && patchelf --set-rpath '$ORIGIN/../lib' "$f" 2>/dev/null || true; done
+  for f in "$OUT"/libexec/gstreamer-1.0/*; do [ -f "$f" ] && patchelf --set-rpath '$ORIGIN/../../lib' "$f" 2>/dev/null || true; done
+else
+  echo "WARNING: patchelf not found - bundle is NOT relocatable (gst-plugin-scanner will fail to find the bundled core). Install patchelf."
+fi
+
 echo "Created linux-x64/linux-arm64 GStreamer bundle at: $OUT"
 echo "Bundle size:"
 du -sh "$OUT"

@@ -3,6 +3,8 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/base/gstbasesink.h>
 #include <gst/video/videooverlay.h>
+#include <gst/video/video.h>
+#include <cstdio>
 #include <cstring>
 #include <initializer_list>
 #include <string>
@@ -33,6 +35,14 @@ static void ensure_init() {
   static bool done = false;
   if (!done) {
     gst_init(NULL, NULL);
+    // Opt-in verbose decode/sink tracing
+    if (const char* dbg = getenv("LIVI_GST_DEBUG")) {
+      gst_debug_set_threshold_from_string(
+        (dbg[0] == '1' && dbg[1] == '\0')
+          ? "v4l2codecs-decoder:6,v4l2codecs-h265dec:6,waylandsink:5,wl_dmabuf:6"
+          : dbg,
+        FALSE);
+    }
     done = true;
   }
 }
@@ -97,6 +107,47 @@ static GstPadProbeReturn caps_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
     return GST_PAD_PROBE_REMOVE;
   }
   return GST_PAD_PROBE_OK;
+}
+
+// Advertise GstVideoMeta in the decoder's ALLOCATION query. The Pi v4l2codecs
+// decoder zero-copies a frame whose coded buffer layout differs from the
+// display size (1080p is coded at 1088, bottom-cropped) ONLY when downstream
+// advertises GstVideoMeta. Otherwise it sees an offset mismatch and falls
+// back to a system-memory copy ("GstVideoMeta support required, copying frames"
+// in gstv4l2codech265dec.c). waylandsink does not advertise it, so we add it.
+// Combined with the distro plugin's crop fix (need_crop only on x/y offset),
+// this makes 1080p zero-copy. NOTE: only add the meta, never a buffer pool here
+// (a generic pool can't describe DMA_DRM and crashes the decoder with QBUF
+// EINVAL). 720p needs no crop and zero-copies regardless.
+static GstPadProbeReturn alloc_meta_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
+  GstQuery* query = GST_PAD_PROBE_INFO_QUERY(info);
+  if (query && GST_QUERY_TYPE(query) == GST_QUERY_ALLOCATION) {
+    gboolean had = gst_query_find_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
+    if (!had) gst_query_add_allocation_meta(query, GST_VIDEO_META_API_TYPE, NULL);
+    fprintf(stderr, "[gst_video] ALLOC query: had_videometa=%d added=%d\n", had, !had);
+  }
+  return GST_PAD_PROBE_OK;
+}
+
+// DIAGNOSTIC (temporary)
+static GstPadProbeReturn buffer_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
+  GstBuffer* buf = GST_PAD_PROBE_INFO_BUFFER(info);
+  if (!buf) return GST_PAD_PROBE_OK;
+  guint n = gst_buffer_n_memory(buf);
+  fprintf(stderr, "[gst_video] sink buffer: n_memory=%u size=%" G_GSIZE_FORMAT "\n",
+    n, gst_buffer_get_size(buf));
+  for (guint i = 0; i < n; i++) {
+    GstMemory* m = gst_buffer_peek_memory(buf, i);
+    fprintf(stderr, "[gst_video]   mem[%u] alloc=%s\n", i,
+      (m && m->allocator && m->allocator->mem_type) ? m->allocator->mem_type : "(null)");
+  }
+  GstVideoMeta* vm = gst_buffer_get_video_meta(buf);
+  if (vm)
+    fprintf(stderr, "[gst_video]   videometa n_planes=%u stride0=%d offset1=%" G_GSIZE_FORMAT "\n",
+      vm->n_planes, (int)vm->stride[0], vm->n_planes > 1 ? vm->offset[1] : (gsize)0);
+  else
+    fprintf(stderr, "[gst_video]   videometa: NONE\n");
+  return GST_PAD_PROBE_REMOVE;
 }
 
 static void remove_video_view(Player* p) {
@@ -190,7 +241,12 @@ static std::string sink_chain() {
 #elif defined(_WIN32)
   return "d3d11videosink name=sink sync=false qos=false";
 #else
-  return "waylandsink name=sink sync=false";
+  // waylandsink hands the decoded dmabuf (incl. the Pi's SAND-tiled NV12) to
+  // livi-compositor zero-copy; the compositor samples it as a YUV texture and the
+  // GPU does the colour conversion. LIVI_GST_SINK overrides for debugging.
+  const char* sink_env = getenv("LIVI_GST_SINK");
+  return std::string(sink_env && *sink_env ? sink_env : "waylandsink") +
+    " name=sink sync=false";
 #endif
 }
 
@@ -273,11 +329,21 @@ static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
     }
   }
 
-  // Live low-latency
+  // Live low-latency, two queues on purpose:
+  //  - BEFORE the decoder: NON-leaky. A stateless HW decoder needs every
+  //    encoded frame for its reference chain, dropping one corrupts the DPB
+  //    and hangs the HW ("Request took too long"). The HW decodes far faster
+  //    than realtime, so this queue stays near-empty and never needs to drop
+  //  - AFTER the decoder: leaky=downstream. THIS is where live "stay current"
+  //    dropping belongs: if the sink/compositor falls behind, drop DECODED
+  //    frames to keep latency low and free the scarce zero-copy capture
+  //    buffers, without ever breaking the reference chain
   std::string desc = "appsrc name=src is-live=true do-timestamp=true format=time"
     " min-latency=0 max-latency=0 caps=" +
-    caps_for(codec) + " ! " + parser_for(codec) + " ! " + decoder_for(codec) + " name=dec" +
-    " ! queue max-size-buffers=1 max-size-bytes=0 max-size-time=0 leaky=downstream" +
+    caps_for(codec) + " ! " + parser_for(codec) +
+    " ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=2000000000" +
+    " ! " + decoder_for(codec) + " name=dec" +
+    " ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 leaky=downstream" +
     " ! " + sink_chain();
 
   fprintf(stderr, "[gst_video] codec=%s decoder=%s | %s\n",
@@ -307,9 +373,29 @@ static napi_value CreatePlayer(napi_env env, napi_callback_info info) {
     GstPad* sp = gst_element_get_static_pad(dec, "src");
     if (sp) {
       gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, caps_probe, NULL, NULL);
+      // Advertise GstVideoMeta in the decoder's ALLOCATION query so it exports
+      // the cropped (1088->1080) frame as a dmabuf instead of copying. The
+      // decoder queries its PEER pad in decide_allocation, and that peer is the
+      // post-decoder queue (a queue does not forward allocation queries
+      // synchronously), so the probe must sit on the peer pad, not on
+      // waylandsink further downstream.
+      GstPad* peer = gst_pad_get_peer(sp);
+      if (peer) {
+        gst_pad_add_probe(peer, GST_PAD_PROBE_TYPE_QUERY_DOWNSTREAM, alloc_meta_probe, NULL, NULL);
+        gst_object_unref(peer);
+      }
       gst_object_unref(sp);
     }
     gst_object_unref(dec);
+  }
+
+  if (p->sink) {
+    GstPad* sp = gst_element_get_static_pad(p->sink, "sink");
+    if (sp) {
+      // DIAGNOSTIC (temporary): inspect the first buffer the sink receives.
+      gst_pad_add_probe(sp, GST_PAD_PROBE_TYPE_BUFFER, buffer_probe, NULL, NULL);
+      gst_object_unref(sp);
+    }
   }
 
   GstBus* bus = gst_element_get_bus(pipeline);
@@ -369,6 +455,13 @@ static napi_value PushBuffer(napi_env env, napi_callback_info info) {
     napi_get_boolean(env, false, &result);
     return result;
   }
+
+  // DIAGNOSTIC (inert unless LIVI_DUMP_H265 names a path)
+  static FILE* dump = [] {
+    const char* path = getenv("LIVI_DUMP_H265");
+    return (path && *path) ? fopen(path, "wb") : (FILE*)nullptr;
+  }();
+  if (dump) { fwrite(data, 1, len, dump); fflush(dump); }
 
   GstBuffer* buf = gst_buffer_new_memdup(data, len);
   GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(p->appsrc), buf);

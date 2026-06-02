@@ -890,9 +890,12 @@ export class ProjectionService {
     const p = probeGstCodecs()
     const hwCap = (s: { hw: boolean }): { hw?: unknown; sw?: unknown } | undefined =>
       s.hw ? { hw: true, sw: true } : undefined
+    // Offer h265 when it has a HW decoder, or when it can only be done in software
+    // but there's no HW h264 to fall back on either. Pi3/Pi4 (HW h264, no HW h265) must stay on h264.
+    const h265Cap = p.h265.hw || (p.h265.sw && !p.h264.hw) ? { hw: true, sw: true } : undefined
     this.lastCodecCaps = {
       h264: { hw: true, sw: true },
-      h265: hwCap(p.h265),
+      h265: h265Cap,
       vp9: hwCap(p.vp9),
       av1: hwCap(p.av1)
     }

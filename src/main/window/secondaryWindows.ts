@@ -137,7 +137,8 @@ function spawn(spec: SecondaryWindowSpec, runtimeState: runtimeStateProps) {
   if (wantKiosk) {
     win.once('ready-to-show', () => {
       if (win.isDestroyed()) return
-      if (process.platform === 'darwin') win.setFullScreen(true)
+      // In the compositor, fullscreen the HOST output via xdg set_fullscreen
+      if (process.platform === 'darwin' || inCompositor) win.setFullScreen(true)
       else win.setKiosk(true)
     })
   }
@@ -202,7 +203,7 @@ function applyKiosk(spec: SecondaryWindowSpec, runtimeState: runtimeStateProps) 
   const win = windows.get(spec.role)
   if (!win || win.isDestroyed()) return
   const want = getKioskFor(runtimeState.config, spec.role)
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' || inCompositor) {
     if (win.isFullScreen() === want) return
     win.setFullScreen(want)
   } else {

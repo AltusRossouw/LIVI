@@ -120,6 +120,12 @@ struct tinywl_server {
 	struct wl_list videos;        // video toplevels, found by tag
 	struct livi_video_cfg video_cfgs[LIVI_MAX_VIDEO_CFGS];
 	int ctrl_fd;
+
+	// inner UI child (the -s startup command)
+	char *startup_cmd;
+	pid_t startup_pid;
+	bool full_restart;   // on shutdown, re-exec the whole compositor instead of exiting
+	char **argv;         // saved for the re-exec
 };
 
 struct tinywl_output {
@@ -963,7 +969,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	struct livi_screen *s = toplevel->screen;
 	if (s != NULL && s->ui == toplevel) {
 		s->ui = NULL;
-		/* LIVI: the main UI quit -> the app is closing, take everything down */
+		/* LIVI: the main UI quit -> the app is closing, terminate the loop. On a normal
+		 * close this exits; on a "restart" (full_restart set) main() re-execs us. */
 		if (toplevel->server->n_screens > 0 && s == &toplevel->server->screens[0]) {
 			wlr_log(WLR_INFO, "livi: main UI toplevel gone -> shutting down");
 			wl_display_terminate(toplevel->server->wl_display);
@@ -1016,8 +1023,29 @@ static void xdg_toplevel_request_fullscreen(
 		struct wl_listener *listener, void *data) {
 	struct tinywl_toplevel *toplevel =
 		wl_container_of(listener, toplevel, request_fullscreen);
+	struct tinywl_server *server = toplevel->server;
+
+	// LIVI: forward to the HOST output window so app-driven kiosk/fullscreen fullscreens
+	bool want = toplevel->xdg_toplevel->requested.fullscreen;
+	for (int i = 0; i < server->n_screens; i++) {
+		struct livi_screen *s = &server->screens[i];
+		if (s->ui == toplevel && s->wlr_output != NULL &&
+				wlr_output_is_wl(s->wlr_output)) {
+			wlr_wl_output_set_fullscreen(s->wlr_output, want);
+			// Force the inner UI to the output size when entering fullscreen
+			if (want && toplevel->xdg_toplevel->base->initialized) {
+				wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, s->width, s->height);
+			}
+			wlr_log(WLR_INFO, "livi: request_fullscreen=%d screen '%s' output %dx%d",
+				want, s->role, s->width, s->height);
+			break;
+		}
+	}
+
 	if (toplevel->xdg_toplevel->base->initialized) {
-		wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
+		/* Reflect fullscreen onto the inner toplevel too, so Electron confirms it and the
+		 * app keeps its kiosk/UI state in sync (its enter/leave-full-screen fires). */
+		wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, want);
 	}
 }
 
@@ -1089,9 +1117,22 @@ static void server_new_xdg_popup(struct wl_listener *listener, void *data) {
 	wl_signal_add(&xdg_popup->events.destroy, &popup->destroy);
 }
 
+// (Re)spawn the inner UI child (the -s startup command). Used at boot and on "restart".
+static void spawn_startup(struct tinywl_server *server) {
+	if (server->startup_cmd == NULL) {
+		return;
+	}
+	pid_t pid = fork();
+	if (pid == 0) {
+		execl("/bin/sh", "/bin/sh", "-c", server->startup_cmd, (void *)NULL);
+		_exit(127);
+	}
+	server->startup_pid = pid;
+}
+
 // Control socket (LIVI_COMPOSITOR_CTRL): line protocol from the host. Commands:
 //   screen <role> <0|1> | claim <tag> | videocfg <tag> <screen> <crop...>
-//   videoshow <tag> <0|1> | backdrop <r> <g> <b>
+//   videoshow <tag> <0|1> | backdrop <r> <g> <b> | restart
 struct livi_ctrl_client {
 	struct tinywl_server *server;
 	struct wl_event_source *source;
@@ -1103,6 +1144,18 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 	char tag[64], srole[32];
 	double cl, ct, vw, vh, tw, th;
 	int onoff;
+
+	// restart the inner UI: kill the current child and re-spawn it. The compositor (and
+	// thus the host output windows) stays up, only the Electron app relaunches.
+	if (strcmp(line, "restart") == 0) {
+		// Full restart: re-exec the whole compositor (fresh outputs + fresh inner), which
+		// is what a manual close+relaunch does. Relaunching only the inner left stale
+		// compositor/session state and the stream wouldn't show.
+		wlr_log(WLR_INFO, "livi: restart requested -> full compositor re-exec");
+		server->full_restart = true;
+		wl_display_terminate(server->wl_display);
+		return;
+	}
 
 	// open/close a role's nested output window (its own movable host window)
 	if (sscanf(line, "screen %31s %d", srole, &onoff) == 2) {
@@ -1407,20 +1460,17 @@ int main(int argc, char *argv[]) {
 
 	setenv("WAYLAND_DISPLAY", socket, true);
 	ctrl_init(&server);   // before forking the UI, so the host can connect immediately
-	pid_t startup_pid = -1;
-	if (startup_cmd) {
-		startup_pid = fork();
-		if (startup_pid == 0) {
-			execl("/bin/sh", "/bin/sh", "-c", startup_cmd, (void *)NULL);
-			_exit(127);
-		}
-	}
+	// Auto-reap the UI child so we never leave zombies.
+	signal(SIGCHLD, SIG_IGN);
+	server.startup_cmd = startup_cmd;
+	server.argv = argv;   // saved for a full-restart re-exec
+	spawn_startup(&server);
 	wlr_log(WLR_INFO, "Running livi-compositor on WAYLAND_DISPLAY=%s", socket);
 	wl_display_run(server.wl_display);
 
 	/* LIVI: take the spawned UI down with us */
-	if (startup_pid > 0) {
-		kill(startup_pid, SIGTERM);
+	if (server.startup_pid > 0) {
+		kill(server.startup_pid, SIGTERM);
 	}
 
 	if (server.ctrl_fd >= 0) {
@@ -1461,5 +1511,13 @@ int main(int argc, char *argv[]) {
 	wlr_backend_destroy(server.backend);
 	wl_display_destroy(server.wl_display);
 	free(server.screens);
+
+	// Full restart: re-exec ourselves now that the old outputs/clients/ctrl socket are torn
+	// down, so we come up exactly like a fresh launch (fresh inner + AA session).
+	if (server.full_restart) {
+		wlr_log(WLR_INFO, "livi: re-exec for full restart");
+		execvp(server.argv[0], server.argv);
+		wlr_log(WLR_ERROR, "livi: re-exec failed: %s", strerror(errno));
+	}
 	return 0;
 }

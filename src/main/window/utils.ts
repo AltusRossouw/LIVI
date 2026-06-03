@@ -62,10 +62,11 @@ export function withMainKiosk(config: Config, value: boolean): Config['kiosk'] {
 
 export function currentKiosk(config: Config): boolean {
   const win: BrowserWindow | null = getMainWindow()
-  const isMac = isMacPlatform()
+  // mac and the nested compositor both express kiosk as host-window fullscreen, not setKiosk
+  const viaFullscreen = isMacPlatform() || process.env.LIVI_COMPOSITOR === '1'
 
   if (win && !win.isDestroyed()) {
-    return isMac ? win.isFullScreen() : win.isKiosk()
+    return viaFullscreen ? win.isFullScreen() : win.isKiosk()
   }
   return getMainKiosk(config)
 }
@@ -125,7 +126,7 @@ export function attachKioskStateSync(runtimeState: runtimeStateProps) {
 
   const syncFromElectron = () => {
     if (win.isDestroyed()) return
-    push(win.isKiosk())
+    push(process.env.LIVI_COMPOSITOR === '1' ? win.isFullScreen() : win.isKiosk())
   }
 
   win.on('enter-full-screen', syncFromElectron)

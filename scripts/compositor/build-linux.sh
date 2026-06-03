@@ -3,9 +3,8 @@ set -euo pipefail
 
 # Builds the nested wlroots compositor (livi-compositor) and bundles it with its
 # non-system shared libs into OUT, so electron-builder can drop it into the
-# AppImage. System wlroots-0.20 is used when present, otherwise meson
-# builds the pinned 0.20 subproject (CI/Ubuntu, Pi). The host graphics stack
-# (wayland/drm/gbm/EGL/GLES) is left out the same way the GStreamer bundle does.
+# AppImage. The pinned 0.20 wlroots subproject is always built (it carries a LIVI
+# patch), never the system one.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SRC_DIR="$REPO_ROOT/native/livi-compositor"
@@ -25,11 +24,13 @@ for tool in meson ninja pkg-config; do
   fi
 done
 
-MESON_ARGS=(--buildtype=release --wrap-mode=default)
+# LIVI carries a wlroots patch (subprojects/packagefiles/wlroots-livi.patch) that exposes
+# host-output control for app-kiosk + our own decorations. force-fallback-for builds the
+# pinned 0.20 subproject even when a system wlroots-0.20 exists, so the patch always applies.
+echo "→ Forcing pinned wlroots-0.20 subproject (carries the LIVI output-control patch)"
+MESON_ARGS=(--buildtype=release --wrap-mode=default --force-fallback-for=wlroots-0.20)
 
-# No system wlroots-0.20 (CI/Ubuntu, Pi) -> meson builds it
 if ! pkg-config --exists 'wlroots-0.20'; then
-  echo "→ system wlroots-0.20 not found; building the pinned 0.20 subproject"
   MESON_ARGS+=(
     -Dwayland:documentation=false
     -Dwayland:tests=false

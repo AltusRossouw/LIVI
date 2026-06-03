@@ -3,3 +3,4 @@ subprojects/wlroots/
 subprojects/packagecache/
 subprojects/*/
 !subprojects/*.wrap
+!subprojects/packagefiles/

@@ -1,4 +1,5 @@
 import { registerIpcHandle, registerIpcOn } from '@main/ipc/register'
+import { compositorRestart } from '@main/services/video/GstVideo'
 import { runtimeStateProps, ServicesProps } from '@main/types'
 import { isMacPlatform } from '@main/utils'
 import { broadcastToRenderers } from '@main/window/broadcast'
@@ -48,6 +49,15 @@ export function registerAppIpc(runtimeState: runtimeStateProps, services: Servic
     }
 
     await new Promise((r) => setTimeout(r, 150))
+
+    try {
+      await runtimeState.telemetrySocket?.disconnect?.()
+    } catch {
+      // best-effort
+    }
+
+    // In the compositor the app is the inner UI child. Ask the compositor to relaunch it (it kills + re-spawns us)
+    if (compositorRestart()) return
 
     if (process.platform === 'linux' && process.env.APPIMAGE) {
       const appImage = process.env.APPIMAGE

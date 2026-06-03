@@ -67,6 +67,14 @@ class CompositorControl {
     this.flush()
   }
 
+  // Ask the compositor to relaunch its inner UI child (the Electron app). One-shot, not resent on reconnect.
+  restart(): boolean {
+    if (!this.enabled) return false
+    this.outbox.push('restart\n')
+    this.flush()
+    return true
+  }
+
   private flush(): void {
     const s = this.socket
     if (s && !s.destroyed && s.writable) {
@@ -107,6 +115,12 @@ export function setCompositorBackdrop(darkMode: boolean): void {
 // Open/close a secondary screen's nested output window (Linux/compositor only)
 export function setCompositorScreen(role: string, on: boolean): void {
   compositorControl.screen(role, on)
+}
+
+// Ask the compositor to relaunch the inner UI (Linux/compositor only). Returns false when
+// not running in the compositor, so the caller can fall back to a normal relaunch.
+export function compositorRestart(): boolean {
+  return compositorControl.restart()
 }
 
 export type GstCodecSupport = { hw: boolean; sw: boolean }

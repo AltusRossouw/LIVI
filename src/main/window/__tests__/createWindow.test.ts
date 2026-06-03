@@ -31,6 +31,7 @@ jest.mock('electron', () => {
       loadURL: jest.fn(),
       setKiosk: jest.fn(),
       setContentSize: jest.fn(),
+      getContentSize: jest.fn(() => [800, 480]),
       show: jest.fn(),
       hide: jest.fn(),
       getBounds: jest.fn(() => ({ x: 0, y: 0, width: 800, height: 480 })),
@@ -58,6 +59,7 @@ jest.mock('electron', () => {
     },
     screen: {
       getDisplayMatching: jest.fn(() => ({
+        size: { width: 1920, height: 1080 },
         workAreaSize: { width: 1920, height: 1080 }
       }))
     }

@@ -40,6 +40,7 @@ export function bootstrapCompositor(): boolean {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     LIVI_UI_APP_ID: 'livi',
+    LIVI_OUTPUT_APP_ID: 'livi',
     LIVI_COMPOSITOR_CTRL: ctrlSocket,
     LIVI_SCREENS: 'main,dash,aux',
     ...(outputSize ? { LIVI_OUTPUT_SIZE: outputSize } : {})

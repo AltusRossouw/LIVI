@@ -777,6 +777,14 @@ static void output_destroy(struct wl_listener *listener, void *data) {
 	free(output);
 }
 
+// Branded display title per role (role stays the lowercase identifier).
+static const char *role_title(const char *role) {
+	if (strcmp(role, "main") == 0) return "LIVI";
+	if (strcmp(role, "dash") == 0) return "Dash";
+	if (strcmp(role, "aux") == 0) return "Auxiliary";
+	return role;
+}
+
 static void server_new_output(struct wl_listener *listener, void *data) {
 	struct tinywl_server *server =
 		wl_container_of(listener, server, new_output);
@@ -806,27 +814,29 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	}
 	wlr_output_state_set_custom_mode(&state, ow, oh, 0);
 
-	wlr_output_commit_state(wlr_output, &state);
-	wlr_output_state_finish(&state);
-
 	/* LIVI: bind to the host-requested screen (NULL -> main); each role keeps its own
 	 * x-slot so its nested window renders just that screen's content */
 	struct livi_screen *s = server->pending_screen ? server->pending_screen
 		: &server->screens[0];
 	server->pending_screen = NULL;
+
+	// Set title/app_id before the first commit: wlroots applies them when the output
+	// maps, and the host panel resolves the window icon from app_id at map time.
+	if (wlr_output_is_wl(wlr_output)) {
+		wlr_wl_output_set_title(wlr_output, role_title(s->role));
+		const char *app_id = getenv("LIVI_OUTPUT_APP_ID");
+		wlr_wl_output_set_app_id(wlr_output, app_id ? app_id : "livi");
+	}
+
+	wlr_output_commit_state(wlr_output, &state);
+	wlr_output_state_finish(&state);
+
 	s->wlr_output = wlr_output;
 	s->width = wlr_output->width;
 	s->height = wlr_output->height;
 	s->x = (int32_t)(s - server->screens) * LIVI_SCREEN_X_SLOT;
 	wlr_log(WLR_INFO, "livi: new output -> screen '%s' at x=%d (%dx%d)",
 		s->role, s->x, s->width, s->height);
-
-	// title = role (so nested windows are distinguishable); app_id = the .desktop name
-	if (wlr_output_is_wl(wlr_output)) {
-		wlr_wl_output_set_title(wlr_output, s->role);
-		const char *app_id = getenv("LIVI_OUTPUT_APP_ID");
-		wlr_wl_output_set_app_id(wlr_output, app_id ? app_id : "LIVI");
-	}
 
 	struct tinywl_output *output = calloc(1, sizeof(*output));
 	output->wlr_output = wlr_output;

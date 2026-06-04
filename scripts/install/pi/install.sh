@@ -39,6 +39,10 @@ mkdir -p "$(dirname "$ICON_DEST")"
 echo "   Downloading icon from $ICON_URL..."
 if curl -fL "$ICON_URL" -o "$ICON_DEST"; then
   echo "   App icon downloaded and installed successfully."
+  HICOLOR_ICON="$USER_HOME/.local/share/icons/hicolor/256x256/apps/livi.png"
+  mkdir -p "$(dirname "$HICOLOR_ICON")"
+  cp -f "$ICON_DEST" "$HICOLOR_ICON" 2>/dev/null || true
+  gtk-update-icon-cache -f -t "$USER_HOME/.local/share/icons/hicolor" 2>/dev/null || true
 else
   echo "   Failed to download icon from $ICON_URL. Skipping icon install."
   ICON_DEST=""
@@ -82,7 +86,7 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 Categories=AudioVideo;
-StartupWMClass=LIVI
+StartupWMClass=livi
 EOF
 echo "Autostart entry at $AUTOSTART_DIR/LIVI.desktop"
 echo "Autostart log at $AUTOSTART_LOG"
@@ -106,10 +110,27 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 Categories=AudioVideo;
 StartupNotify=false
-StartupWMClass=LIVI
+StartupWMClass=livi
 EOF
 
 chmod +x "$DESKTOP_DIR/LIVI.desktop"
 echo "Desktop shortcut at $DESKTOP_DIR/LIVI.desktop"
+
+# Application entry so the panel/compositor can resolve the window icon from app_id.
+echo "→ Creating application entry"
+APPLICATIONS_DIR="$USER_HOME/.local/share/applications"
+mkdir -p "$APPLICATIONS_DIR"
+cat > "$APPLICATIONS_DIR/livi.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=LIVI
+Exec=$APPIMAGE_PATH
+Icon=livi
+Terminal=false
+Categories=AudioVideo;
+StartupWMClass=livi
+EOF
+update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
+echo "Application entry at $APPLICATIONS_DIR/livi.desktop"
 
 echo "✅ Installation complete!"

@@ -13,7 +13,7 @@ importers:
         version: 1.5.0(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@electron-toolkit/utils':
         specifier: 4.0.0
-        version: 4.0.0(electron@42.3.1)
+        version: 4.0.0(electron@42.3.3)
       '@emotion/react':
         specifier: ^11.14.0
         version: 11.14.0(@types/react@19.2.16)(react@19.2.7)
@@ -45,8 +45,8 @@ importers:
         specifier: ^4.0.4
         version: 4.0.4
       i18next:
-        specifier: ^26.3.0
-        version: 26.3.0(typescript@6.0.3)
+        specifier: ^26.3.1
+        version: 26.3.1(typescript@6.0.3)
       lodash.debounce:
         specifier: ^4.0.8
         version: 4.0.8
@@ -58,7 +58,7 @@ importers:
         version: 8.5.0
       react-i18next:
         specifier: ^17.0.8
-        version: 17.0.8(i18next@26.3.0(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+        version: 17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
       react-router:
         specifier: ^7.16.0
         version: 7.16.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -118,8 +118,8 @@ importers:
         specifier: ^0.1.70
         version: 0.1.70
       electron:
-        specifier: ^42.3.1
-        version: 42.3.1
+        specifier: ^42.3.3
+        version: 42.3.3
       electron-builder:
         specifier: ^26.11.1
         version: 26.11.1(electron-builder-squirrel-windows@26.11.1)
@@ -172,8 +172,8 @@ importers:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.1)(esbuild@0.28.0)(jiti@2.7.0)(yaml@2.9.0)
       vite-plugin-electron:
-        specifier: ^1.0.0
-        version: 1.0.0(vite-plugin-electron-renderer@1.0.0)
+        specifier: ^1.0.1
+        version: 1.0.1(vite-plugin-electron-renderer@1.0.0)
       vite-plugin-electron-renderer:
         specifier: ^1.0.0
         version: 1.0.0
@@ -2146,8 +2146,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@42.3.1:
-    resolution: {integrity: sha512-srUkulADc2QNJKlhxYU+wSaGEQ/Wbz/F3ko3DzUhNyvtWkP0XCTdGwKAOX1q4z1bVlWYZT7LV7APFmUAGTFykg==}
+  electron@42.3.3:
+    resolution: {integrity: sha512-0MwYp9wTb7TrtTalOYqeW+suqd9T/Znstr/nDLKqFGIjHdBZX339guo3mQqTPURRZ/UQmYM4uMpzKpI5wLptfQ==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -2484,8 +2484,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  i18next@26.3.0:
-    resolution: {integrity: sha512-gHSgGpUXVmuqE2El1W61DmxeyeTlFfZgdJRWMo9jScAn5pu7TuTuiccb1zh3E2J9hEBVGJ23+96x0ieBhfuIHA==}
+  i18next@26.3.1:
+    resolution: {integrity: sha512-txQqd5EULsqEh9OJqRH15aCaOuy/nLJyhw5EHCSKLKJE1aBbb3Zve2+uQIxgWhPm1QqUQoWyQBm2kfmmIrzkcQ==}
     peerDependencies:
       typescript: ^5 || ^6
     peerDependenciesMeta:
@@ -3955,8 +3955,8 @@ packages:
   vite-plugin-electron-renderer@1.0.0:
     resolution: {integrity: sha512-/9CBdUqnCgwWXn61v5PErWnR5q3Bfne2oI52uHzgJnKnlaoNgEKvxOzS0/XssDXWMK3ElStM2+J/Ko4Q63XhMA==}
 
-  vite-plugin-electron@1.0.0:
-    resolution: {integrity: sha512-05oTapZl917xRq2GtLFuxdXKDGFaa5qn+XJhmTWXQo1NdFq8GZs32uU6BjWzx4KHhdXgUQWs1zC1yQF5Rw/bYA==}
+  vite-plugin-electron@1.0.1:
+    resolution: {integrity: sha512-ReUCkhVUCbjco9dyS3NnrA0PgJH73/ota9pulq2z2v/4aDuppOtbwK1tGeeuo3ESwDNFHZ5l/AbgMIdXZ7yqbg==}
     peerDependencies:
       vite-plugin-electron-renderer: '*'
     peerDependenciesMeta:
@@ -4483,9 +4483,9 @@ snapshots:
       ajv: 6.15.0
       ajv-keywords: 3.5.2(ajv@6.15.0)
 
-  '@electron-toolkit/utils@4.0.0(electron@42.3.1)':
+  '@electron-toolkit/utils@4.0.0(electron@42.3.3)':
     dependencies:
-      electron: 42.3.1
+      electron: 42.3.3
 
   '@electron/asar@3.4.1':
     dependencies:
@@ -6213,7 +6213,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@42.3.1:
+  electron@42.3.3:
     dependencies:
       '@electron/get': 5.0.0
       '@types/node': 24.12.4
@@ -6611,7 +6611,7 @@ snapshots:
 
   husky@9.1.7: {}
 
-  i18next@26.3.0(typescript@6.0.3):
+  i18next@26.3.1(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
 
@@ -7633,11 +7633,11 @@ snapshots:
       react: 19.2.7
       scheduler: 0.27.0
 
-  react-i18next@17.0.8(i18next@26.3.0(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3):
+  react-i18next@17.0.8(i18next@26.3.1(typescript@6.0.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@6.0.3):
     dependencies:
       '@babel/runtime': 7.29.7
       html-parse-stringify: 3.0.1
-      i18next: 26.3.0(typescript@6.0.3)
+      i18next: 26.3.1(typescript@6.0.3)
       react: 19.2.7
       use-sync-external-store: 1.6.0(react@19.2.7)
     optionalDependencies:
@@ -8279,7 +8279,7 @@ snapshots:
 
   vite-plugin-electron-renderer@1.0.0: {}
 
-  vite-plugin-electron@1.0.0(vite-plugin-electron-renderer@1.0.0):
+  vite-plugin-electron@1.0.1(vite-plugin-electron-renderer@1.0.0):
     dependencies:
       local-pkg: 1.2.1
     optionalDependencies:

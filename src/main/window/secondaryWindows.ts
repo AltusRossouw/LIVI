@@ -5,6 +5,7 @@ import { runtimeStateProps } from '@main/types'
 import type { Config, WindowBounds } from '@shared/types'
 import { BrowserWindow, shell } from 'electron'
 import { join } from 'path'
+import { sanitizeBounds } from './utils'
 
 // Inside livi-compositor the host window is the compositor's own output (titled by role);
 // the Electron title only tells the compositor which screen this window belongs to.
@@ -103,7 +104,7 @@ function scheduleBoundsSave(spec: SecondaryWindowSpec, runtimeState: runtimeStat
 
 function spawn(spec: SecondaryWindowSpec, runtimeState: runtimeStateProps) {
   const { w, h } = getSize(runtimeState.config, spec)
-  const bounds = readBounds(runtimeState.config, spec)
+  const bounds = inCompositor ? undefined : sanitizeBounds(readBounds(runtimeState.config, spec))
   const wantKiosk = getKioskFor(runtimeState.config, spec.role)
 
   const win = new BrowserWindow({
@@ -130,7 +131,8 @@ function spawn(spec: SecondaryWindowSpec, runtimeState: runtimeStateProps) {
   if (bounds) {
     win.once('ready-to-show', () => {
       if (win.isDestroyed()) return
-      win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height })
+      win.setContentSize(bounds.width, bounds.height)
+      win.setPosition(bounds.x, bounds.y)
     })
   }
 
@@ -222,9 +224,10 @@ export function syncSecondaryWindows(runtimeState: runtimeStateProps, prev?: Con
       (prev[spec.widthKey] !== cfg[spec.widthKey] || prev[spec.heightKey] !== cfg[spec.heightKey])
     const kioskChanged = prev && (prev.kiosk?.[spec.role] === true) !== getKioskFor(cfg, spec.role)
 
-    // Open/close the role's compositor output before its window appears/closes
+    const { w, h } = getSize(cfg, spec)
+
     if (!prev || prev[spec.activeKey] !== cfg[spec.activeKey]) {
-      setCompositorScreen(spec.role, wantActive)
+      setCompositorScreen(spec.role, wantActive, w, h)
     }
 
     if (wantActive && !windows.has(spec.role)) {
@@ -232,7 +235,14 @@ export function syncSecondaryWindows(runtimeState: runtimeStateProps, prev?: Con
     } else if (!wantActive && windows.has(spec.role)) {
       close(spec.role)
     } else if (wantActive) {
-      if (sizeChanged) resize(spec, runtimeState)
+      if (sizeChanged) {
+        resize(spec, runtimeState)
+
+        if (inCompositor) {
+          setCompositorScreen(spec.role, false)
+          setCompositorScreen(spec.role, true, w, h)
+        }
+      }
       if (kioskChanged) applyKiosk(spec, runtimeState)
     }
   }

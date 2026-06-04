@@ -182,6 +182,7 @@ struct livi_screen {
 	struct wlr_output *wlr_output;
 	int32_t x;                       // layout x-offset in the scene
 	int32_t width, height;
+	int32_t req_width, req_height;   // host-requested output size (0 -> LIVI_OUTPUT_SIZE)
 
 	struct tinywl_toplevel *ui;      // UI plane (Electron), on top
 
@@ -787,7 +788,7 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 	wlr_output_state_init(&state);
 	wlr_output_state_set_enabled(&state, true);
 
-	// nested window size from LIVI_OUTPUT_SIZE ("WxH", default 1280x720)
+	// nested window size: per-screen request wins, else LIVI_OUTPUT_SIZE ("WxH", default 1280x720)
 	int ow = 1280, oh = 720;
 	const char *size = getenv("LIVI_OUTPUT_SIZE");
 	if (size != NULL) {
@@ -796,6 +797,12 @@ static void server_new_output(struct wl_listener *listener, void *data) {
 			ow = w;
 			oh = h;
 		}
+	}
+	if (server->pending_screen != NULL &&
+			server->pending_screen->req_width > 0 &&
+			server->pending_screen->req_height > 0) {
+		ow = server->pending_screen->req_width;
+		oh = server->pending_screen->req_height;
 	}
 	wlr_output_state_set_custom_mode(&state, ow, oh, 0);
 
@@ -1143,7 +1150,7 @@ struct livi_ctrl_client {
 static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 	char tag[64], srole[32];
 	double cl, ct, vw, vh, tw, th;
-	int onoff;
+	int onoff, swidth, sheight;
 
 	// restart the inner UI: kill the current child and re-spawn it. The compositor (and
 	// thus the host output windows) stays up, only the Electron app relaunches.
@@ -1158,9 +1165,15 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 	}
 
 	// open/close a role's nested output window (its own movable host window)
-	if (sscanf(line, "screen %31s %d", srole, &onoff) == 2) {
+	// optional trailing "<w> <h>" sizes the output to that screen's own resolution
+	int sn = sscanf(line, "screen %31s %d %d %d", srole, &onoff, &swidth, &sheight);
+	if (sn >= 2) {
 		struct livi_screen *s = screen_by_role(server, srole);
 		if (s != NULL && server->wl_backend != NULL) {
+			if (sn >= 4 && swidth > 0 && sheight > 0) {
+				s->req_width = swidth;
+				s->req_height = sheight;
+			}
 			if (onoff && s->wlr_output == NULL) {
 				server->pending_screen = s;
 				wlr_wl_output_create(server->wl_backend);   // fires server_new_output now

@@ -53,9 +53,11 @@ class CompositorControl {
   }
 
   // Open/close a role's nested output (its own movable host window). Resent on reconnect.
-  screen(role: string, on: boolean): void {
+  // Optional w/h sizes the output to that screen's own configured resolution.
+  screen(role: string, on: boolean, w?: number, h?: number): void {
     if (!this.enabled) return
-    this.state.set(`screen:${role}`, `screen ${role} ${on ? 1 : 0}\n`)
+    const size = w && h && w > 0 && h > 0 ? ` ${Math.round(w)} ${Math.round(h)}` : ''
+    this.state.set(`screen:${role}`, `screen ${role} ${on ? 1 : 0}${size}\n`)
     this.flush()
   }
 
@@ -112,9 +114,10 @@ export function setCompositorBackdrop(darkMode: boolean): void {
   compositorControl.setBackdrop(darkMode)
 }
 
-// Open/close a secondary screen's nested output window (Linux/compositor only)
-export function setCompositorScreen(role: string, on: boolean): void {
-  compositorControl.screen(role, on)
+// Open/close a secondary screen's nested output window (Linux/compositor only).
+// Optional w/h sizes the output to that screen's own configured resolution.
+export function setCompositorScreen(role: string, on: boolean, w?: number, h?: number): void {
+  compositorControl.screen(role, on, w, h)
 }
 
 // Ask the compositor to relaunch the inner UI (Linux/compositor only). Returns false when

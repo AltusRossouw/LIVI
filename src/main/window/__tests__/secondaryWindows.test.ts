@@ -16,6 +16,7 @@ class MockBrowserWindow extends EventEmitter {
   close = jest.fn()
   setBounds = jest.fn()
   setContentSize = jest.fn()
+  setPosition = jest.fn()
   setFullScreen = jest.fn()
   setKiosk = jest.fn()
   getPosition = jest.fn(() => [100, 100])
@@ -233,7 +234,9 @@ describe('secondaryWindows — bounds + ready-to-show', () => {
     syncSecondaryWindows(rt)
     const win = lastWindows[0]
     win.emit('ready-to-show')
-    expect(win.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, width: 1024, height: 768 })
+    // width/height restored as content size, position separately (no titlebar drift)
+    expect(win.setContentSize).toHaveBeenCalledWith(1024, 768)
+    expect(win.setPosition).toHaveBeenCalledWith(10, 20)
   })
 
   test('darwin kiosk applies on ready-to-show', () => {

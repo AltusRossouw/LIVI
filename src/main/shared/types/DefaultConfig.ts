@@ -87,6 +87,9 @@ export const DEFAULT_CONFIG: Config = {
   auxScreenActive: false,
   auxScreenWidth: 800,
   auxScreenHeight: 480,
+  mainScreenBounds: { x: 0, y: 0, width: 0, height: 0 },
+  dashScreenBounds: { x: 0, y: 0, width: 0, height: 0 },
+  auxScreenBounds: { x: 0, y: 0, width: 0, height: 0 },
   dashboards: {
     dash1: { main: true, dash: false, aux: false, pos: 1 },
     dash2: { main: false, dash: false, aux: false, pos: 2 },

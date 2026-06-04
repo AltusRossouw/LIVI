@@ -11,7 +11,8 @@ import {
   applyWindowedContentSize,
   attachKioskStateSync,
   currentKiosk,
-  persistKioskAndBroadcast
+  persistKioskAndBroadcast,
+  sanitizeBounds
 } from './utils'
 
 let mainWindow: BrowserWindow | null = null
@@ -37,7 +38,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   const compositorMode = process.env.LIVI_COMPOSITOR === '1'
   const transparentWindow = compositorMode || isMac
 
-  const savedBounds = readMainBounds(runtimeState)
+  const savedBounds = compositorMode ? undefined : sanitizeBounds(readMainBounds(runtimeState))
 
   mainWindow = new BrowserWindow({
     width: savedBounds?.width ?? runtimeState.config.width,
@@ -82,6 +83,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   let boundsTimer: NodeJS.Timeout | null = null
   const persistMainBounds = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
+    if (compositorMode) return
     try {
       if (mainWindow.isFullScreen()) return
       if (typeof mainWindow.isKiosk === 'function' && mainWindow.isKiosk()) return
@@ -145,8 +147,8 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return
 
-    const baseW = runtimeState.config.width || 800
-    const baseH = runtimeState.config.height || 480
+    const baseW = savedBounds?.width || runtimeState.config.width || 1200
+    const baseH = savedBounds?.height || runtimeState.config.height || 720
 
     // always start windowed
     applyWindowedContentSize(mainWindow, baseW, baseH)
@@ -160,8 +162,6 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
       const goFullscreen = () => {
         if (!mainWindow || mainWindow.isDestroyed()) return
 
-        // Read the live screen size from the now-alive window, then size the window to it
-        // before going fullscreen.
         const d = screen.getDisplayMatching(mainWindow.getBounds())
         const [cw, ch] = mainWindow.getContentSize()
         console.log(

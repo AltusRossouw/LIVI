@@ -81,7 +81,8 @@ jest.mock('@main/window/utils', () => ({
   applyWindowedContentSize: jest.fn(),
   attachKioskStateSync: jest.fn(),
   currentKiosk: jest.fn(() => false),
-  persistKioskAndBroadcast: jest.fn()
+  persistKioskAndBroadcast: jest.fn(),
+  sanitizeBounds: jest.fn((b) => b)
 }))
 
 jest.mock('@main/ipc/utils', () => ({

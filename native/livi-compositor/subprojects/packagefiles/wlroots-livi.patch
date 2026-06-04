@@ -1,0 +1,45 @@
+diff --git a/backend/wayland/output.c b/backend/wayland/output.c
+index c3442f41..18d46ec4 100644
+--- a/backend/wayland/output.c
++++ b/backend/wayland/output.c
+@@ -1268,6 +1268,21 @@ void wlr_wl_output_set_app_id(struct wlr_output *output, const char *app_id) {
+ 	}
+ }
+ 
++void wlr_wl_output_set_fullscreen(struct wlr_output *output, bool fullscreen) {
++	struct wlr_wl_output *wl_output = get_wl_output_from_output(output);
++	assert(wl_output->xdg_toplevel != NULL);
++
++	if (!wl_output->initialized) {
++		return;
++	}
++	if (fullscreen) {
++		xdg_toplevel_set_fullscreen(wl_output->xdg_toplevel, NULL);
++	} else {
++		xdg_toplevel_unset_fullscreen(wl_output->xdg_toplevel);
++	}
++	wl_display_flush(wl_output->backend->remote_display);
++}
++
+ struct wl_surface *wlr_wl_output_get_surface(struct wlr_output *output) {
+ 	struct wlr_wl_output *wl_output = get_wl_output_from_output(output);
+ 	return wl_output->surface;
+diff --git a/include/wlr/backend/wayland.h b/include/wlr/backend/wayland.h
+index 7a41b3d0..25c70fc6 100644
+--- a/include/wlr/backend/wayland.h
++++ b/include/wlr/backend/wayland.h
+@@ -68,6 +68,14 @@ void wlr_wl_output_set_title(struct wlr_output *output, const char *title);
+  */
+ void wlr_wl_output_set_app_id(struct wlr_output *output, const char *app_id);
+ 
++/**
++ * Sets the fullscreen state of a struct wlr_output which is a Wayland toplevel.
++ *
++ * LIVI: lets a nested compositor drive its host output window's fullscreen state,
++ * so app-controlled kiosk/fullscreen fullscreens the real desktop window.
++ */
++void wlr_wl_output_set_fullscreen(struct wlr_output *output, bool fullscreen);
++
+ /**
+  * Returns the remote struct wl_surface used by the Wayland output.
+  */

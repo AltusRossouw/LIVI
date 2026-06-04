@@ -1,4 +1,5 @@
 import { registerIpcHandle, registerIpcOn } from '@main/ipc/register'
+import { compositorRestart } from '@main/services/video/GstVideo'
 import { runtimeStateProps, ServicesProps } from '@main/types'
 import { isMacPlatform } from '@main/utils'
 import { broadcastToRenderers } from '@main/window/broadcast'
@@ -48,6 +49,21 @@ export function registerAppIpc(runtimeState: runtimeStateProps, services: Servic
     }
 
     await new Promise((r) => setTimeout(r, 150))
+
+    try {
+      await runtimeState.telemetrySocket?.disconnect?.()
+    } catch {
+      // best-effort
+    }
+
+    // In the compositor: tell it to re-exec (full_restart), then quit ourselves cleanly so our
+    // surfaces disconnect while the compositor loop is still alive
+    if (compositorRestart()) {
+      await new Promise((r) => setTimeout(r, 100))
+      runtimeState.isQuitting = true
+      app.quit()
+      return
+    }
 
     if (process.platform === 'linux' && process.env.APPIMAGE) {
       const appImage = process.env.APPIMAGE

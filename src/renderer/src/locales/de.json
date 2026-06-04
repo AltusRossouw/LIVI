@@ -137,7 +137,6 @@
     "audioInputDeviceDescription": "Mikrofon-Quelle auswählen.",
     "audioDeviceSystemDefault": "System-Standard",
     "audioDeviceOffline": "{{name}} (offline)",
-    "hwAcceleration": "HW-Beschleunigung",
     "video": "Video",
     "width": "Breite",
     "widthDescription": "Stream-Breite in px.",

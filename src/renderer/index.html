@@ -34,6 +34,20 @@
             #nav-root {
               width: 75px;
             }
+
+            /* Video underlay (compositor on Linux, NSView on mac) */
+            html.show-video,
+            html.show-video body,
+            html.show-video #root,
+            html.show-video #main,
+            html.show-video #videoContainer,
+            html.show-cluster,
+            html.show-cluster body,
+            html.show-cluster #root,
+            html.show-cluster #main,
+            html.show-cluster #videoContainer {
+              background-color: transparent;
+            }
     </style>
   </head>
   <body>

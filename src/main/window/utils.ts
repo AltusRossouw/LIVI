@@ -3,7 +3,7 @@ import { saveSettings } from '@main/ipc/utils'
 import { runtimeStateProps } from '@main/types'
 import { isMacPlatform, pushSettingsToRenderer } from '@main/utils'
 import { getMainWindow } from '@main/window/createWindow'
-import type { Config } from '@shared/types'
+import type { Config, WindowBounds } from '@shared/types'
 import { BrowserWindow, screen } from 'electron'
 
 export function applyAspectRatioFullscreen(
@@ -51,6 +51,31 @@ export function applyWindowedContentSize(win: BrowserWindow, w: number, h: numbe
   applyAspectRatioWindowed(win, w, h)
 }
 
+// Guards against monitors being unplugged/rearranged so a window never opens off-screen.
+export function sanitizeBounds(b?: WindowBounds): WindowBounds | undefined {
+  if (
+    !b ||
+    typeof b.x !== 'number' ||
+    typeof b.y !== 'number' ||
+    typeof b.width !== 'number' ||
+    typeof b.height !== 'number' ||
+    b.width < 1 ||
+    b.height < 1
+  ) {
+    return undefined
+  }
+  const MIN_VISIBLE = 64
+  const displays = typeof screen?.getAllDisplays === 'function' ? screen.getAllDisplays() : []
+  for (const d of displays) {
+    const wa = d.workArea
+    const overlapW = Math.min(b.x + b.width, wa.x + wa.width) - Math.max(b.x, wa.x)
+    const overlapH = Math.min(b.y + b.height, wa.y + wa.height) - Math.max(b.y, wa.y)
+    if (overlapW >= MIN_VISIBLE && overlapH >= MIN_VISIBLE) return b
+  }
+  // No display info available (e.g. headless/test) -> trust the saved rect as-is.
+  return displays.length === 0 ? b : undefined
+}
+
 export function getMainKiosk(config: Config): boolean {
   return config.kiosk?.main === true
 }
@@ -62,10 +87,11 @@ export function withMainKiosk(config: Config, value: boolean): Config['kiosk'] {
 
 export function currentKiosk(config: Config): boolean {
   const win: BrowserWindow | null = getMainWindow()
-  const isMac = isMacPlatform()
+  // mac and the nested compositor both express kiosk as host-window fullscreen, not setKiosk
+  const viaFullscreen = isMacPlatform() || process.env.LIVI_COMPOSITOR === '1'
 
   if (win && !win.isDestroyed()) {
-    return isMac ? win.isFullScreen() : win.isKiosk()
+    return viaFullscreen ? win.isFullScreen() : win.isKiosk()
   }
   return getMainKiosk(config)
 }
@@ -125,7 +151,7 @@ export function attachKioskStateSync(runtimeState: runtimeStateProps) {
 
   const syncFromElectron = () => {
     if (win.isDestroyed()) return
-    push(win.isKiosk())
+    push(process.env.LIVI_COMPOSITOR === '1' ? win.isFullScreen() : win.isKiosk())
   }
 
   win.on('enter-full-screen', syncFromElectron)

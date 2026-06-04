@@ -76,7 +76,10 @@ export default defineConfig({
     react({}),
     electron({
       main: {
-        entry: 'src/main/index.ts',
+        entry: resolve(__dirname, 'src/main/index.ts'),
+        onstart({ startup }) {
+          startup(['.', '--no-sandbox'], { cwd: __dirname })
+        },
         vite: {
           plugins: [copyAaResourcesPlugin()],
           resolve: {
@@ -86,7 +89,7 @@ export default defineConfig({
             outDir: resolve(__dirname, 'out/main'),
             emptyOutDir: false,
             rolldownOptions: {
-              external: ['electron', 'usb', 'node-gyp-build', ...NODE_BUILTINS],
+              external: ['electron', 'usb', 'gst-video', 'node-gyp-build', ...NODE_BUILTINS],
               input: {
                 main: resolve(__dirname, 'src/main/index.ts'),
                 usbWorker: resolve(__dirname, 'src/main/services/usb/USBWorker.ts')
@@ -109,7 +112,7 @@ export default defineConfig({
           build: {
             outDir: resolve(__dirname, 'out/preload'),
             emptyOutDir: false,
-            rollupOptions: {
+            rolldownOptions: {
               external: ['electron', ...NODE_BUILTINS],
               output: {
                 format: 'cjs',

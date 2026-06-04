@@ -5,8 +5,13 @@ import { ICON_120_B64, ICON_180_B64, ICON_256_B64 } from '@shared/assets/carIcon
 import type { Config, DevListEntry } from '@shared/types'
 import { PhoneWorkMode } from '@shared/types'
 import { isInputCommand } from '@shared/types/InputCommand'
-import type { NavLocale } from '@shared/utils'
-import { isClusterDisplayed, translateNavigation } from '@shared/utils'
+import type { ClusterScreen, NavLocale } from '@shared/utils'
+import {
+  aaContentArea,
+  clusterTargetScreens,
+  isClusterDisplayed,
+  translateNavigation
+} from '@shared/utils'
 import { app, WebContents } from 'electron'
 import fs from 'fs'
 import path from 'path'
@@ -17,6 +22,7 @@ import {
 } from '../../audio/AudioDeviceEnumerator'
 import { StatusFileWriter } from '../../status/StatusFileWriter'
 import { isCarlinkitDongle } from '../../usb/constants'
+import { GstVideo, type GstVideoCodec, probeGstCodecs } from '../../video/GstVideo'
 import { AaBtSockClient } from '../driver/aa/AaBtSockClient'
 import { AaBluetoothSupervisor } from '../driver/aa/aaBluetoothSupervisor'
 import { AaDriver } from '../driver/aa/aaDriver'
@@ -131,6 +137,20 @@ export class ProjectionService {
   private firstFrameLogged = false
   private lastVideoWidth?: number
   private lastVideoHeight?: number
+  private gstVideo: GstVideo | null = null
+  private gstVideoCodec: GstVideoCodec = 'h264'
+  private gstVideoVisible = true
+  private videoCrop: {
+    cropL: number
+    cropT: number
+    visW: number
+    visH: number
+    tierW: number
+    tierH: number
+  } | null = null
+  private gstVideoClusters = new Map<ClusterScreen, GstVideo>()
+  private gstVideoClusterCodec: GstVideoCodec = 'h264'
+  private clusterVisible = false
   private dongleFwVersion?: string
   private boxInfo?: unknown
   private hostDevList: DevListEntry[] = []
@@ -196,21 +216,24 @@ export class ProjectionService {
     const prev = this.config
     this.config = { ...this.config, ...next }
 
-    const hwToggled =
-      typeof next.hwAcceleration === 'boolean' && next.hwAcceleration !== prev?.hwAcceleration
     const prevClusterActive = isClusterDisplayed(prev)
     const nextClusterActive = isClusterDisplayed(this.config)
     const clusterToggled = prevClusterActive !== nextClusterActive
-
-    if (hwToggled) {
-      this.recomputeCodecCapabilities()
-    }
 
     if (clusterToggled && !nextClusterActive) {
       this.clusterRequested = false
       this.lastClusterCodec = null
       this.lastClusterVideoWidth = undefined
       this.lastClusterVideoHeight = undefined
+    }
+
+    // Drop cluster planes for screens no longer targeted (re-spawn on demand)
+    const nextScreens = new Set(clusterTargetScreens(this.config))
+    for (const [screen, plane] of this.gstVideoClusters) {
+      if (!nextScreens.has(screen)) {
+        plane.dispose()
+        this.gstVideoClusters.delete(screen)
+      }
     }
 
     // Seed AA's initial NIGHT_MODE
@@ -322,11 +345,9 @@ export class ProjectionService {
   private recomputeCodecCapabilities(): void {
     const caps = this.lastCodecCaps
     if (!caps) return
-    const useHw = Boolean(this.config.hwAcceleration)
-    const isSupported = (c: { hw?: unknown; sw?: unknown } | undefined): boolean => {
-      if (!c) return false
-      return useHw ? Boolean(c.hw) || Boolean(c.sw) : Boolean(c.sw)
-    }
+    // applyGstCodecCaps already drops optional codecs without a HW decoder to
+    // undefined, so a present entry means the codec is advertised
+    const isSupported = (c: { hw?: unknown; sw?: unknown } | undefined): boolean => Boolean(c)
 
     const hevc = isSupported(caps.h265)
     const vp9 = isSupported(caps.vp9)
@@ -334,23 +355,17 @@ export class ProjectionService {
 
     if (this.hevcSupported !== hevc) {
       this.hevcSupported = hevc
-      console.log(
-        `[ProjectionService] hevc support: ${hevc} (useHw=${useHw}, hw=${Boolean(caps.h265?.hw)}, sw=${Boolean(caps.h265?.sw)})`
-      )
+      console.log(`[ProjectionService] hevc support: ${hevc}`)
       this.aaDriver?.setHevcSupported(hevc)
     }
     if (this.vp9Supported !== vp9) {
       this.vp9Supported = vp9
-      console.log(
-        `[ProjectionService] vp9 support: ${vp9} (useHw=${useHw}, hw=${Boolean(caps.vp9?.hw)}, sw=${Boolean(caps.vp9?.sw)})`
-      )
+      console.log(`[ProjectionService] vp9 support: ${vp9}`)
       this.aaDriver?.setVp9Supported(vp9)
     }
     if (this.av1Supported !== av1) {
       this.av1Supported = av1
-      console.log(
-        `[ProjectionService] av1 support: ${av1} (useHw=${useHw}, hw=${Boolean(caps.av1?.hw)}, sw=${Boolean(caps.av1?.sw)})`
-      )
+      console.log(`[ProjectionService] av1 support: ${av1}`)
       this.aaDriver?.setAv1Supported(av1)
     }
   }
@@ -539,15 +554,10 @@ export class ProjectionService {
           for (const wc of clusterTargets) {
             if (!wc.isDestroyed()) wc.send('cluster-video-resolution', { width: w, height: h })
           }
+          for (const plane of this.gstVideoClusters.values()) this.applyClusterCrop(plane)
         }
 
-        this.sendChunked(
-          'cluster-video-chunk',
-          msg.data?.buffer as ArrayBuffer,
-          512 * 1024,
-          undefined,
-          clusterTargets
-        )
+        if (msg.data) this.pushGstVideoCluster(msg.data)
         return
       }
 
@@ -564,6 +574,7 @@ export class ProjectionService {
       if (w > 0 && h > 0 && (w !== this.lastVideoWidth || h !== this.lastVideoHeight)) {
         this.lastVideoWidth = w
         this.lastVideoHeight = h
+        this.updateVideoCrop()
 
         this.emitProjectionEvent({
           type: 'resolution',
@@ -571,7 +582,7 @@ export class ProjectionService {
         })
       }
 
-      this.sendChunked('projection-video-chunk', msg.data?.buffer as ArrayBuffer, 512 * 1024)
+      if (msg.data) this.pushGstVideo(msg.data)
     } else if (msg instanceof AudioData) {
       this.audio.handleAudioData(msg)
 
@@ -719,16 +730,129 @@ export class ProjectionService {
     this.pendingStartupConnectTarget = null
   }
 
-  // 'video-codec' — phone announces which advertised codec it picked.
+  // 'video-codec' — phone announces which advertised codec it picked
   private readonly onDriverVideoCodec = (codec: 'h264' | 'h265' | 'vp9' | 'av1'): void => {
+    this.gstVideoCodec = codec
     const wc = this.webContents
     if (!wc || wc.isDestroyed?.()) return
     wc.send('projection-event', { type: 'video-codec', payload: { codec } })
   }
 
+  private updateVideoCrop(): void {
+    const tw = this.lastVideoWidth ?? 0
+    const th = this.lastVideoHeight ?? 0
+    const dw = this.config.width ?? 0
+    const dh = this.config.height ?? 0
+    if (tw > 0 && th > 0 && dw > 0 && dh > 0) {
+      const { contentWidth, contentHeight } = aaContentArea(
+        { width: tw, height: th },
+        { width: dw, height: dh }
+      )
+      this.videoCrop = {
+        cropL: Math.max(0, (tw - contentWidth) / 2),
+        cropT: Math.max(0, (th - contentHeight) / 2),
+        visW: contentWidth,
+        visH: contentHeight,
+        tierW: tw,
+        tierH: th
+      }
+    } else {
+      this.videoCrop = null
+    }
+    this.applyVideoCrop()
+  }
+
+  private applyVideoCrop(): void {
+    const r = this.videoCrop
+    this.gstVideo?.setContentRegion(
+      r?.cropL ?? 0,
+      r?.cropT ?? 0,
+      r?.visW ?? 0,
+      r?.visH ?? 0,
+      r?.tierW ?? 0,
+      r?.tierH ?? 0
+    )
+  }
+
+  private pushGstVideo(nal: Buffer): void {
+    const wc = this.webContents
+    if (!wc || wc.isDestroyed?.()) return
+    if (!this.gstVideo) {
+      this.gstVideo = new GstVideo(wc)
+      this.gstVideo.setVisible(this.gstVideoVisible)
+      this.applyVideoCrop()
+    }
+    this.gstVideo.push(this.gstVideoCodec, nal)
+  }
+
+  private clusterPlaneVisible(screen: ClusterScreen): boolean {
+    return screen === 'main' ? this.clusterVisible : true
+  }
+
+  // The window a cluster plane belongs to: main → main window, dash/aux → ... window
+  // mac embeds the video into this window's native view. Linux ignores the handle and
+  // places the plane on the target compositor screen instead
+  private clusterScreenWebContents(screen: ClusterScreen): WebContents | null {
+    if (screen === 'main') return this.webContents ?? null
+    const w = getSecondaryWindow(screen)
+    return w && !w.isDestroyed() ? w.webContents : null
+  }
+
+  private applyClusterCrop(plane: GstVideo): void {
+    const tw = this.lastClusterVideoWidth ?? 0
+    const th = this.lastClusterVideoHeight ?? 0
+    const dw = this.config.clusterWidth ?? 0
+    const dh = this.config.clusterHeight ?? 0
+    if (tw > 0 && th > 0 && dw > 0 && dh > 0) {
+      const { contentWidth, contentHeight } = aaContentArea(
+        { width: tw, height: th },
+        { width: dw, height: dh }
+      )
+      plane.setContentRegion(
+        Math.max(0, (tw - contentWidth) / 2),
+        Math.max(0, (th - contentHeight) / 2),
+        contentWidth,
+        contentHeight,
+        tw,
+        th
+      )
+    } else {
+      plane.setContentRegion(0, 0, 0, 0, 0, 0)
+    }
+  }
+
+  private pushGstVideoCluster(nal: Buffer): void {
+    // one plane per configured screen, all fed the same cluster stream
+    for (const screen of clusterTargetScreens(this.config)) {
+      let plane = this.gstVideoClusters.get(screen)
+      if (!plane) {
+        const wc = this.clusterScreenWebContents(screen)
+        if (!wc || wc.isDestroyed?.()) continue
+        plane = new GstVideo(wc, `cluster-${screen}`, screen)
+        plane.setVisible(this.clusterPlaneVisible(screen))
+        this.applyClusterCrop(plane) // fit to the configured cluster-stream AR
+        this.gstVideoClusters.set(screen, plane)
+      }
+      plane.push(this.gstVideoClusterCodec, nal)
+    }
+  }
+
+  // Renderer reports whether the projection screen is currently shown
+  public setVideoVisible(visible: boolean): void {
+    this.gstVideoVisible = visible
+    this.gstVideo?.setVisible(visible)
+  }
+
+  // Cluster tab visibility (cluster:request) drives the main-screen plane only
+  public setClusterVisible(visible: boolean): void {
+    this.clusterVisible = visible
+    this.gstVideoClusters.get('main')?.setVisible(visible)
+  }
+
   // Cluster channel codec selection
   private readonly onDriverClusterVideoCodec = (codec: 'h264' | 'h265' | 'vp9' | 'av1'): void => {
     this.lastClusterCodec = codec
+    this.gstVideoClusterCodec = codec
     for (const wc of this.getClusterTargetWebContents()) {
       try {
         wc.send('projection-event', { type: 'cluster-video-codec', payload: { codec } })
@@ -805,7 +929,8 @@ export class ProjectionService {
         this.emitProjectionEvent(payload)
       },
       (channel, data, chunkSize, extra) => {
-        this.sendChunked(channel, data, chunkSize, extra)
+        // FFT audio chunks must reach every window that can draw the visualizer
+        this.sendChunked(channel, data, chunkSize, extra, this.getAllUiWebContents())
       },
       (pcm, decodeType) => {
         try {
@@ -820,6 +945,7 @@ export class ProjectionService {
       start: () => this.start(),
       stop: () => this.stop(),
       restartSession: () => this.restartSession(),
+      setVideoVisible: (v) => this.setVideoVisible(v),
       pickPreferredTransport: () => this.pickPreferredTransport(),
       switchTransport: () => this.switchTransport(),
       getTransportState: () => this.getTransportState(),
@@ -843,6 +969,7 @@ export class ProjectionService {
       setClusterRequested: (v) => {
         this.clusterRequested = v
       },
+      setClusterVisible: (v) => this.setClusterVisible(v),
       resetLastClusterVideoSize: () => {
         this.lastClusterVideoWidth = undefined
         this.lastClusterVideoHeight = undefined
@@ -857,7 +984,7 @@ export class ProjectionService {
       getDongleFwVersion: () => this.dongleFwVersion,
       emitProjectionEvent: (p) => this.emitProjectionEvent(p),
       setAudioStreamVolume: (s, v) => this.audio.setStreamVolume(s, v),
-      setAudioVisualizerEnabled: (e) => this.audio.setVisualizerEnabled(e)
+      setAudioVisualizerEnabled: (e, id) => this.audio.setVisualizerEnabled(e, id)
     }
     registerProjectionIpc(ipcHost)
 
@@ -865,6 +992,33 @@ export class ProjectionService {
     this.audioMonitor = startAudioDeviceMonitor(() => {
       this.emitProjectionEvent({ type: 'audioDevicesChanged' })
     })
+
+    this.applyGstCodecCaps()
+  }
+
+  // Advertise the codecs the bundled GStreamer can decode. Optional codecs are
+  // offered only when a HW decoder exists, h264 is the always-on AA baseline
+  private applyGstCodecCaps(): void {
+    const p = probeGstCodecs()
+    const hwCap = (s: { hw: boolean }): { hw?: unknown; sw?: unknown } | undefined =>
+      s.hw ? { hw: true, sw: true } : undefined
+    // Offer h265 when it has a HW decoder, or when it can only be done in software
+    // but there's no HW h264 to fall back on either. Pi3/Pi4 (HW h264, no HW h265) must stay on h264.
+    const h265Cap = p.h265.hw || (p.h265.sw && !p.h264.hw) ? { hw: true, sw: true } : undefined
+    this.lastCodecCaps = {
+      h264: { hw: true, sw: true },
+      h265: h265Cap,
+      vp9: hwCap(p.vp9),
+      av1: hwCap(p.av1)
+    }
+    console.log(
+      `[ProjectionService] GStreamer codecs: ` +
+        `h264(hw=${p.h264.hw} sw=${p.h264.sw}) ` +
+        `h265(hw=${p.h265.hw} sw=${p.h265.sw}) ` +
+        `vp9(hw=${p.vp9.hw} sw=${p.vp9.sw}) ` +
+        `av1(hw=${p.av1.hw} sw=${p.av1.sw})`
+    )
+    this.recomputeCodecCapabilities()
   }
 
   private async reloadConfigFromDisk(): Promise<void> {
@@ -1687,6 +1841,13 @@ export class ProjectionService {
       this.webUsbDevice = null
       this.audio.resetForSessionStop()
 
+      this.gstVideo?.dispose()
+      this.gstVideo = null
+      this.gstVideoCodec = 'h264'
+      for (const plane of this.gstVideoClusters.values()) plane.dispose()
+      this.gstVideoClusters.clear()
+      this.gstVideoClusterCodec = 'h264'
+
       this.started = false
       this.resetMediaSnapshot('session-stop')
       this.resetNavigationSnapshot('session-stop')
@@ -1881,6 +2042,25 @@ export class ProjectionService {
     }
     if (out.length === 0 && isAlive(this.webContents)) {
       out.push(this.webContents as WebContents)
+    }
+    return out
+  }
+
+  // Every live UI window (main + secondary). Used for data every window may render,
+  // e.g. the FFT audio chunks, which otherwise only reach the main window.
+  private getAllUiWebContents(): WebContents[] {
+    const alive = (wc: WebContents | null | undefined): wc is WebContents => {
+      try {
+        return !!wc && (typeof wc.isDestroyed !== 'function' || !wc.isDestroyed())
+      } catch {
+        return !!wc
+      }
+    }
+    const out: WebContents[] = []
+    if (alive(this.webContents)) out.push(this.webContents as WebContents)
+    for (const role of ['dash', 'aux'] as const) {
+      const w = getSecondaryWindow(role)
+      if (w && !w.isDestroyed() && alive(w.webContents)) out.push(w.webContents)
     }
     return out
   }

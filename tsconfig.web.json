@@ -16,7 +16,7 @@
     "target": "es2024",
     "module": "es2022",
     "lib": ["dom", "dom.iterable", "es2024", "webworker"],
-    "types": ["jest", "@testing-library/jest-dom", "@webgpu/types", "w3c-web-usb", "vite/client"],
+    "types": ["jest", "@testing-library/jest-dom", "w3c-web-usb", "vite/client"],
     "allowJs": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

@@ -35,6 +35,7 @@ export interface ProjectionIpcHost {
   start(): Promise<void>
   stop(): Promise<void>
   restartSession(): Promise<void>
+  setVideoVisible(visible: boolean): void
   pickPreferredTransport(): Transport | null
   switchTransport(): Promise<{ ok: boolean; active: Transport | null }>
   getTransportState(): TransportSnapshot
@@ -58,6 +59,7 @@ export interface ProjectionIpcHost {
   // Cluster
   getConfig(): Config
   setClusterRequested(v: boolean): void
+  setClusterVisible(v: boolean): void
   resetLastClusterVideoSize(): void
   getLastClusterCodec(): string | null
   getClusterTargetWebContents(): WebContents[]
@@ -75,5 +77,5 @@ export interface ProjectionIpcHost {
 
   // Audio
   setAudioStreamVolume(stream: LogicalStreamKey, volume: number): void
-  setAudioVisualizerEnabled(enabled: boolean): void
+  setAudioVisualizerEnabled(enabled: boolean, sourceId?: number): void
 }

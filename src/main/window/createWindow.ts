@@ -11,7 +11,8 @@ import {
   applyWindowedContentSize,
   attachKioskStateSync,
   currentKiosk,
-  persistKioskAndBroadcast
+  persistKioskAndBroadcast,
+  sanitizeBounds
 } from './utils'
 
 let mainWindow: BrowserWindow | null = null
@@ -34,19 +35,24 @@ function readMainBounds(rs: runtimeStateProps): WindowBounds | undefined {
 export function createMainWindow(runtimeState: runtimeStateProps, services: ServicesProps) {
   const { projectionService } = services
   const isMac = isMacPlatform()
+  const compositorMode = process.env.LIVI_COMPOSITOR === '1'
+  const transparentWindow = compositorMode || isMac
 
-  const savedBounds = readMainBounds(runtimeState)
+  const savedBounds = compositorMode ? undefined : sanitizeBounds(readMainBounds(runtimeState))
 
   mainWindow = new BrowserWindow({
     width: savedBounds?.width ?? runtimeState.config.width,
     height: savedBounds?.height ?? runtimeState.config.height,
     x: savedBounds?.x,
     y: savedBounds?.y,
-    frame: true,
+    // Compositor mode: frameless (the host/compositor draws the frame)
+    frame: !compositorMode,
+    resizable: true,
     useContentSize: true,
     kiosk: false,
     autoHideMenuBar: true,
-    backgroundColor: '#000',
+    transparent: compositorMode,
+    backgroundColor: transparentWindow ? '#00000000' : '#000',
     fullscreenable: true,
     simpleFullscreen: false,
     webPreferences: {
@@ -56,8 +62,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
       contextIsolation: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      backgroundThrottling: false,
-      experimentalFeatures: true
+      backgroundThrottling: false
     }
   })
 
@@ -78,6 +83,7 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   let boundsTimer: NodeJS.Timeout | null = null
   const persistMainBounds = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
+    if (compositorMode) return
     try {
       if (mainWindow.isFullScreen()) return
       if (typeof mainWindow.isKiosk === 'function' && mainWindow.isKiosk()) return
@@ -141,8 +147,8 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow) return
 
-    const baseW = runtimeState.config.width || 800
-    const baseH = runtimeState.config.height || 480
+    const baseW = savedBounds?.width || runtimeState.config.width || 1200
+    const baseH = savedBounds?.height || runtimeState.config.height || 720
 
     // always start windowed
     applyWindowedContentSize(mainWindow, baseW, baseH)
@@ -153,20 +159,36 @@ export function createMainWindow(runtimeState: runtimeStateProps, services: Serv
 
     const forceKiosk = process.env.LIVI_KIOSK === '1'
     if (runtimeState.config.kiosk?.main || forceKiosk) {
-      setImmediate(() => {
+      const goFullscreen = () => {
         if (!mainWindow || mainWindow.isDestroyed()) return
+
+        const d = screen.getDisplayMatching(mainWindow.getBounds())
+        const [cw, ch] = mainWindow.getContentSize()
+        console.log(
+          `[kiosk] enter: screen=${d.size.width}x${d.size.height} ` +
+            `workArea=${d.workAreaSize.width}x${d.workAreaSize.height} window=${cw}x${ch}`
+        )
 
         if (isMac) {
           mainWindow.setFullScreen(true)
+        } else if (compositorMode) {
+          mainWindow.setContentSize(d.size.width, d.size.height)
+          mainWindow.setFullScreen(true)
         } else {
           mainWindow.setKiosk(true)
-
-          const d = screen.getDisplayMatching(mainWindow.getBounds())
-          const wa = d.workAreaSize
-
-          mainWindow.setContentSize(wa.width, wa.height)
+          mainWindow.setContentSize(d.workAreaSize.width, d.workAreaSize.height)
         }
-      })
+      }
+
+      if (compositorMode) {
+        // The nested compositor only learns the monitor size once the host fullscreens
+        // the output. Going fullscreen at ready-to-show is too early: the output/host
+        // handshake hasn't settled, so the UI ends up sized to the windowed mode inside
+        // the fullscreen window. Defer a beat so the output is established first.
+        setTimeout(goFullscreen, 400)
+      } else {
+        setImmediate(goFullscreen)
+      }
     }
 
     mainWindow.webContents.setZoomFactor((runtimeState.config.uiZoomPercent ?? 100) / 100)

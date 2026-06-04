@@ -139,6 +139,12 @@ export function saveSettings(runtimeState: runtimeStateProps, next: Partial<Conf
   } else {
     // Linux
     const win = mainWindow
+
+    if (process.env.LIVI_COMPOSITOR === '1') {
+      if (kioskChanged) win.setFullScreen(nextMainKiosk)
+      return
+    }
+
     if (kioskChanged) {
       const leavingKiosk = !nextMainKiosk
 

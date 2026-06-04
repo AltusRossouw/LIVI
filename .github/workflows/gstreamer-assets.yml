@@ -221,7 +221,7 @@ jobs:
 
               apt-get update
               apt-get install -y --no-install-recommends \
-                bash coreutils findutils file python3 dpkg-dev ca-certificates \
+                bash coreutils findutils file python3 dpkg-dev patchelf ca-certificates \
                 gstreamer1.0-tools \
                 gstreamer1.0-plugins-base \
                 gstreamer1.0-plugins-base-apps \
@@ -295,7 +295,7 @@ jobs:
 
               apt-get update
               apt-get install -y --no-install-recommends \
-                bash coreutils findutils file python3 dpkg-dev ca-certificates \
+                bash coreutils findutils file python3 dpkg-dev patchelf ca-certificates \
                 gstreamer1.0-tools \
                 gstreamer1.0-plugins-base \
                 gstreamer1.0-plugins-base-apps \

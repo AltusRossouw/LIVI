@@ -9,6 +9,7 @@ import {
   currentKiosk,
   persistKioskAndBroadcast,
   restoreKioskAfterWmExit,
+  sanitizeBounds,
   sendKioskSync
 } from '@main/window/utils'
 import { screen } from 'electron'
@@ -30,7 +31,8 @@ jest.mock('electron', () => ({
   screen: {
     getDisplayMatching: jest.fn(() => ({
       workAreaSize: { width: 1600, height: 900 }
-    }))
+    })),
+    getAllDisplays: jest.fn(() => [])
   }
 }))
 
@@ -482,6 +484,54 @@ describe('window utils', () => {
     expect(win.setKiosk).toHaveBeenCalledWith(true)
     expect(saveSettings).toHaveBeenCalledWith(runtimeState, {
       kiosk: { main: true, dash: false, aux: false }
+    })
+  })
+
+  describe('sanitizeBounds', () => {
+    const mockedGetAllDisplays = screen.getAllDisplays as jest.Mock
+
+    const display = (x: number, y: number, width: number, height: number) => ({
+      workArea: { x, y, width, height }
+    })
+
+    test('returns undefined for missing or malformed bounds', () => {
+      mockedGetAllDisplays.mockReturnValue([display(0, 0, 1920, 1080)])
+      expect(sanitizeBounds(undefined)).toBeUndefined()
+      expect(sanitizeBounds({ x: 0, y: 0, width: 0, height: 480 } as any)).toBeUndefined()
+      expect(sanitizeBounds({ x: 0, y: 0, width: 800 } as any)).toBeUndefined()
+    })
+
+    test('keeps a rect that is visible on a display', () => {
+      mockedGetAllDisplays.mockReturnValue([display(0, 0, 1920, 1080)])
+      const b = { x: 100, y: 100, width: 800, height: 480 }
+      expect(sanitizeBounds(b)).toBe(b)
+    })
+
+    test('keeps a rect on a second monitor (negative offset)', () => {
+      mockedGetAllDisplays.mockReturnValue([
+        display(0, 0, 1920, 1080),
+        display(-1920, 0, 1920, 1080)
+      ])
+      const b = { x: -1820, y: 200, width: 800, height: 480 }
+      expect(sanitizeBounds(b)).toBe(b)
+    })
+
+    test('drops a rect that lies fully off all displays (monitor unplugged)', () => {
+      mockedGetAllDisplays.mockReturnValue([display(0, 0, 1920, 1080)])
+      // saved on a now-missing monitor at x=-1820
+      expect(sanitizeBounds({ x: -1820, y: 200, width: 800, height: 480 })).toBeUndefined()
+    })
+
+    test('drops a rect with only a sliver visible (< 64px)', () => {
+      mockedGetAllDisplays.mockReturnValue([display(0, 0, 1920, 1080)])
+      // only 10px peek in from the left edge
+      expect(sanitizeBounds({ x: 1910, y: 200, width: 800, height: 480 })).toBeUndefined()
+    })
+
+    test('trusts the rect when no display info is available (headless)', () => {
+      mockedGetAllDisplays.mockReturnValue([])
+      const b = { x: 4000, y: 4000, width: 800, height: 480 }
+      expect(sanitizeBounds(b)).toBe(b)
     })
   })
 })

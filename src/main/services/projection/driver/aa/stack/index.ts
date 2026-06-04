@@ -25,6 +25,8 @@ import type { TouchPointer } from './channels/InputChannel'
 import type { MediaPlaybackMetadata, MediaPlaybackStatus } from './channels/MediaInfoChannel'
 import type {
   NavigationDistanceUpdate,
+  NavigationPositionUpdate,
+  NavigationStateUpdate,
   NavigationStatusUpdate,
   NavigationTurnUpdate
 } from './channels/NavigationChannel'
@@ -41,7 +43,9 @@ export type {
 } from './channels/MediaInfoChannel.js'
 export type {
   NavigationDistanceUpdate,
+  NavigationPositionUpdate,
   NavigationState,
+  NavigationStateUpdate,
   NavigationStatusUpdate,
   NavigationTurnEvent,
   NavigationTurnSide,
@@ -106,6 +110,8 @@ export class AAStack extends EventEmitter {
     session.on('nav-status', (s: NavigationStatusUpdate) => this.emit('nav-status', s))
     session.on('nav-turn', (t: NavigationTurnUpdate) => this.emit('nav-turn', t))
     session.on('nav-distance', (d: NavigationDistanceUpdate) => this.emit('nav-distance', d))
+    session.on('nav-state', (s: NavigationStateUpdate) => this.emit('nav-state', s))
+    session.on('nav-position', (p: NavigationPositionUpdate) => this.emit('nav-position', p))
     session.on('connected', () => this.emit('connected'))
     session.on('disconnected', (reason?: string) => this.emit('disconnected', reason))
     session.on('error', (err: Error) => this.emit('error', err))

@@ -80,13 +80,47 @@ export interface NavigationDistanceUpdate {
   displayUnit?: number
 }
 
+/** Modern NavigationState (STATE, AA ≥ 1.7): current step + destination. */
+export interface NavigationStateUpdate {
+  /** NavigationManeuver.NavigationType enum of the current step. */
+  maneuverType?: number
+  /** Name of the step's target road. */
+  roadName?: string
+  /** First cue / alternate text for the step. */
+  cue?: string
+  /** First destination address. */
+  destinationAddress?: string
+}
+
+/** Modern NavigationCurrentPosition (CURRENT_POSITION, AA ≥ 1.7): live distances. */
+export interface NavigationPositionUpdate {
+  /** Distance to the next step (maneuver), metres. */
+  stepDistanceMeters?: number
+  stepDistanceDisplay?: string
+  /** Seconds to the next step. */
+  timeToStepSeconds?: number
+  /** Distance to the destination, metres. */
+  destinationMeters?: number
+  destinationDisplay?: string
+  /** NavigationDistance.DistanceUnits enum. */
+  destinationUnits?: number
+  /** Clock time of arrival, e.g. "21:58". */
+  etaText?: string
+  /** Seconds remaining to the destination. */
+  timeToArrivalSeconds?: number
+  /** Name of the road currently driven. */
+  currentRoadName?: string
+}
+
 export class NavigationChannel extends EventEmitter {
   // Events emitted:
   //   'nav-start'                            — instrument-cluster session began
   //   'nav-stop'                             — instrument-cluster session ended
   //   'nav-status'    (s: NavigationStatusUpdate)
-  //   'nav-turn'      (t: NavigationTurnUpdate)
-  //   'nav-distance'  (d: NavigationDistanceUpdate)
+  //   'nav-turn'      (t: NavigationTurnUpdate)       [deprecated path]
+  //   'nav-distance'  (d: NavigationDistanceUpdate)   [deprecated path]
+  //   'nav-state'     (s: NavigationStateUpdate)      [modern path, AA ≥ 1.7]
+  //   'nav-position'  (p: NavigationPositionUpdate)   [modern path, AA ≥ 1.7]
 
   handleMessage(msgId: number, payload: Buffer): void {
     switch (msgId) {
@@ -127,14 +161,27 @@ export class NavigationChannel extends EventEmitter {
         break
       }
 
-      case NAV_MSG.STATE:
-      case NAV_MSG.CURRENT_POSITION:
-        // Modern API: NavigationState / NavigationCurrentPosition. Maps doesn't
-        // emit these to non-cluster HUs; left as a TODO if a future device does.
-        console.debug(
-          `[NavigationChannel] modern msgId=0x${msgId.toString(16)} len=${payload.length} (not parsed)`
+      case NAV_MSG.STATE: {
+        // Modern API (AA protocol ≥ 1.7): current step (maneuver/road/cue) + destination.
+        const s = this._decodeState(payload)
+        console.log(
+          `[NavigationChannel] state maneuver=${s.maneuverType} road=${JSON.stringify(s.roadName)}` +
+            ` dest=${JSON.stringify(s.destinationAddress)}`
         )
+        this.emit('nav-state', s)
         break
+      }
+
+      case NAV_MSG.CURRENT_POSITION: {
+        // Modern API: distance/time to the next step AND to the destination (+ ETA clock).
+        const p = this._decodePosition(payload)
+        console.log(
+          `[NavigationChannel] position dest=${p.destinationMeters}m eta=${p.etaText}` +
+            ` ttarr=${p.timeToArrivalSeconds}s step=${p.stepDistanceMeters}m`
+        )
+        this.emit('nav-position', p)
+        break
+      }
 
       default:
         console.log(
@@ -206,6 +253,92 @@ export class NavigationChannel extends EventEmitter {
     }
     return { distanceMeters, timeToTurnSeconds, displayDistanceE3, displayUnit }
   }
+
+  // NavigationState { steps=1 (NavigationStep), destinations=2 (NavigationDestination) }
+  private _decodeState(payload: Buffer): NavigationStateUpdate {
+    const out: NavigationStateUpdate = {}
+    for (const f of decodeFields(payload)) {
+      if (f.field === 1 && f.wire === 2 && out.maneuverType === undefined && !out.roadName) {
+        // first NavigationStep { maneuver=1, road=2, lanes=3, cue=4 }
+        for (const s of decodeFields(f.bytes)) {
+          if (s.field === 1 && s.wire === 2) {
+            // NavigationManeuver { type=1 }
+            for (const m of decodeFields(s.bytes)) {
+              if (m.field === 1 && m.wire === 0) out.maneuverType = decodeVarintValue(m.bytes)
+            }
+          } else if (s.field === 2 && s.wire === 2) {
+            // NavigationRoad { name=1 }
+            for (const r of decodeFields(s.bytes)) {
+              if (r.field === 1 && r.wire === 2) out.roadName = r.bytes.toString('utf8')
+            }
+          } else if (s.field === 4 && s.wire === 2 && out.cue === undefined) {
+            // NavigationCue { alternate_text=1 (repeated) } — take the first
+            for (const c of decodeFields(s.bytes)) {
+              if (c.field === 1 && c.wire === 2 && out.cue === undefined) {
+                out.cue = c.bytes.toString('utf8')
+              }
+            }
+          }
+        }
+      } else if (f.field === 2 && f.wire === 2 && out.destinationAddress === undefined) {
+        // first NavigationDestination { address=1 }
+        for (const d of decodeFields(f.bytes)) {
+          if (d.field === 1 && d.wire === 2) out.destinationAddress = d.bytes.toString('utf8')
+        }
+      }
+    }
+    return out
+  }
+
+  // NavigationCurrentPosition { step_distance=1, destination_distances=2, current_road=3 }
+  private _decodePosition(payload: Buffer): NavigationPositionUpdate {
+    const out: NavigationPositionUpdate = {}
+    for (const f of decodeFields(payload)) {
+      if (f.field === 1 && f.wire === 2) {
+        // NavigationStepDistance { distance=1, time_to_step_seconds=2 }
+        for (const s of decodeFields(f.bytes)) {
+          if (s.field === 1 && s.wire === 2) {
+            const d = decodeNavDistance(s.bytes)
+            out.stepDistanceMeters = d.meters
+            out.stepDistanceDisplay = d.display
+          } else if (s.field === 2 && s.wire === 0) {
+            out.timeToStepSeconds = decodeVarintValue(s.bytes)
+          }
+        }
+      } else if (f.field === 2 && f.wire === 2 && out.destinationMeters === undefined) {
+        // first NavigationDestinationDistance { distance=1, eta=2, time_to_arrival=3 }
+        for (const dd of decodeFields(f.bytes)) {
+          if (dd.field === 1 && dd.wire === 2) {
+            const d = decodeNavDistance(dd.bytes)
+            out.destinationMeters = d.meters
+            out.destinationDisplay = d.display
+            out.destinationUnits = d.units
+          } else if (dd.field === 2 && dd.wire === 2) {
+            out.etaText = dd.bytes.toString('utf8')
+          } else if (dd.field === 3 && dd.wire === 0) {
+            out.timeToArrivalSeconds = decodeVarintValue(dd.bytes)
+          }
+        }
+      } else if (f.field === 3 && f.wire === 2) {
+        // NavigationRoad { name=1 }
+        for (const r of decodeFields(f.bytes)) {
+          if (r.field === 1 && r.wire === 2) out.currentRoadName = r.bytes.toString('utf8')
+        }
+      }
+    }
+    return out
+  }
+}
+
+// NavigationDistance { meters=1, display_value=2, display_units=3 }
+function decodeNavDistance(b: Buffer): { meters?: number; display?: string; units?: number } {
+  const out: { meters?: number; display?: string; units?: number } = {}
+  for (const f of decodeFields(b)) {
+    if (f.field === 1 && f.wire === 0) out.meters = decodeVarintValue(f.bytes)
+    else if (f.field === 2 && f.wire === 2) out.display = f.bytes.toString('utf8')
+    else if (f.field === 3 && f.wire === 0) out.units = decodeVarintValue(f.bytes)
+  }
+  return out
 }
 
 function mapNextTurnEnum(v: number): NavigationTurnEvent {

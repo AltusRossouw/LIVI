@@ -46,8 +46,8 @@ describe('translateNavigation', () => {
     expect(result.SourceName).toBe('Maps')
     expect(result.DestinationName).toBe('Home')
     expect(result.CurrentRoadName).toBe('Main St')
-    expect(result.TimeRemainingToDestinationText).toBe('1:01')
-    expect(result.DistanceRemainingDisplayStringText).toBe('1.58 km')
+    expect(result.TimeRemainingToDestinationText).toBe('1 min')
+    expect(result.DistanceRemainingDisplayStringText).toBe('1.6 km')
     expect(result.RemainDistanceText).toBe('999 m')
     expect(result.ManeuverTypeText).toBe('Turn left')
     expect(result.JunctionTypeText).toBe('Roundabout')
@@ -63,20 +63,31 @@ describe('translateNavigation', () => {
     })
   })
 
-  test('formats large distances with one decimal', () => {
+  test('formats distances >= 10 km as whole kilometers', () => {
     const result = translateNavigation({ NaviDistanceToDestination: 12345 }, 'en')
-    expect(result.DistanceRemainingDisplayStringText).toBe('12.3 km')
+    expect(result.DistanceRemainingDisplayStringText).toBe('12 km')
   })
 
-  test('formats exactly 1km and under 10km with two decimals', () => {
+  test('formats a multi-hour remaining time as h:mm with an h unit', () => {
+    // 11 h 36 min → 41760 s (seconds dropped at this scale)
+    const result = translateNavigation({ NaviTimeToDestination: 41760 }, 'en')
+    expect(result.TimeRemainingToDestinationText).toBe('11:36 h')
+  })
+
+  test('passes through the arrival clock (NaviETA → EtaClockText)', () => {
+    expect(translateNavigation({ NaviETA: '21:58' }, 'en').EtaClockText).toBe('21:58')
+    expect(translateNavigation({}, 'en').EtaClockText).toBeUndefined()
+  })
+
+  test('formats 1km up to under 10km with one decimal', () => {
     expect(
       translateNavigation({ NaviDistanceToDestination: 1000 }, 'en')
         .DistanceRemainingDisplayStringText
-    ).toBe('1.00 km')
+    ).toBe('1.0 km')
     expect(
-      translateNavigation({ NaviDistanceToDestination: 9000 }, 'en')
+      translateNavigation({ NaviDistanceToDestination: 9100 }, 'en')
         .DistanceRemainingDisplayStringText
-    ).toBe('9.00 km')
+    ).toBe('9.1 km')
   })
 
   test('formats sub-kilometer distances in meters', () => {
@@ -112,12 +123,19 @@ describe('translateNavigation', () => {
     expect(ua.ManeuverTypeText).toBe('Різко праворуч')
   })
 
-  test('uses locale-specific number formatting', () => {
-    const de = translateNavigation({ NaviDistanceToDestination: 1580 }, 'de')
-    const ua = translateNavigation({ NaviDistanceToDestination: 1580 }, 'ua')
-
-    expect(de.DistanceRemainingDisplayStringText).toBe('1,58 km')
-    expect(ua.DistanceRemainingDisplayStringText).toBe('1,58 km')
+  test('distances use a period decimal and no thousands separator on every locale', () => {
+    for (const loc of ['en', 'de', 'ua'] as const) {
+      // period decimal in the 1..10 km range
+      expect(
+        translateNavigation({ NaviDistanceToDestination: 9100 }, loc)
+          .DistanceRemainingDisplayStringText
+      ).toBe('9.1 km')
+      // no thousands separator, no decimals at >= 10 km
+      expect(
+        translateNavigation({ NaviDistanceToDestination: 1065100 }, loc)
+          .DistanceRemainingDisplayStringText
+      ).toBe('1065 km')
+    }
   })
 
   test('falls back to english dictionary for unsupported locale', () => {

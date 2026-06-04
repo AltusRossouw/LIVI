@@ -367,7 +367,7 @@ describe('NavFull', () => {
       SourceName: 'Maps',
       codes: {
         ManeuverType: 4,
-        TurnSide: 2
+        TurnSide: 0
       }
     }))
     ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
@@ -385,7 +385,7 @@ describe('NavFull', () => {
     })
   })
 
-  test('renders fallback help icon for unknown maneuver type', async () => {
+  test('renders a neutral navigation icon for unknown maneuver type', async () => {
     translateNavigationMock.mockImplementation(() => ({
       ManeuverTypeText: 'Unknown move',
       RemainDistanceText: '300 m',
@@ -410,7 +410,7 @@ describe('NavFull', () => {
     render(<NavFull />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('HelpOutlinedIcon')).toBeInTheDocument()
+      expect(screen.getByTestId('NavigationOutlinedIcon')).toBeInTheDocument()
     })
   })
 
@@ -449,7 +449,7 @@ describe('NavFull', () => {
   })
 
   // One assertion per maneuver code → keeps the switch's branches honest.
-  // turnSide=1 (left). turnSide=2 paths are already covered above.
+  // turnSide=1 (left). The right-side path (turnSide=0) is covered above.
   test.each([
     [1, 'TurnLeftIcon'],
     [2, 'TurnRightIcon'],
@@ -470,7 +470,7 @@ describe('NavFull', () => {
     [24, 'FlagIcon'],
     [25, 'FlagIcon'],
     [27, 'FlagIcon'],
-    [11, 'WrongLocationIcon'],
+    [11, 'StraightIcon'],
     [13, 'ForkLeftIcon'],
     [14, 'ForkRightIcon'],
     [15, 'DirectionsBoatIcon'],

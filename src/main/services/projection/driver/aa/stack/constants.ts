@@ -81,7 +81,7 @@ export const CH = {
 // ── Version negotiation ───────────────────────────────────────────────────────
 export const VERSION = {
   MAJOR: 1,
-  MINOR: 1,
+  MINOR: 7,
   STATUS_MATCH: 0x0000,
   STATUS_MISMATCH: 0xffff
 } as const

@@ -350,7 +350,7 @@ describe('AaEventBridge', () => {
       expect(naviInfo(all[1]).NaviStatus).toBe(0)
     })
 
-    test('nav-distance emits distance + time fields', () => {
+    test('nav-distance maps to the maneuver distance, not the destination', () => {
       const { aa, emitMessage } = makeBridge()
       aa.emit('nav-distance', {
         distanceMeters: 500,
@@ -358,11 +358,45 @@ describe('AaEventBridge', () => {
         displayDistanceE3: 0.5,
         displayUnit: 'km'
       })
-      expect(naviInfo(metas(emitMessage)[0])).toMatchObject({
-        NaviDistanceToDestination: 500,
-        NaviTimeToDestination: 30,
+      const info = naviInfo(metas(emitMessage)[0])
+      expect(info).toMatchObject({
+        NaviRemainDistance: 500,
         NaviDisplayDistanceE3: 0.5,
         NaviDisplayDistanceUnit: 'km'
+      })
+      // AA never carries the trip distance/ETA — those destination fields stay unset
+      expect(info.NaviDistanceToDestination).toBeUndefined()
+      expect(info.NaviTimeToDestination).toBeUndefined()
+    })
+
+    test('nav-state maps the modern maneuver enum + road + destination address', () => {
+      const { aa, emitMessage } = makeBridge()
+      aa.emit('nav-state', {
+        maneuverType: 8, // TURN_NORMAL_RIGHT
+        roadName: 'Jarrestraße',
+        destinationAddress: 'Harburger Ring 24, Harburg'
+      })
+      expect(naviInfo(metas(emitMessage)[0])).toMatchObject({
+        NaviManeuverType: 2, // right
+        NaviTurnSide: 0, // right
+        NaviRoadName: 'Jarrestraße',
+        NaviDestinationName: 'Harburger Ring 24, Harburg'
+      })
+    })
+
+    test('nav-position maps step distance + destination distance + ETA', () => {
+      const { aa, emitMessage } = makeBridge()
+      aa.emit('nav-position', {
+        stepDistanceMeters: 345,
+        destinationMeters: 18185,
+        timeToArrivalSeconds: 1599,
+        etaText: '21:58'
+      })
+      expect(naviInfo(metas(emitMessage)[0])).toMatchObject({
+        NaviRemainDistance: 345,
+        NaviDistanceToDestination: 18185,
+        NaviTimeToDestination: 1599,
+        NaviETA: '21:58'
       })
     })
 

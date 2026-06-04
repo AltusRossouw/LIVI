@@ -365,7 +365,7 @@ describe('NavMini', () => {
     expect(screen.getByText('200 m')).toBeInTheDocument()
   })
 
-  test('renders straight icon when maneuver type is missing', async () => {
+  test('renders a neutral navigation icon when maneuver type is missing', async () => {
     translateNavigationMock.mockImplementation(() => ({
       RemainDistanceText: '200 m',
       TimeRemainingToDestinationText: '12 min',
@@ -387,7 +387,7 @@ describe('NavMini', () => {
     render(<NavMini />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('StraightIcon')).toBeInTheDocument()
+      expect(screen.getByTestId('NavigationOutlinedIcon')).toBeInTheDocument()
     })
   })
 
@@ -425,7 +425,7 @@ describe('NavMini', () => {
       CurrentRoadName: 'Main Street',
       codes: {
         ManeuverType: 4,
-        TurnSide: 2
+        TurnSide: 0
       }
     }))
     ;(window as any).projection.ipc.readNavigation = jest.fn().mockResolvedValue({
@@ -443,7 +443,7 @@ describe('NavMini', () => {
     })
   })
 
-  test('renders fallback help icon for unknown maneuver type', async () => {
+  test('renders a neutral navigation icon for unknown maneuver type', async () => {
     translateNavigationMock.mockImplementation(() => ({
       RemainDistanceText: '300 m',
       TimeRemainingToDestinationText: '6 min',
@@ -465,7 +465,7 @@ describe('NavMini', () => {
     render(<NavMini />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('HelpOutlinedIcon')).toBeInTheDocument()
+      expect(screen.getByTestId('NavigationOutlinedIcon')).toBeInTheDocument()
     })
   })
 

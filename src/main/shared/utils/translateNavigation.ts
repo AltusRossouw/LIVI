@@ -390,41 +390,35 @@ function junctionTypeText(value: unknown, d: Dict): string | undefined {
   }
 }
 
-function fmtSecondsToMmSs(totalSeconds: unknown): string | undefined {
+function fmtRemainingTime(totalSeconds: unknown): string | undefined {
   const s = typeof totalSeconds === 'number' ? totalSeconds : undefined
   if (s == null || !Number.isFinite(s) || s < 0) return undefined
-  const mins = Math.floor(s / 60)
-  const secs = Math.floor(s % 60)
-  return `${mins}:${String(secs).padStart(2, '0')}`
+  const total = Math.floor(s)
+  const hours = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+
+  if (hours > 0) {
+    return `${hours}:${String(mins).padStart(2, '0')} h`
+  }
+  return `${mins} min`
 }
 
-function fmtMeters(meters: unknown, locale: string): string | undefined {
+// Distance display:
+//   < 1 km   -> meters (e.g. 999 m)
+//   1..10 km -> one decimal (e.g. 9.1 km)
+//   >= 10 km -> whole km (e.g. 1065 km)
+function fmtMeters(meters: unknown): string | undefined {
   const m = typeof meters === 'number' ? meters : undefined
   if (m == null || !Number.isFinite(m) || m < 0) return undefined
-
-  // UI stability:
-  // < 1 km  -> meters (e.g. 999 m)
-  // 1..10 km -> always 2 decimals (e.g. 1.58 km, 9.00 km)
-  // >= 10 km -> always 1 decimal (e.g. 12.3 km)
   if (m >= 1000) {
     const km = m / 1000
-    const fractionDigits = km < 10 ? 2 : 1
-
-    return (
-      new Intl.NumberFormat(locale, {
-        minimumFractionDigits: fractionDigits,
-        maximumFractionDigits: fractionDigits
-      }).format(km) + ' km'
-    )
+    return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`
   }
-
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(m) + ' m'
+  return `${Math.round(m)} m`
 }
 
 export function translateNavigation(navi: NaviBag | null | undefined, locale: NavLocale) {
   const d = DICT[locale] ?? DICT.en
-  const langTag = locale === 'de' ? 'de-DE' : locale === 'ua' ? 'uk-UA' : 'en-US'
-
   const obj = (navi ?? {}) as Record<string, unknown>
 
   const sourceName = typeof obj.NaviAPPName === 'string' ? obj.NaviAPPName : undefined
@@ -432,9 +426,12 @@ export function translateNavigation(navi: NaviBag | null | undefined, locale: Na
     typeof obj.NaviDestinationName === 'string' ? obj.NaviDestinationName : undefined
   const currentRoadName = typeof obj.NaviRoadName === 'string' ? obj.NaviRoadName : undefined
 
-  const timeRemainingToDestinationText = fmtSecondsToMmSs(obj.NaviTimeToDestination)
-  const distanceRemainingDisplayStringText = fmtMeters(obj.NaviDistanceToDestination, langTag)
-  const remainDistanceText = fmtMeters(obj.NaviRemainDistance, langTag)
+  const timeRemainingToDestinationText = fmtRemainingTime(obj.NaviTimeToDestination)
+  const distanceRemainingDisplayStringText = fmtMeters(obj.NaviDistanceToDestination)
+  const remainDistanceText = fmtMeters(obj.NaviRemainDistance)
+
+  const etaClockText =
+    typeof obj.NaviETA === 'string' && obj.NaviETA.length > 0 ? obj.NaviETA : undefined
 
   const maneuverType = typeof obj.NaviManeuverType === 'number' ? obj.NaviManeuverType : undefined
   const maneuverText = maneuverTypeText(maneuverType, d) ?? d.unknown
@@ -459,6 +456,7 @@ export function translateNavigation(navi: NaviBag | null | undefined, locale: Na
     TimeRemainingToDestinationText: timeRemainingToDestinationText,
     DistanceRemainingDisplayStringText: distanceRemainingDisplayStringText,
     RemainDistanceText: remainDistanceText,
+    EtaClockText: etaClockText,
 
     ManeuverTypeText: maneuverText,
     JunctionTypeText: junctionText,

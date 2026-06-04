@@ -18,6 +18,8 @@ import { MicChannel } from '../channels/MicChannel.js'
 import {
   NavigationChannel,
   type NavigationDistanceUpdate,
+  type NavigationPositionUpdate,
+  type NavigationStateUpdate,
   type NavigationStatusUpdate,
   type NavigationTurnUpdate
 } from '../channels/NavigationChannel.js'
@@ -607,6 +609,8 @@ export class Session extends EventEmitter {
     this._nav.on('nav-status', (s: NavigationStatusUpdate) => this.emit('nav-status', s))
     this._nav.on('nav-turn', (t: NavigationTurnUpdate) => this.emit('nav-turn', t))
     this._nav.on('nav-distance', (d: NavigationDistanceUpdate) => this.emit('nav-distance', d))
+    this._nav.on('nav-state', (s: NavigationStateUpdate) => this.emit('nav-state', s))
+    this._nav.on('nav-position', (p: NavigationPositionUpdate) => this.emit('nav-position', p))
     this._control.on('voice-session', (active: boolean) => this.emit('voice-session', active))
     this._control.on('pong', () => {
       this._lastPongAt = Date.now()

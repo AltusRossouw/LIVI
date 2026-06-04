@@ -1,36 +1,16 @@
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import AppsIcon from '@mui/icons-material/Apps'
-import DirectionsBoatIcon from '@mui/icons-material/DirectionsBoat'
-import ExitToAppIcon from '@mui/icons-material/ExitToApp'
-import FlagIcon from '@mui/icons-material/Flag'
-import ForkLeftIcon from '@mui/icons-material/ForkLeft'
-import ForkRightIcon from '@mui/icons-material/ForkRight'
-import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined'
-import MergeIcon from '@mui/icons-material/Merge'
 import NavigationOutlinedIcon from '@mui/icons-material/NavigationOutlined'
 import PlaceIcon from '@mui/icons-material/Place'
-import RoundaboutRightIcon from '@mui/icons-material/RoundaboutRight'
 import RouteIcon from '@mui/icons-material/Route'
 import SignpostIcon from '@mui/icons-material/Signpost'
-import StraightIcon from '@mui/icons-material/Straight'
-import SubdirectoryArrowLeftIcon from '@mui/icons-material/SubdirectoryArrowLeft'
-import SubdirectoryArrowRightIcon from '@mui/icons-material/SubdirectoryArrowRight'
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
-import TurnLeftIcon from '@mui/icons-material/TurnLeft'
-import TurnRightIcon from '@mui/icons-material/TurnRight'
-import TurnSharpLeftIcon from '@mui/icons-material/TurnSharpLeft'
-import TurnSharpRightIcon from '@mui/icons-material/TurnSharpRight'
-import TurnSlightLeftIcon from '@mui/icons-material/TurnSlightLeft'
-import TurnSlightRightIcon from '@mui/icons-material/TurnSlightRight'
-import UTurnLeftIcon from '@mui/icons-material/UTurnLeft'
-import UTurnRightIcon from '@mui/icons-material/UTurnRight'
-import WrongLocationIcon from '@mui/icons-material/WrongLocation'
-import { Box, Chip, Stack, Typography } from '@mui/material'
+import { Box, Stack, Typography } from '@mui/material'
 import type { NaviBag } from '@shared/types'
 
 import { NavLocale, translateNavigation } from '@shared/utils/translateNavigation'
 import { useLiviStore } from '@store/store'
 import * as React from 'react'
+import { ManeuverGraphic } from './ManeuverIcon'
 
 export type NavFullProps = {
   className?: string
@@ -110,156 +90,6 @@ function mergeNavi(prev: NaviBag | null, patch: Partial<NaviBag> | null): NaviBa
     ...(prev as unknown as Record<string, unknown>),
     ...(patch as unknown as Record<string, unknown>)
   } as NaviBag
-}
-
-function RoundaboutIconWithExit({ exitNumber }: { exitNumber: number }) {
-  const size = 72
-  return (
-    <Box
-      sx={{
-        position: 'relative',
-        width: size,
-        height: size,
-        display: 'grid',
-        placeItems: 'center'
-      }}
-    >
-      <RoundaboutRightIcon sx={{ fontSize: size }} />
-      <Box sx={{ position: 'absolute', right: -6, bottom: -6 }}>
-        <Chip
-          size="small"
-          label={exitNumber}
-          sx={{ height: 20, fontSize: 12, '& .MuiChip-label': { px: 0.8 } }}
-        />
-      </Box>
-    </Box>
-  )
-}
-
-function ManeuverVisual({
-  type,
-  turnSide
-}: {
-  type: number | undefined
-  turnSide: number | undefined
-}) {
-  const size = 72
-  const isRight = turnSide === 2
-
-  if (type == null) return <HelpOutlinedIcon sx={{ fontSize: size }} />
-
-  if (type >= 28 && type <= 46) {
-    return <RoundaboutIconWithExit exitNumber={type - 27} />
-  }
-
-  switch (type) {
-    case 0:
-    case 3:
-    case 5:
-      return <StraightIcon sx={{ fontSize: size }} />
-
-    case 1:
-      return <TurnLeftIcon sx={{ fontSize: size }} />
-    case 2:
-      return <TurnRightIcon sx={{ fontSize: size }} />
-
-    case 4:
-    case 18:
-    case 26:
-      return isRight ? (
-        <UTurnRightIcon sx={{ fontSize: size }} />
-      ) : (
-        <UTurnLeftIcon sx={{ fontSize: size }} />
-      )
-
-    case 6:
-    case 7:
-    case 19:
-      return <RoundaboutRightIcon sx={{ fontSize: size }} />
-
-    case 8:
-    case 22:
-    case 23:
-      return <ExitToAppIcon sx={{ fontSize: size }} />
-
-    case 9:
-      return <MergeIcon sx={{ fontSize: size }} />
-
-    case 10:
-    case 12:
-    case 24:
-    case 25:
-    case 27:
-      return <FlagIcon sx={{ fontSize: size }} />
-
-    case 11:
-      return <WrongLocationIcon sx={{ fontSize: size }} />
-
-    case 13:
-      return <ForkLeftIcon sx={{ fontSize: size }} />
-    case 14:
-      return <ForkRightIcon sx={{ fontSize: size }} />
-
-    case 15:
-    case 16:
-    case 17:
-      return <DirectionsBoatIcon sx={{ fontSize: size }} />
-
-    case 20:
-      return <SubdirectoryArrowLeftIcon sx={{ fontSize: size }} />
-    case 21:
-      return <SubdirectoryArrowRightIcon sx={{ fontSize: size }} />
-
-    case 47:
-      return <TurnSharpLeftIcon sx={{ fontSize: size }} />
-    case 48:
-      return <TurnSharpRightIcon sx={{ fontSize: size }} />
-
-    case 49:
-      return <TurnSlightLeftIcon sx={{ fontSize: size }} />
-    case 50:
-      return <TurnSlightRightIcon sx={{ fontSize: size }} />
-
-    case 51:
-      return <SwapHorizIcon sx={{ fontSize: size }} />
-    case 52:
-      return <ForkLeftIcon sx={{ fontSize: size }} />
-    case 53:
-      return <ForkRightIcon sx={{ fontSize: size }} />
-
-    default:
-      return <HelpOutlinedIcon sx={{ fontSize: size }} />
-  }
-}
-
-function ManeuverGraphic({
-  imageBase64,
-  type,
-  turnSide
-}: {
-  imageBase64?: string
-  type: number | undefined
-  turnSide: number | undefined
-}) {
-  const size = 72
-
-  if (imageBase64) {
-    return (
-      <Box
-        component="img"
-        src={`data:image/png;base64,${imageBase64}`}
-        alt="Navigation maneuver"
-        sx={{
-          width: size,
-          height: size,
-          objectFit: 'contain',
-          display: 'block'
-        }}
-      />
-    )
-  }
-
-  return <ManeuverVisual type={type} turnSide={turnSide} />
 }
 
 export function NavFull({ className }: NavFullProps) {
@@ -357,6 +187,7 @@ export function NavFull({ className }: NavFullProps) {
                     imageBase64={maneuverImageBase64}
                     type={t.codes.ManeuverType}
                     turnSide={t.codes.TurnSide}
+                    size={72}
                   />
 
                   {remainDistanceText && (
@@ -401,6 +232,7 @@ export function NavFull({ className }: NavFullProps) {
                     imageBase64={maneuverImageBase64}
                     type={t.codes.ManeuverType}
                     turnSide={t.codes.TurnSide}
+                    size={72}
                   />
 
                   {remainDistanceText && (

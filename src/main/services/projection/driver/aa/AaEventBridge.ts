@@ -13,7 +13,12 @@ import {
   VideoData
 } from '@projection/messages/readable'
 import { AudioCommand, CommandMapping } from '@shared/types/ProjectionEnums'
-import { turnEventToManeuverType, turnSideToNaviCode } from './stack/channels/navManeuverMap'
+import {
+  navManeuverTypeToCode,
+  navManeuverTypeToSide,
+  turnEventToManeuverType,
+  turnSideToNaviCode
+} from './stack/channels/navManeuverMap'
 import {
   type AAStack,
   type AAStackConfig,
@@ -21,6 +26,8 @@ import {
   type MediaPlaybackMetadata,
   type MediaPlaybackStatus,
   type NavigationDistanceUpdate,
+  type NavigationPositionUpdate,
+  type NavigationStateUpdate,
   type NavigationStatusUpdate,
   type NavigationTurnUpdate,
   type VideoCodec
@@ -318,8 +325,7 @@ export class AaEventBridge {
 
     aa.on('nav-distance', (d: NavigationDistanceUpdate) => {
       const patch: Record<string, unknown> = {
-        NaviDistanceToDestination: d.distanceMeters,
-        NaviTimeToDestination: d.timeToTurnSeconds
+        NaviRemainDistance: d.distanceMeters
       }
       if (d.displayDistanceE3 !== undefined) {
         patch.NaviDisplayDistanceE3 = d.displayDistanceE3
@@ -328,6 +334,32 @@ export class AaEventBridge {
         patch.NaviDisplayDistanceUnit = d.displayUnit
       }
       this.publishNavi(patch)
+    })
+
+    // Modern nav (AA ≥ 1.7): current step maneuver/road + destination address.
+    aa.on('nav-state', (s: NavigationStateUpdate) => {
+      const patch: Record<string, unknown> = {}
+      if (s.maneuverType !== undefined) {
+        const code = navManeuverTypeToCode(s.maneuverType)
+        if (code !== undefined) patch.NaviManeuverType = code
+        const side = navManeuverTypeToSide(s.maneuverType)
+        if (side !== undefined) patch.NaviTurnSide = side
+      }
+      if (s.roadName) patch.NaviRoadName = s.roadName
+      if (s.destinationAddress) patch.NaviDestinationName = s.destinationAddress
+      if (Object.keys(patch).length > 0) this.publishNavi(patch)
+    })
+
+    // Modern nav (AA ≥ 1.7): live distance/time to the next step AND to the destination.
+    aa.on('nav-position', (p: NavigationPositionUpdate) => {
+      const patch: Record<string, unknown> = {}
+      // step_distance = distance to the next maneuver (shown next to the turn arrow)
+      if (p.stepDistanceMeters !== undefined) patch.NaviRemainDistance = p.stepDistanceMeters
+      // destination distance + remaining time + arrival clock — the real trip figures
+      if (p.destinationMeters !== undefined) patch.NaviDistanceToDestination = p.destinationMeters
+      if (p.timeToArrivalSeconds !== undefined) patch.NaviTimeToDestination = p.timeToArrivalSeconds
+      if (p.etaText) patch.NaviETA = p.etaText
+      if (Object.keys(patch).length > 0) this.publishNavi(patch)
     })
 
     aa.on('error', (err: Error) => {

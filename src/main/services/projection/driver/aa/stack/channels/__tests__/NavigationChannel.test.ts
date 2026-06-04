@@ -148,18 +148,85 @@ describe('NavigationChannel — DISTANCE_EVENT', () => {
   })
 })
 
-describe('NavigationChannel — passthrough', () => {
-  test('modern STATE / CURRENT_POSITION are accepted but not emitted', () => {
+describe('NavigationChannel — STATE (modern)', () => {
+  test('decodes the first step maneuver/road/cue + destination address', () => {
     const ch = new NavigationChannel()
     const cb = jest.fn()
-    ch.on('nav-status', cb)
-    ch.on('nav-turn', cb)
-    ch.on('nav-distance', cb)
-    ch.handleMessage(NAV_MSG.STATE, Buffer.alloc(0))
-    ch.handleMessage(NAV_MSG.CURRENT_POSITION, Buffer.alloc(0))
-    expect(cb).not.toHaveBeenCalled()
-  })
+    ch.on('nav-state', cb)
 
+    // NavigationStep { maneuver=1{type=1=8}, road=2{name=1}, cue=4{alternate_text=1} }
+    const step = Buffer.concat([
+      fieldLenDelim(1, fieldVarint(1, 8)), // TURN_NORMAL_RIGHT
+      fieldLenDelim(2, fieldLenDelim(1, Buffer.from('Jarrestraße'))),
+      fieldLenDelim(4, fieldLenDelim(1, Buffer.from('Richtung Maacksgasse')))
+    ])
+    const dest = fieldLenDelim(1, Buffer.from('Harburger Ring 24, Harburg'))
+    ch.handleMessage(NAV_MSG.STATE, Buffer.concat([fieldLenDelim(1, step), fieldLenDelim(2, dest)]))
+
+    expect(cb).toHaveBeenCalledWith({
+      maneuverType: 8,
+      roadName: 'Jarrestraße',
+      cue: 'Richtung Maacksgasse',
+      destinationAddress: 'Harburger Ring 24, Harburg'
+    })
+  })
+})
+
+describe('NavigationChannel — CURRENT_POSITION (modern)', () => {
+  test('decodes step distance + destination distance + ETA + current road', () => {
+    const ch = new NavigationChannel()
+    const cb = jest.fn()
+    ch.on('nav-position', cb)
+
+    // NavigationStepDistance { distance=1{meters=345, display="350", units=1}, time=2=102 }
+    const stepDistance = Buffer.concat([
+      fieldLenDelim(
+        1,
+        Buffer.concat([
+          fieldVarint(1, 345),
+          fieldLenDelim(2, Buffer.from('350')),
+          fieldVarint(3, 1)
+        ])
+      ),
+      fieldVarint(2, 102)
+    ])
+    // NavigationDestinationDistance { distance=1{meters=18185,display="18",units=2}, eta=2, tta=3 }
+    const destDistance = Buffer.concat([
+      fieldLenDelim(
+        1,
+        Buffer.concat([
+          fieldVarint(1, 18185),
+          fieldLenDelim(2, Buffer.from('18')),
+          fieldVarint(3, 2)
+        ])
+      ),
+      fieldLenDelim(2, Buffer.from('21:58')),
+      fieldVarint(3, 1599)
+    ])
+    ch.handleMessage(
+      NAV_MSG.CURRENT_POSITION,
+      Buffer.concat([
+        fieldLenDelim(1, stepDistance),
+        fieldLenDelim(2, destDistance),
+        fieldLenDelim(3, fieldLenDelim(1, Buffer.from('Current Rd')))
+      ])
+    )
+
+    expect(cb).toHaveBeenCalledWith({
+      stepDistanceMeters: 345,
+      stepDistanceDisplay: '350',
+      timeToStepSeconds: 102,
+      destinationMeters: 18185,
+      destinationDisplay: '18',
+      destinationUnits: 2,
+      etaText: '21:58',
+      timeToArrivalSeconds: 1599,
+      currentRoadName: 'Current Rd'
+    })
+  })
+})
+
+describe('NavigationChannel — passthrough', () => {
   test('unknown msgId is logged but does not throw', () => {
     const ch = new NavigationChannel()
     expect(() => ch.handleMessage(0xdead, Buffer.from([1]))).not.toThrow()

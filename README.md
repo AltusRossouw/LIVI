@@ -32,9 +32,12 @@ It is a standalone cross-platform Electron head unit with hardware-accelerated v
 ## Installation
 
 > [!IMPORTANT]
-> LIVI requires **WebGL2 or WebGPU support**.
+> LIVI requires **OpenGL ES 3.x**.
 
 ## Raspberry Pi OS
+
+> [!NOTE]
+> The Pi 3 and earlier use the VideoCore IV GPU, which only supports OpenGL ES 2.0 and is therefore unsupported.
 
 ```bash
 curl -fL -o install.sh https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/pi/install.sh
@@ -42,7 +45,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-> Raspberry Pi OS **Trixie or newer** is required for WebGL2 support.
+> Raspberry Pi OS **Trixie or newer** is required.
 
 The `install.sh` script performs the following tasks:
 
@@ -211,14 +214,19 @@ pnpm -C scripts/tools run telemetry:set _repeatMs=1000 speedKph=90 rpm=2500
 ## Multi-Display
 
 LIVI can run as multiple windows at once, each placeable on its own physical display.
-The Dash and Aux windows are freely assignable and can show the cluster stream, live telemetry, turn-by-turn navigation, the reverse camera or the media player. Assignment is not exclusive: any feature can be shown on one, several, or all windows at the same time.
+The Dash and Aux windows are freely assignable and can show the Dashes, the reverse camera or the media player. Assignment is not exclusive: any feature can be shown on one, several, or all windows at the same time.
 
 Configure each window under Settings → Window Settings
 (Main Screen / Dash Screen / Aux Screen), and assign features under
-Settings → General → Window Settings.
+Settings → General → Tab Settings.
 
 <p align="center">
-  <img src="docs/images/multi-display.png" alt="Multi-Display" width="70%" />
+  <img src="docs/images/multi-display/dash.png" alt="Dash Screen" width="70%" />
+</p>
+
+<p align="center">
+  <img src="docs/images/multi-display/auxilary.png" alt="Aux Screen" width="34%" align="top" />
+  <img src="docs/images/multi-display/livi.png" alt="Main Screen" width="34%" align="top" />
 </p>
 
 ## Images

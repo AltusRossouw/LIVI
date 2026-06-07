@@ -9,9 +9,11 @@
 #include <initializer_list>
 #include <string>
 
-// Native window attach is platform-specific; the macOS (Cocoa) implementation
-// lives in gst_video_mac.mm. Non-mac uses the window handle directly
-#ifdef __APPLE__
+// Native window attach is platform-specific: the macOS (Cocoa) implementation lives in
+// gst_video_mac.mm, the Windows (Win32) one in gst_video_win.cc. Both put the video in a
+// native surface under the transparent UI. Linux runs under livi-compositor (waylandsink is
+// its own client placed below the UI), so it uses the bare handle and the no-op stubs.
+#if defined(__APPLE__) || defined(_WIN32)
 extern "C" guintptr livi_attach_view(guintptr parent, void** outView);
 extern "C" void livi_remove_view(void* view);
 extern "C" void livi_set_view_hidden(void* view, bool hidden);
@@ -246,7 +248,7 @@ static std::string sink_chain() {
 #ifdef __APPLE__
   return "glimagesink name=sink sync=false qos=false";
 #elif defined(_WIN32)
-  return "d3d11videosink name=sink sync=false qos=false";
+  return "d3d11videosink name=sink sync=false qos=false force-aspect-ratio=false";
 #else
   // waylandsink hands the decoded dmabuf (incl. the Pi's SAND-tiled NV12) to
   // livi-compositor zero-copy; the compositor samples it as a YUV texture and the

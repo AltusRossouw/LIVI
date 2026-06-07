@@ -116,8 +116,11 @@ function spawn(spec: SecondaryWindowSpec, runtimeState: runtimeStateProps) {
     frame: !inCompositor,
     useContentSize: true,
     autoHideMenuBar: true,
-    transparent: inCompositor,
-    backgroundColor: inCompositor || process.platform === 'darwin' ? '#00000000' : '#000',
+    transparent: inCompositor || process.platform === 'win32',
+    backgroundColor:
+      inCompositor || process.platform === 'darwin' || process.platform === 'win32'
+        ? '#00000000'
+        : '#000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

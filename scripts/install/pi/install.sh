@@ -29,6 +29,17 @@ for tool in curl xdg-user-dir pkexec; do
   fi
 done
 
+# Ensure the GStreamer plugins LIVI's video pipeline needs
+echo "→ Ensuring GStreamer plugins for the video pipeline"
+sudo apt-get update
+sudo apt-get install -y \
+  gstreamer1.0-plugins-base \
+  gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-bad \
+  gstreamer1.0-gl \
+  gstreamer1.0-libav \
+  gstreamer1.0-tools
+
 # ICON INSTALLATION
 ICON_URL="https://raw.githubusercontent.com/f-io/LIVI/main/assets/icons/linux/livi.png"
 ICON_DEST="$USER_HOME/.local/share/icons/livi.png"
@@ -132,5 +143,46 @@ StartupWMClass=livi
 EOF
 update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
 echo "Application entry at $APPLICATIONS_DIR/livi.desktop"
+
+# Raspberry Pi 1080p HEVC needs the v4l2codecs SAND-crop fix. GStreamer 1.26.x
+# (< 1.26.11, which the Pi currently ships) detiles the 1088-padded 1080p frame into
+# SystemMemory. Waylandsink rejects that and the main video layer hard-fails (black).
+# Build the crop-fixed plugin from the distro source on-device. Upstream-fixed in
+# 1.26.11 / 1.28.x, where this detects the version and skips.
+apply_pi_hevc_crop_patch() {
+  local ver here patch tmp
+  ver="$(dpkg-query -W -f='${Version}' gstreamer1.0-plugins-bad 2>/dev/null \
+    | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' || true)"
+  if [ -z "$ver" ]; then
+    echo "→ gstreamer1.0-plugins-bad not present; skipping HEVC crop patch"
+    return 0
+  fi
+  if dpkg --compare-versions "$ver" lt 1.26.0 || dpkg --compare-versions "$ver" ge 1.26.11; then
+    echo "→ GStreamer $ver is not affected by the 1080p-HEVC crop bug; skipping patch"
+    return 0
+  fi
+  echo "→ GStreamer $ver has the 1080p-HEVC SAND-crop bug; building the patched v4l2codecs plugin"
+
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  patch="$here/../../gstreamer/patch-pi-v4l2codecs.sh"
+  if [ ! -f "$patch" ]; then
+    tmp="$(mktemp)"
+    if curl -fsSL "https://raw.githubusercontent.com/f-io/LIVI/main/scripts/gstreamer/patch-pi-v4l2codecs.sh" -o "$tmp"; then
+      patch="$tmp"
+    else
+      echo "   could not obtain patch-pi-v4l2codecs.sh; apply it manually later" >&2
+      return 0
+    fi
+  fi
+
+  if bash "$patch"; then
+    echo "   v4l2codecs crop patch applied"
+  else
+    echo "   v4l2codecs crop patch did not complete; 1080p HEVC may not display." >&2
+    echo "   Re-run manually: bash scripts/gstreamer/patch-pi-v4l2codecs.sh" >&2
+  fi
+}
+
+apply_pi_hevc_crop_patch
 
 echo "✅ Installation complete!"

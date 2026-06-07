@@ -29,9 +29,14 @@ function listSysfsDir(dir: string): string[] {
   }
 }
 
+// These tools exist only on Linux.
 function readBtMacFromHciconfig(iface = 'hci0'): string | null {
   try {
-    const out = execSync(`hciconfig ${iface} 2>/dev/null`, { encoding: 'utf8', timeout: 2000 })
+    const out = execSync(`hciconfig ${iface}`, {
+      encoding: 'utf8',
+      timeout: 2000,
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
     const m = out.match(/BD Address:\s*([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})/)
     return m ? m[1]!.toUpperCase() : null
   } catch {
@@ -42,8 +47,8 @@ function readBtMacFromHciconfig(iface = 'hci0'): string | null {
 function readBtMacFromBusctl(iface = 'hci0'): string | null {
   try {
     const out = execSync(
-      `busctl --system get-property org.bluez /org/bluez/${iface} org.bluez.Adapter1 Address 2>/dev/null`,
-      { encoding: 'utf8', timeout: 2000 }
+      `busctl --system get-property org.bluez /org/bluez/${iface} org.bluez.Adapter1 Address`,
+      { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] }
     )
     // Output format: s "AA:BB:CC:DD:EE:FF"
     const m = out.match(/"([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})"/)

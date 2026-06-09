@@ -22,9 +22,10 @@ export const DashboardsPagination: FC<DashboardsPaginationProps> = ({
         bottom: 'clamp(10px, 2.2svh, 18px)',
         display: 'flex',
         justifyContent: 'center',
-        pointerEvents: 'auto',
+        pointerEvents: showDots ? 'auto' : 'none',
         opacity: showDots ? 1 : 0,
-        transition: 'opacity 180ms ease-out'
+        transform: showDots ? 'translateY(0)' : 'translateY(160%)',
+        transition: 'opacity 220ms ease, transform 220ms ease'
       }}
     >
       <Box

@@ -76,19 +76,35 @@ describe('main utils', () => {
 
   test('sizesEqual compares normalized width and height', () => {
     expect(
-      sizesEqual({ width: 800, height: 480 } as any, { width: '800', height: 480 } as any)
+      sizesEqual(
+        { mainScreenWidth: 800, mainScreenHeight: 480 } as any,
+        { mainScreenWidth: '800', mainScreenHeight: 480 } as any
+      )
     ).toBe(true)
-    expect(sizesEqual({ width: 800, height: 480 } as any, { width: 801, height: 480 } as any)).toBe(
-      false
-    )
+    expect(
+      sizesEqual(
+        { mainScreenWidth: 800, mainScreenHeight: 480 } as any,
+        { mainScreenWidth: 801, mainScreenHeight: 480 } as any
+      )
+    ).toBe(false)
   })
 
   test('sizesEqual treats missing or invalid dimensions as zero', () => {
-    expect(sizesEqual({ width: undefined, height: undefined } as any, {} as any)).toBe(true)
-    expect(sizesEqual({ width: 'abc', height: null } as any, { width: 0, height: 0 } as any)).toBe(
-      true
-    )
-    expect(sizesEqual({ width: '', height: 5 } as any, { width: 0, height: 0 } as any)).toBe(false)
+    expect(
+      sizesEqual({ mainScreenWidth: undefined, mainScreenHeight: undefined } as any, {} as any)
+    ).toBe(true)
+    expect(
+      sizesEqual(
+        { mainScreenWidth: 'abc', mainScreenHeight: null } as any,
+        { mainScreenWidth: 0, mainScreenHeight: 0 } as any
+      )
+    ).toBe(true)
+    expect(
+      sizesEqual(
+        { mainScreenWidth: '', mainScreenHeight: 5 } as any,
+        { mainScreenWidth: 0, mainScreenHeight: 0 } as any
+      )
+    ).toBe(false)
   })
 
   test('setFeatureFlags emits comma-joined enable-features switch', () => {

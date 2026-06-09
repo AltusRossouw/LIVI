@@ -9,7 +9,7 @@ jest.mock('@store/store', () => ({
   useLiviStore: (selector: (s: any) => unknown) =>
     selector({
       saveSettings,
-      restartBaseline: { width: 800, bindings: { back: 'KeyB' } },
+      restartBaseline: { projectionWidth: 800, bindings: { back: 'KeyB' } },
       markRestartBaseline
     }),
   useStatusStore: (selector: (s: any) => unknown) => selector({ isDongleConnected })
@@ -24,36 +24,36 @@ describe('useSmartSettings', () => {
   })
 
   test('handleFieldChange updates state and persists settings', () => {
-    const initial = { width: 800, 'bindings.back': 'KeyB' } as any
-    const settings = { width: 800, bindings: { back: 'KeyB' } } as any
+    const initial = { projectionWidth: 800, 'bindings.back': 'KeyB' } as any
+    const settings = { projectionWidth: 800, bindings: { back: 'KeyB' } } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
 
     act(() => {
-      result.current.handleFieldChange('width', 900)
+      result.current.handleFieldChange('projectionWidth', 900)
     })
 
-    expect(result.current.state.width).toBe(900)
+    expect(result.current.state.projectionWidth).toBe(900)
     expect(saveSettings).toHaveBeenCalled()
     expect(result.current.isDirty).toBe(true)
   })
 
   test('requestRestart ignores bindings paths but marks relevant paths', () => {
-    const initial = { width: 800, 'bindings.back': 'KeyB' } as any
-    const settings = { width: 800 } as any
+    const initial = { projectionWidth: 800, 'bindings.back': 'KeyB' } as any
+    const settings = { projectionWidth: 800 } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
 
     act(() => result.current.requestRestart('bindings.back'))
     expect(result.current.needsRestart).toBe(false)
 
-    act(() => result.current.requestRestart('width'))
+    act(() => result.current.requestRestart('projectionWidth'))
     expect(result.current.needsRestart).toBe(true)
   })
 
   test('restart requires dongle connection and calls forceReset', async () => {
-    const initial = { width: 800 } as any
-    const settings = { width: 800 } as any
+    const initial = { projectionWidth: 800 } as any
+    const settings = { projectionWidth: 800 } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
-    act(() => result.current.requestRestart('width'))
+    act(() => result.current.requestRestart('projectionWidth'))
     await act(async () => {
       await result.current.restart()
     })
@@ -69,8 +69,8 @@ describe('useSmartSettings', () => {
 
   test('restart returns false when needsRestart is false', async () => {
     // line 88: if (!needsRestart) return false
-    const initial = { width: 800 } as any
-    const settings = { width: 800 } as any
+    const initial = { projectionWidth: 800 } as any
+    const settings = { projectionWidth: 800 } as any
     const { result } = renderHook(() => useSmartSettings(initial, settings))
     // needsRestart is false (no requestRestart called, no baseline diff)
     await act(async () => {
@@ -81,10 +81,10 @@ describe('useSmartSettings', () => {
 
   test('needsRestartFromConfig detects when settings differ from restartBaseline', () => {
     // lines 44-53: restartBaseline[key] !== settings[key] for a restart-relevant key
-    // The store mock has restartBaseline.width = 800, settings.width = 900 would differ
-    const initial = { width: 900 } as any
-    const settings = { width: 900 } as any
-    // restartBaseline from mock has width: 800 → needsRestartFromConfig = true
+    // The store mock has restartBaseline.projectionWidth = 800, settings.projectionWidth = 900 would differ
+    const initial = { projectionWidth: 900 } as any
+    const settings = { projectionWidth: 900 } as any
+    // restartBaseline from mock has projectionWidth: 800 → needsRestartFromConfig = true
     const { result } = renderHook(() => useSmartSettings(initial, settings))
     expect(result.current.needsRestart).toBe(true)
   })

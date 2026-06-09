@@ -94,10 +94,10 @@ import { AaDriver } from '../aaDriver'
 
 const baseCfg = (): Config =>
   ({
-    width: 1280,
-    height: 720,
-    fps: 30,
-    dpi: 0,
+    projectionWidth: 1280,
+    projectionHeight: 720,
+    projectionFps: 30,
+    projectionDpi: 0,
     hand: 0,
     format: 0,
     iBoxVersion: 0,
@@ -172,9 +172,9 @@ describe('AaDriver.start — wireless', () => {
     expect(cfg.initialNightMode).toBe(true)
   })
 
-  test('config seed: fps=60 → videoFps=60', async () => {
+  test('config seed: projectionFps=60 → videoFps=60', async () => {
     const d = new AaDriver()
-    await d.start({ ...baseCfg(), fps: 60 } as Config)
+    await d.start({ ...baseCfg(), projectionFps: 60 } as Config)
     const cfg = lastAaStack.instance!.cfg as Record<string, unknown>
     expect(cfg.videoFps).toBe(60)
   })

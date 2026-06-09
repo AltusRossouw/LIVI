@@ -155,33 +155,33 @@ export const generalSchema: SettingsNode<Config> = {
             {
               type: 'number',
               label: 'Width',
-              labelKey: 'settings.width',
-              path: 'width',
+              labelKey: 'settings.mainScreenWidth',
+              path: 'mainScreenWidth',
               min: MIN_WIDTH,
               max: MAX_WIDTH,
               step: 1,
               displayValue: true,
               page: {
                 title: 'Main Screen Width',
-                labelTitle: 'settings.width',
-                description: 'Main window width in px',
-                labelDescription: 'settings.widthDescription'
+                labelTitle: 'settings.mainScreenWidth',
+                description: 'Main Screen width in px',
+                labelDescription: 'settings.mainScreenWidthDescription'
               }
             },
             {
               type: 'number',
               label: 'Height',
-              labelKey: 'settings.height',
-              path: 'height',
+              labelKey: 'settings.mainScreenHeight',
+              path: 'mainScreenHeight',
               min: MIN_HEIGHT,
               max: MAX_HEIGHT,
               step: 1,
               displayValue: true,
               page: {
                 title: 'Main Screen Height',
-                labelTitle: 'settings.height',
-                description: 'Main window height in px',
-                labelDescription: 'settings.heightDescription'
+                labelTitle: 'settings.mainScreenHeight',
+                description: 'Main Screen height in px',
+                labelDescription: 'settings.mainScreenHeightDescription'
               }
             },
             {
@@ -208,7 +208,7 @@ export const generalSchema: SettingsNode<Config> = {
             {
               type: 'number',
               label: 'Width',
-              labelKey: 'settings.width',
+              labelKey: 'settings.dashScreenWidth',
               path: 'dashScreenWidth',
               min: MIN_WIDTH,
               max: MAX_WIDTH,
@@ -216,15 +216,15 @@ export const generalSchema: SettingsNode<Config> = {
               displayValue: true,
               page: {
                 title: 'Dash Screen Width',
-                labelTitle: 'settings.width',
-                description: 'Dash window width in px',
+                labelTitle: 'settings.dashScreenWidth',
+                description: 'Dash Screen width in px',
                 labelDescription: 'settings.dashScreenWidthDescription'
               }
             },
             {
               type: 'number',
               label: 'Height',
-              labelKey: 'settings.height',
+              labelKey: 'settings.dashScreenHeight',
               path: 'dashScreenHeight',
               min: MIN_HEIGHT,
               max: MAX_HEIGHT,
@@ -232,8 +232,8 @@ export const generalSchema: SettingsNode<Config> = {
               displayValue: true,
               page: {
                 title: 'Dash Screen Height',
-                labelTitle: 'settings.height',
-                description: 'Dash window height in px',
+                labelTitle: 'settings.dashScreenHeight',
+                description: 'Dash Screen height in px',
                 labelDescription: 'settings.dashScreenHeightDescription'
               }
             },
@@ -261,7 +261,7 @@ export const generalSchema: SettingsNode<Config> = {
             {
               type: 'number',
               label: 'Width',
-              labelKey: 'settings.width',
+              labelKey: 'settings.auxScreenWidth',
               path: 'auxScreenWidth',
               min: MIN_WIDTH,
               max: MAX_WIDTH,
@@ -269,15 +269,15 @@ export const generalSchema: SettingsNode<Config> = {
               displayValue: true,
               page: {
                 title: 'Aux Screen Width',
-                labelTitle: 'settings.width',
-                description: 'Aux window width in px',
+                labelTitle: 'settings.auxScreenWidth',
+                description: 'Aux Screen width in px',
                 labelDescription: 'settings.auxScreenWidthDescription'
               }
             },
             {
               type: 'number',
               label: 'Height',
-              labelKey: 'settings.height',
+              labelKey: 'settings.auxScreenHeight',
               path: 'auxScreenHeight',
               min: MIN_HEIGHT,
               max: MAX_HEIGHT,
@@ -285,8 +285,8 @@ export const generalSchema: SettingsNode<Config> = {
               displayValue: true,
               page: {
                 title: 'Aux Screen Height',
-                labelTitle: 'settings.height',
-                description: 'Aux window height in px',
+                labelTitle: 'settings.auxScreenHeight',
+                description: 'Aux Screen height in px',
                 labelDescription: 'settings.auxScreenHeightDescription'
               }
             },
@@ -810,7 +810,7 @@ export const generalSchema: SettingsNode<Config> = {
         { label: 'English', labelKey: 'settings.english', value: 'en' },
         { label: 'German', labelKey: 'settings.german', value: 'de' },
         { label: 'Ukrainian', labelKey: 'settings.ukrainian', value: 'ua' },
-        { label: 'French', labelKey: 'settings.french', value: 'fr' },
+        { label: 'French', labelKey: 'settings.french', value: 'fr' }
       ],
       page: {
         title: 'Language',

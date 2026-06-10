@@ -77,7 +77,7 @@ is_system_excluded() {
     */libgcc_s.so.*|*/libstdc++.so.*|\
     */libglib-2.0.so.*|*/libgobject-2.0.so.*|*/libgio-2.0.so.*|*/libgmodule-2.0.so.*|\
     */libdbus-1.so.*|*/libsystemd.so.*|\
-    */libX*.so.*|*/libxcb*.so.*|*/libwayland-*.so.*|\
+    */libX*.so.*|*/libxcb*.so.*|\
     */libdrm.so.*|*/libgbm.so.*|*/libGL.so.*|*/libEGL.so.*|*/libGLESv2.so.*|\
     */libGLdispatch.so.*|*/libOpenGL.so.*|*/libglapi.so.*|*/libgallium*.so.*|\
     */libvulkan.so.*|*/libudev.so.*|*/libgudev-1.0.so.*)

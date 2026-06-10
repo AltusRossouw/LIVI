@@ -32,6 +32,7 @@ linux:
   icon: icons/linux/livi.png
   maintainer: 'Lasse Heitgres <hello@f-io.dev>'
   category: Utility
+  syncDesktopName: true
   extraResources:
     - from: out/compositor
       to: compositor

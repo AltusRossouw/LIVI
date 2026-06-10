@@ -97,7 +97,7 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 X-GNOME-Autostart-enabled=true
 Categories=AudioVideo;
-StartupWMClass=livi
+StartupWMClass=dev.f-io.livi
 EOF
 echo "Autostart entry at $AUTOSTART_DIR/LIVI.desktop"
 echo "Autostart log at $AUTOSTART_LOG"
@@ -121,7 +121,7 @@ Icon=${ICON_DEST:-livi}
 Terminal=false
 Categories=AudioVideo;
 StartupNotify=false
-StartupWMClass=livi
+StartupWMClass=dev.f-io.livi
 EOF
 
 chmod +x "$DESKTOP_DIR/LIVI.desktop"
@@ -131,7 +131,8 @@ echo "Desktop shortcut at $DESKTOP_DIR/LIVI.desktop"
 echo "→ Creating application entry"
 APPLICATIONS_DIR="$USER_HOME/.local/share/applications"
 mkdir -p "$APPLICATIONS_DIR"
-cat > "$APPLICATIONS_DIR/livi.desktop" <<EOF
+rm -f "$APPLICATIONS_DIR/livi.desktop"
+cat > "$APPLICATIONS_DIR/dev.f-io.livi.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=LIVI
@@ -139,10 +140,10 @@ Exec=$APPIMAGE_PATH
 Icon=livi
 Terminal=false
 Categories=AudioVideo;
-StartupWMClass=livi
+StartupWMClass=dev.f-io.livi
 EOF
 update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
-echo "Application entry at $APPLICATIONS_DIR/livi.desktop"
+echo "Application entry at $APPLICATIONS_DIR/dev.f-io.livi.desktop"
 
 # Phone attached across a cold boot stays charge-only; cycle USB ports once so it re-enumerates
 echo "→ Installing USB re-enumerate service"

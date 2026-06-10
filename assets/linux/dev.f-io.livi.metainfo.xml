@@ -17,7 +17,7 @@
   </developer>
   <url type="homepage">https://f-io.github.io/LIVI/</url>
   <url type="bugtracker">https://github.com/f-io/LIVI/issues</url>
-  <launchable type="desktop-id">livi.desktop</launchable>
+  <launchable type="desktop-id">dev.f-io.livi.desktop</launchable>
   <categories>
     <category>Utility</category>
     <category>AudioVideo</category>

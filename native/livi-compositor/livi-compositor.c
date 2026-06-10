@@ -1277,12 +1277,13 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 			wlr_xdg_toplevel_decoration_v1_set_mode(toplevel->decoration,
 				WLR_XDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
 		}
-		// classify + route: Electron UI windows use app_id "livi" (routed by their
-		// "livi:<role>" title, untitled -> main), video planes are waylandsink with
-		// app_id "livi-video" and carry the claim tag.
+		// classify + route: video planes are waylandsink with app_id "livi-video" (set by
+		// gst-host) and carry the claim tag. Everything else is Electron UI (routed by its
+		// "livi:<role>" title, untitled -> main). Electron's app_id is not stable across
+		// desktopName/Chromium changes, so only our own video id is matched.
 		const char *app_id = toplevel->xdg_toplevel->app_id;
 		const char *title = toplevel->xdg_toplevel->title;
-		bool is_ui = app_id && strcmp(app_id, "livi") == 0;
+		bool is_ui = !(app_id && strcmp(app_id, "livi-video") == 0);
 		struct livi_screen *s = NULL;
 
 		if (is_ui) {

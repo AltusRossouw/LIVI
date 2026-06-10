@@ -41,8 +41,8 @@ export function bootstrapCompositor(): boolean {
   // Known screen roles; the host opens/closes each output on demand via the control socket
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    LIVI_UI_APP_ID: 'livi',
-    LIVI_OUTPUT_APP_ID: 'livi',
+    // Host windows associate with the installed dev.f-io.livi.desktop entry
+    LIVI_OUTPUT_APP_ID: 'dev.f-io.livi',
     LIVI_COMPOSITOR_CTRL: ctrlSocket,
     LIVI_SCREENS: 'main,dash,aux',
     ...(outputSize ? { LIVI_OUTPUT_SIZE: outputSize } : {})

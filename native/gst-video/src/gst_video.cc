@@ -33,15 +33,15 @@ extern "C" void livi_set_content_region(void* view, void* sink, double cropL,
     double cropT, double visW, double visH, double tierW, double tierH);
 extern "C" void livi_set_backdrop(guintptr parent, double r, double g, double b);
 #else
-static guintptr livi_attach_view(guintptr parent, void** outView) {
+[[maybe_unused]] static guintptr livi_attach_view(guintptr parent, void** outView) {
   *outView = nullptr;
   return parent;
 }
-static void livi_remove_view(void*) {}
-static void livi_set_view_hidden(void*, bool) {}
-static void livi_set_content_region(void*, void*, double, double, double, double,
+[[maybe_unused]] static void livi_remove_view(void*) {}
+[[maybe_unused]] static void livi_set_view_hidden(void*, bool) {}
+[[maybe_unused]] static void livi_set_content_region(void*, void*, double, double, double, double,
     double, double) {}
-static void livi_set_backdrop(guintptr, double, double, double) {}
+[[maybe_unused]] static void livi_set_backdrop(guintptr, double, double, double) {}
 #endif
 
 struct Player {

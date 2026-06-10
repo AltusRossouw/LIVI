@@ -1,5 +1,5 @@
 name: build
-run-name: 'build → ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}'
+run-name: 'build → ${{ github.event.workflow_run.head_branch || github.ref_name }}'
 
 on:
   workflow_run:
@@ -7,20 +7,25 @@ on:
     branches: [main]
     types: [completed]
 
+  # Manual runs build the branch the workflow is dispatched on
   workflow_dispatch:
     inputs:
-      branch:
-        description: 'Branch to build'
-        required: true
-        default: 'main'
       linux_x64:
-        description: 'Build Linux x64 (AppImage)'
+        description: 'Build Linux x64'
         type: boolean
         default: true
       linux_arm64:
-        description: 'Build Linux arm64 (AppImage)'
+        description: 'Build Linux arm64'
         type: boolean
         default: true
+      linux_packages:
+        description: 'Linux package type'
+        type: choice
+        options:
+          - all
+          - AppImage
+          - deb
+        default: 'all'
       macos_arm64:
         description: 'Build macOS arm64 (dmg)'
         type: boolean
@@ -49,6 +54,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           IN_LINUX_X64: ${{ inputs.linux_x64 }}
           IN_LINUX_ARM64: ${{ inputs.linux_arm64 }}
+          IN_LINUX_PACKAGES: ${{ inputs.linux_packages }}
           IN_MACOS_ARM64: ${{ inputs.macos_arm64 }}
           IN_WINDOWS_X64: ${{ inputs.windows_x64 }}
         run: |
@@ -64,25 +70,28 @@ jobs:
           const inputs = {
             linux_x64: isTrue(process.env.IN_LINUX_X64),
             linux_arm64: isTrue(process.env.IN_LINUX_ARM64),
+            linux_packages: process.env.IN_LINUX_PACKAGES || 'all',
             macos_arm64: isTrue(process.env.IN_MACOS_ARM64),
             windows_x64: isTrue(process.env.IN_WINDOWS_X64),
           };
 
           const include = [];
-          const add = (os, runner, arch, artifact_ext) => {
-            include.push({ os, runner, arch, artifact_ext });
+          const add = (os, runner, arch, artifact_ext, lpkg = 'all') => {
+            include.push({ os, runner, arch, artifact_ext, lpkg });
           };
+
+          const linuxExt = inputs.linux_packages === 'all' ? 'AppImage+deb' : inputs.linux_packages;
 
           if (eventName === 'workflow_run') {
             // main: always build everything
-            add('linux', 'ubuntu-latest', 'x64', 'AppImage');
-            add('linux', 'ubuntu-24.04-arm', 'arm64', 'AppImage');
+            add('linux', 'ubuntu-latest', 'x64', 'AppImage+deb');
+            add('linux', 'ubuntu-24.04-arm', 'arm64', 'AppImage+deb');
             add('macos', 'macos-latest', 'arm64', 'dmg');
             add('windows', 'windows-2025-vs2026', 'x64', 'exe');
           } else {
             // manual: only selected
-            if (inputs.linux_x64) add('linux', 'ubuntu-latest', 'x64', 'AppImage');
-            if (inputs.linux_arm64) add('linux', 'ubuntu-24.04-arm', 'arm64', 'AppImage');
+            if (inputs.linux_x64) add('linux', 'ubuntu-latest', 'x64', linuxExt, inputs.linux_packages);
+            if (inputs.linux_arm64) add('linux', 'ubuntu-24.04-arm', 'arm64', linuxExt, inputs.linux_packages);
             if (inputs.macos_arm64) add('macos', 'macos-latest', 'arm64', 'dmg');
             if (inputs.windows_x64) add('windows', 'windows-2025-vs2026', 'x64', 'exe');
           }
@@ -100,12 +109,12 @@ jobs:
           NODE
 
   build:
-    name: Build ${{ matrix.artifact_ext }} (${{ matrix.os }}-${{ matrix.arch }}) on ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}
+    name: Build ${{ matrix.artifact_ext }} (${{ matrix.os }}-${{ matrix.arch }}) on ${{ github.event.workflow_run.head_branch || github.ref_name }}
     needs: plan
     if: ${{ needs.plan.outputs.is_empty != 'true' }}
     runs-on: ${{ matrix.runner }}
     env:
-      BUILD_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.event.workflow_run.head_branch }}
+      BUILD_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
       HUSKY: 0
       ELECTRON_CACHE: .cache/electron
       ELECTRON_BUILDER_CACHE: .cache/electron-builder
@@ -118,7 +127,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/heads/{0}', github.event.inputs.branch) || github.event.workflow_run.head_sha }}
+          # Dispatch builds the ref the workflow was started on, workflow_run pins the head sha
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
 
       - name: Cache pnpm store
         uses: actions/cache@v5
@@ -228,7 +238,11 @@ jobs:
           npx --yes node-gyp install --target="$ELECTRON_VERSION" --dist-url=https://artifacts.electronjs.org/headers/dist
           pnpm run typecheck
           rm -rf dist
-          pnpm run build:linux
+          case "${{ matrix.lpkg }}" in
+            AppImage) pnpm run build:linux:appimage ;;
+            deb)      pnpm run build:linux:deb ;;
+            *)        pnpm run build:linux ;;
+          esac
 
       # ----------------------------
       # Linux arm64
@@ -262,7 +276,11 @@ jobs:
           npx --yes node-gyp install --target="$ELECTRON_VERSION" --dist-url=https://artifacts.electronjs.org/headers/dist
           pnpm run typecheck
           rm -rf dist
-          pnpm run build:armLinux
+          case "${{ matrix.lpkg }}" in
+            AppImage) pnpm run build:armLinux:appimage ;;
+            deb)      pnpm run build:armLinux:deb ;;
+            *)        pnpm run build:armLinux ;;
+          esac
 
       # ----------------------------
       # macOS arm64
@@ -382,7 +400,7 @@ jobs:
       # Upload artifacts
       # ----------------------------
       - name: Upload AppImage [linux-x64]
-        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        if: matrix.os == 'linux' && matrix.arch == 'x64' && matrix.lpkg != 'deb'
         uses: actions/upload-artifact@v6
         with:
           name: LIVI-${{ steps.pkg.outputs.version }}-linux-x64.AppImage
@@ -390,7 +408,7 @@ jobs:
           retention-days: 7
 
       - name: Upload deb [linux-x64]
-        if: matrix.os == 'linux' && matrix.arch == 'x64'
+        if: matrix.os == 'linux' && matrix.arch == 'x64' && matrix.lpkg != 'AppImage'
         uses: actions/upload-artifact@v6
         with:
           name: LIVI-${{ steps.pkg.outputs.version }}-linux-x64.deb
@@ -398,7 +416,7 @@ jobs:
           retention-days: 7
 
       - name: Upload AppImage [linux-arm64]
-        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        if: matrix.os == 'linux' && matrix.arch == 'arm64' && matrix.lpkg != 'deb'
         uses: actions/upload-artifact@v6
         with:
           name: LIVI-${{ steps.pkg.outputs.version }}-linux-arm64.AppImage
@@ -406,7 +424,7 @@ jobs:
           retention-days: 7
 
       - name: Upload deb [linux-arm64]
-        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        if: matrix.os == 'linux' && matrix.arch == 'arm64' && matrix.lpkg != 'AppImage'
         uses: actions/upload-artifact@v6
         with:
           name: LIVI-${{ steps.pkg.outputs.version }}-linux-arm64.deb

@@ -2,8 +2,8 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import de from './locales/de.json'
 import en from './locales/en.json'
-import ua from './locales/ua.json'
 import fr from './locales/fr.json'
+import ua from './locales/ua.json'
 
 i18n.use(initReactI18next).init({
   debug: false,
@@ -12,7 +12,7 @@ i18n.use(initReactI18next).init({
     de: { translation: de }, // German
     ua: { translation: ua }, // backward compatibility
     uk: { translation: ua }, // official ISO code (generic)
-    fr: { transalation: fr}, // French
+    fr: { translation: fr }, // French
     'uk-UA': { translation: ua } // official ISO code (region)
   },
   lng: 'en',

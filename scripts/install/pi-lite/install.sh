@@ -218,6 +218,8 @@ sudo tee "$RESCAN_SCRIPT" >/dev/null <<'EOF'
 set -eu
 HUBS=$(uhubctl 2>/dev/null | sed -n 's/^Current status for hub \([^ ]*\).*/\1/p' | sort -u)
 [ -z "$HUBS" ] && exit 0
+# The Pi switches port power grouped: all hubs, serially, in this order. The slow libusb
+# waits double as settle time for the cascaded hub tree, do not parallelize or subset.
 for h in $HUBS; do uhubctl -l "$h" -a off >/dev/null 2>&1 || true; done
 sleep 2
 for h in $HUBS; do uhubctl -l "$h" -a on >/dev/null 2>&1 || true; done
@@ -227,7 +229,6 @@ sudo chmod 0755 "$RESCAN_SCRIPT"
 sudo tee /etc/systemd/system/livi-usb-rescan.service >/dev/null <<EOF
 [Unit]
 Description=LIVI USB re-enumerate (wake charge-latched phone at boot)
-After=multi-user.target
 
 [Service]
 Type=oneshot

@@ -99,7 +99,17 @@ export class TransportArbiter {
       this.phoneDevice = device ?? this.phoneDevice
       if (!wasConnected) {
         console.log('[TransportArbiter] wired phone marked connected')
-        this.deps.onShouldAutoStart()
+        const wirelessAaActive =
+          this.deps.getActiveTransport() === 'aa' && !this.deps.isWiredAaSessionActive()
+        if (wirelessAaActive && !this.override && this.deps.getPreference() !== 'dongle') {
+          console.log('[TransportArbiter] preempting wireless AA session for the wired phone')
+          void this.deps
+            .onShouldStop()
+            .catch((e) => console.warn('[TransportArbiter] stop for wired preempt threw', e))
+            .then(() => this.deps.onShouldAutoStart())
+        } else {
+          this.deps.onShouldAutoStart()
+        }
       }
       this.deps.onChange()
       return
@@ -202,20 +212,21 @@ export class TransportArbiter {
     if (pref === 'dongle') {
       return findByT('dongle') ?? findByT('aa') ?? detected[0]
     }
-    if (pref === 'native') {
-      // Sticky to the current session if still detected
+    const wiredAa = detected.find((c) => c.transport === 'aa' && c.mode === 'wired')
+    // Sticky holds the current session, except a wired AA candidate outranks wireless AA
+    const sticky = (): Candidate | null => {
       const current = this.currentCandidate()
-      if (current && detected.some((c) => candidateEquals(c, current))) return current
-      return findByT('aa') ?? findByT('cp') ?? detected[0]
+      if (!current || !detected.some((c) => candidateEquals(c, current))) return null
+      if (wiredAa && current.transport === 'aa' && current.mode === 'wireless') return null
+      return current
     }
 
-    // 'auto' — sticky to current if still detected
-    const current = this.currentCandidate()
-    if (current && detected.some((c) => candidateEquals(c, current))) return current
+    if (pref === 'native') {
+      return sticky() ?? findByT('aa') ?? findByT('cp') ?? detected[0]
+    }
 
-    // Fallback priority: wired AA (direct USB) > dongle > wireless
-    const wiredAa = detected.find((c) => c.transport === 'aa' && c.mode === 'wired')
-    return wiredAa ?? findByT('dongle') ?? detected[0]
+    // 'auto' — fallback priority: wired AA (direct USB) > dongle > wireless
+    return sticky() ?? wiredAa ?? findByT('dongle') ?? detected[0]
   }
 
   decideNextStart(): StartDecision {

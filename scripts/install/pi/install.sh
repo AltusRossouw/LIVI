@@ -14,8 +14,8 @@ echo "→ Creating target directory: $APPIMAGE_DIR"
 mkdir -p "$APPIMAGE_DIR"
 
 # Ensure required tools are installed
-echo "→ Checking for required tools: curl, xdg-user-dir, pkexec"
-for tool in curl xdg-user-dir pkexec; do
+echo "→ Checking for required tools: curl, xdg-user-dir, pkexec, uhubctl"
+for tool in curl xdg-user-dir pkexec uhubctl; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "   $tool not found, installing…"
     sudo apt-get update
@@ -143,6 +143,36 @@ StartupWMClass=livi
 EOF
 update-desktop-database "$APPLICATIONS_DIR" 2>/dev/null || true
 echo "Application entry at $APPLICATIONS_DIR/livi.desktop"
+
+# Phone attached across a cold boot stays charge-only; cycle USB ports once so it re-enumerates
+echo "→ Installing USB re-enumerate service"
+RESCAN_SCRIPT="/usr/local/bin/livi-usb-rescan.sh"
+sudo tee "$RESCAN_SCRIPT" >/dev/null <<'EOF'
+#!/usr/bin/env bash
+set -eu
+HUBS=$(uhubctl 2>/dev/null | sed -n 's/^Current status for hub \([^ ]*\).*/\1/p' | sort -u)
+[ -z "$HUBS" ] && exit 0
+# The Pi switches port power grouped: all hubs, serially, in this order. The slow libusb
+# waits double as settle time for the cascaded hub tree, do not parallelize or subset.
+for h in $HUBS; do uhubctl -l "$h" -a off >/dev/null 2>&1 || true; done
+sleep 2
+for h in $HUBS; do uhubctl -l "$h" -a on >/dev/null 2>&1 || true; done
+EOF
+sudo chmod 0755 "$RESCAN_SCRIPT"
+
+sudo tee /etc/systemd/system/livi-usb-rescan.service >/dev/null <<EOF
+[Unit]
+Description=LIVI USB re-enumerate (wake charge-latched phone at boot)
+
+[Service]
+Type=oneshot
+ExecStart=${RESCAN_SCRIPT}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable livi-usb-rescan.service
 
 # Raspberry Pi 1080p HEVC needs the v4l2codecs SAND-crop fix. GStreamer 1.26.x
 # (< 1.26.11, which the Pi currently ships) detiles the 1088-padded 1080p frame into

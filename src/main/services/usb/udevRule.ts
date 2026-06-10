@@ -21,6 +21,26 @@ function loadTemplate(): string {
   return fs.readFileSync(resolveTemplatePath(), 'utf8')
 }
 
+let cachedPhoneVendorIds: Set<number> | null | undefined
+
+// Android vendor allowlist parsed from the udev template.
+// Lines that also match an idProduct (dongle) are skipped.
+export function phoneVendorIdsFromUdevTemplate(): Set<number> | null {
+  if (cachedPhoneVendorIds !== undefined) return cachedPhoneVendorIds
+  try {
+    const ids = new Set<number>()
+    for (const line of loadTemplate().split('\n')) {
+      if (line.includes('ATTR{idProduct}')) continue
+      const m = line.match(/ATTR\{idVendor\}=="([0-9a-fA-F]+)"/)
+      if (m) ids.add(Number.parseInt(m[1], 16))
+    }
+    cachedPhoneVendorIds = ids.size > 0 ? ids : null
+  } catch {
+    cachedPhoneVendorIds = null
+  }
+  return cachedPhoneVendorIds
+}
+
 function templateMarker(template: string): string {
   const m = template.match(/^# LIVI-RULE-VERSION=\d+$/m)
   return m ? m[0] : '# LIVI-RULE-VERSION=0'

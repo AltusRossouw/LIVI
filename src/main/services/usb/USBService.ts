@@ -6,6 +6,7 @@ import { isAccessoryMode, probeAaCapable } from '../projection/driver/aa/stack/a
 import { ProjectionService } from '../projection/services/ProjectionService'
 import { isCarlinkitDongle } from './constants'
 import { findDongle } from './helpers'
+import { phoneVendorIdsFromUdevTemplate } from './udevRule'
 
 type Device = USBDevice
 
@@ -243,7 +244,13 @@ export class USBService {
     const cls = device.deviceClass
     if (cls === undefined) return false
     if (SKIP_PROBE_DEVICE_CLASSES.has(cls)) return false
-    return cls === 0x00 || cls === 0xff
+    if (cls !== 0x00 && cls !== 0xff) return false
+    // Linux: only probe vendors the udev rules grant access to
+    if (process.platform === 'linux') {
+      const vendors = phoneVendorIdsFromUdevTemplate()
+      if (vendors && device.vendorId !== undefined && !vendors.has(device.vendorId)) return false
+    }
+    return true
   }
 
   private async tryProbePhone(device: Device): Promise<void> {

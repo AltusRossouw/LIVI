@@ -288,15 +288,12 @@ jobs:
       - name: Install deps (brew) [macos-arm64]
         if: matrix.os == 'macos' && matrix.arch == 'arm64'
         shell: bash
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
         run: |
           set -euo pipefail
-          brew update >/dev/null
           for pkg in libusb pkg-config; do
-            if ! brew list --versions "$pkg" >/dev/null; then
-              brew install "$pkg" >/dev/null
-            elif brew outdated --quiet | grep -q "^$pkg\$"; then
-              brew upgrade "$pkg" >/dev/null
-            fi
+            brew list --versions "$pkg" >/dev/null || brew install "$pkg" >/dev/null
           done
 
       # Runtime + devel framework so node-gyp can build the gst-video addon

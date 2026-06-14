@@ -135,6 +135,7 @@ export class ProjectionService {
   private config: Config = DEFAULT_CONFIG as Config
   private pairTimeout: NodeJS.Timeout | null = null
   private frameInterval: NodeJS.Timeout | null = null
+  private videoFlowing = false
   private startRetryTimer: NodeJS.Timeout | null = null
   private startRetryAttempt = 0
 
@@ -775,12 +776,30 @@ export class ProjectionService {
   private pushGstVideo(nal: Buffer): void {
     const wc = this.webContents
     if (!wc || wc.isDestroyed?.()) return
+    this.videoFlowing = true
+    this.ensureFramePoke()
     if (!this.gstVideo) {
       this.gstVideo = new GstVideo(wc)
       this.gstVideo.setVisible(this.gstVideoVisible)
       this.applyVideoCrop()
     }
     this.gstVideo.push(this.gstVideoCodec, nal)
+  }
+
+  // A decoder can hold the last frame until the next arrives, so a single static frame never
+  // shows. Re-request a keyframe while the stream is stalled to flush it, continuous video none.
+  private ensureFramePoke(): void {
+    if (this.frameInterval) return
+    this.frameInterval = setInterval(() => {
+      if (!this.started) return
+      if (this.videoFlowing) {
+        this.videoFlowing = false
+        return
+      }
+      try {
+        this.driver.send(new SendCommand('frame'))
+      } catch {}
+    }, 700)
   }
 
   private clusterPlaneVisible(screen: ClusterScreen): boolean {

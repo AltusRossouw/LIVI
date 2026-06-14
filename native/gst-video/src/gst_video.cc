@@ -286,7 +286,11 @@ static const char* decoder_for(const std::string& c) {
     return "avdec_h264";
   }
 #ifdef __APPLE__
-  if (c == "h265") return pick_decoder({"vtdec", "avdec_h265"});
+  // if (c == "h265") return pick_decoder({"vtdec", "avdec_h265"});
+  // HEVC on macOS uses avdec_h265, not vtdec: vtdec ignores sps_max_num_reorder_pics and adds
+  // output latency. Revert to vtdec once the GStreamer bug is fixed.
+  // https://gitlab.freedesktop.org/gstreamer/gstreamer/-/work_items/5133
+  if (c == "h265") return pick_decoder({"avdec_h265", "vtdec"});
   if (c == "vp9") return pick_decoder({"vp9dec"});
   if (c == "av1") return pick_decoder({"dav1ddec"});
   return pick_decoder({"vtdec", "avdec_h264"});

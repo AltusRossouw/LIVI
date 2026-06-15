@@ -37,7 +37,7 @@ It is a standalone cross-platform Electron head unit with a native, zero-copy GS
 ## Raspberry Pi OS
 
 > [!NOTE]
-> The Pi 3 and earlier use the VideoCore IV GPU, which only supports OpenGL ES 2.0 and is therefore unsupported.
+> The Pi 4, CM 4, Pi 5 and CM 5 require Trixie (Debian 13) for OpenGL ES 3.x. Pi 3 and earlier use the VideoCore IV GPU, which only supports OpenGL ES 2.0 and is therefore unsupported.
 
 ```bash
 curl -fL -o install.sh https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/pi/install.sh

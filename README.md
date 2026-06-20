@@ -66,7 +66,7 @@ _This install script is not actively tested on other Linux distributions._
 
 ## Linux (x86_64)
 
-This AppImage has been tested on Debian Trixie (13) with Wayland, Ubuntu 26.04 and Fedora 44 (GMNOME).
+This AppImage has been tested on Debian Trixie (13) with Wayland, Fedora 44 (GNOME) and Ubuntu 26.04.
 
 ```bash
 chmod +x LIVI-*-x86_64.AppImage

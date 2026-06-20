@@ -10,7 +10,8 @@
     "Lasse Heitgres"
   ],
   "homepage": "https://f-io.dev",
-  "packageManager": "pnpm@11.7.0",
+  "license": "GPL-3.0-or-later",
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
     "prepare": "husky",
     "dev": "vite",

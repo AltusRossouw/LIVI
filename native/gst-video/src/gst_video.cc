@@ -46,6 +46,7 @@ struct Player {
   GstElement* pipeline = nullptr;
   GstElement* appsrc = nullptr;
   GstElement* sink = nullptr;
+  GstElement* glshader = nullptr;
   void* view = nullptr;
 };
 
@@ -342,10 +343,40 @@ static void livi_free_player(Player* p) {
     gst_element_set_state(p->pipeline, GST_STATE_NULL);
     if (p->appsrc) gst_object_unref(p->appsrc);
     if (p->sink) gst_object_unref(p->sink);
+    if (p->glshader) gst_object_unref(p->glshader);
     gst_object_unref(p->pipeline);
   }
   remove_video_view(p);
   delete p;
+}
+
+static const char* CAL_FRAGMENT =
+  "#version 100\n"
+  "precision highp float;\n"
+  "varying vec2 v_texcoord;\n"
+  "uniform sampler2D tex;\n"
+  "uniform float u_gamma;\n"
+  "uniform float u_contrast;\n"
+  "uniform float u_gain_r;\n"
+  "uniform float u_gain_g;\n"
+  "uniform float u_gain_b;\n"
+  "void main() {\n"
+  "  vec3 c = texture2D(tex, v_texcoord).rgb;\n"
+  "  c = pow(c, vec3(1.0 / u_gamma));\n"
+  "  c = (c - 0.5) * u_contrast + 0.5;\n"
+  "  c = c * vec3(u_gain_r, u_gain_g, u_gain_b);\n"
+  "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);\n"
+  "}\n";
+
+static void livi_set_gamma_player(Player* p, double gamma, double contrast, double gain_r,
+                                  double gain_g, double gain_b) {
+  if (!p || !p->glshader) return;
+  GstStructure* u = gst_structure_new(
+    "uniforms", "u_gamma", G_TYPE_FLOAT, (float)(gamma > 0.0 ? gamma : 1.0), "u_contrast",
+    G_TYPE_FLOAT, (float)contrast, "u_gain_r", G_TYPE_FLOAT, (float)gain_r, "u_gain_g",
+    G_TYPE_FLOAT, (float)gain_g, "u_gain_b", G_TYPE_FLOAT, (float)gain_b, NULL);
+  g_object_set(p->glshader, "uniforms", u, NULL);
+  gst_structure_free(u);
 }
 
 #ifndef LIVI_GST_HOST_STANDALONE
@@ -370,19 +401,35 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
   if (!is_hw_decoder(decoder)) presink = "videoconvert ! ";
 #endif
 
-  std::string desc = "appsrc name=src is-live=true do-timestamp=true format=time"
-    " min-latency=0 max-latency=0 caps=" +
-    caps_for(codec) + " ! " + parser_for(codec) +
-    " ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=2000000000" +
-    " ! " + std::string(decoder) + " name=dec" +
-    " ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 leaky=downstream" +
-    " ! " + presink + sink_chain();
+  std::string cal;
+#if defined(__APPLE__)
+  cal = "glupload ! glcolorconvert ! glshader name=cal ! ";
+#endif
 
+  auto make_desc = [&](const std::string& calc) -> std::string {
+    return "appsrc name=src is-live=true do-timestamp=true format=time"
+      " min-latency=0 max-latency=0 caps=" +
+      caps_for(codec) + " ! " + parser_for(codec) +
+      " ! queue max-size-buffers=0 max-size-bytes=0 max-size-time=2000000000" +
+      " ! " + std::string(decoder) + " name=dec" +
+      " ! queue max-size-buffers=2 max-size-bytes=0 max-size-time=0 leaky=downstream" +
+      " ! " + presink + calc + sink_chain();
+  };
+
+  std::string desc = make_desc(cal);
   fprintf(stderr, "[gst_video] codec=%s decoder=%s | %s\n",
     codec.c_str(), decoder, desc.c_str());
 
   GError* err = nullptr;
   GstElement* pipeline = gst_parse_launch(desc.c_str(), &err);
+  if ((!pipeline || err) && !cal.empty()) {
+    fprintf(stderr, "[gst_video] calibration pass failed (%s), retrying without it\n",
+      err ? err->message : "unknown");
+    if (err) { g_error_free(err); err = nullptr; }
+    if (pipeline) { gst_object_unref(pipeline); pipeline = nullptr; }
+    desc = make_desc("");
+    pipeline = gst_parse_launch(desc.c_str(), &err);
+  }
   if (!pipeline || err) {
     fprintf(stderr, "[gst_video] pipeline parse FAILED: %s\n",
       err ? err->message : "unknown");
@@ -395,6 +442,11 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
   p->pipeline = pipeline;
   p->appsrc = gst_bin_get_by_name(GST_BIN(pipeline), "src");
   p->sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
+  p->glshader = gst_bin_get_by_name(GST_BIN(pipeline), "cal");
+  if (p->glshader) {
+    g_object_set(p->glshader, "fragment", CAL_FRAGMENT, NULL);
+    livi_set_gamma_player(p, 1.0, 1.0, 1.0, 1.0, 1.0);
+  }
 
   force_sinks_realtime(pipeline);
 
@@ -580,6 +632,22 @@ static napi_value SetBackdrop(napi_env env, napi_callback_info info) {
   napi_get_undefined(env, &undef);
   return undef;
 }
+
+static napi_value SetGamma(napi_env env, napi_callback_info info) {
+  size_t argc = 6;
+  napi_value argv[6];
+  napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
+  Player* p = argc >= 1 ? unwrap(env, argv[0]) : nullptr;
+  auto d = [&](size_t idx) -> double {
+    double v = 1.0;
+    if (argc > idx) napi_get_value_double(env, argv[idx], &v);
+    return v;
+  };
+  if (p) livi_set_gamma_player(p, d(1), d(2), d(3), d(4), d(5));
+  napi_value undef;
+  napi_get_undefined(env, &undef);
+  return undef;
+}
 #endif
 
 #ifdef __linux__
@@ -614,6 +682,13 @@ static void livi_host_dispatch(LiviHost* h, guint8 op, guint32 id, const guint8*
     if (p) {
       g_hash_table_remove(h->players, key);
       livi_free_player(p);
+    }
+  } else if (op == 4) {
+    Player* p = (Player*)g_hash_table_lookup(h->players, key);
+    if (p && rlen >= 5 * sizeof(double)) {
+      double v[5];
+      memcpy(v, rest, sizeof(v));
+      livi_set_gamma_player(p, v[0], v[1], v[2], v[3], v[4]);
     }
   }
 }
@@ -736,6 +811,8 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_set_named_property(env, exports, "setContentRegion", fn);
   napi_create_function(env, "setBackdrop", NAPI_AUTO_LENGTH, SetBackdrop, NULL, &fn);
   napi_set_named_property(env, exports, "setBackdrop", fn);
+  napi_create_function(env, "setGamma", NAPI_AUTO_LENGTH, SetGamma, NULL, &fn);
+  napi_set_named_property(env, exports, "setGamma", fn);
   napi_create_function(env, "stop", NAPI_AUTO_LENGTH, Stop, NULL, &fn);
   napi_set_named_property(env, exports, "stop", fn);
 #ifdef __linux__

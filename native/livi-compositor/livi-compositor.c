@@ -26,8 +26,10 @@
 #include <wlr/interfaces/wlr_buffer.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
+#include <drm_fourcc.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/types/wlr_buffer.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_data_device.h>
@@ -44,7 +46,19 @@
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_decoration_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/util/addon.h>
 #include <wlr/util/log.h>
+#include <wlr/render/gles2.h>
+#include <wlr/render/egl.h>
+#include <wlr/render/swapchain.h>
+#include <wlr/render/dmabuf.h>
+#include <wlr/render/drm_format_set.h>
+#include <wlr/render/wlr_renderer.h>
+#include <render/wlr_renderer.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <xkbcommon/xkbcommon.h>
 
 enum tinywl_cursor_mode {
@@ -135,6 +149,13 @@ struct tinywl_server {
 	struct livi_video_cfg video_cfgs[LIVI_MAX_VIDEO_CFGS];
 	int ctrl_fd;
 
+	// Display calibration state for the per-video shader pass. cal_active gates it.
+	bool cal_active;
+	float cal_gamma, cal_contrast, cal_gain[3];
+	GLuint cal_prog;
+	GLint cal_loc_gamma, cal_loc_contrast, cal_loc_gain, cal_loc_tex, cal_loc_uvscale;
+	bool cal_prog_failed;
+
 	// inner UI child (the -s startup command)
 	char *startup_cmd;
 	const char *ui_socket;   // WAYLAND_DISPLAY the inner UI connects to (set per-child only)
@@ -176,6 +197,12 @@ struct tinywl_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
+
+	// Per-video calibration pass: the shaded scene_buffer and its swapchain.
+	struct wlr_scene_buffer *cal_buffer;
+	struct wlr_swapchain *cal_swapchain;
+	int cal_w, cal_h;
+	int cal_disp_w, cal_disp_h;   // on-screen size the shaded buffer is scaled to
 };
 
 struct tinywl_popup {
@@ -303,6 +330,9 @@ static void apply_cfg_to_video(struct tinywl_server *server, struct livi_video_c
 	}
 	if (cfg->has_visible) {
 		wlr_scene_node_set_enabled(&v->scene_tree->node, cfg->visible);
+		if (v->cal_buffer) {
+			wlr_scene_node_set_enabled(&v->cal_buffer->node, cfg->visible && v->server->cal_active);
+		}
 	}
 }
 
@@ -818,12 +848,31 @@ static void server_touch_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_touch_notify_frame(server->seat);
 }
 
+static void cal_render(struct tinywl_toplevel *video);
+static void cal_apply_to_video(struct tinywl_toplevel *video);
+
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct tinywl_output *output = wl_container_of(listener, output, frame);
-	struct wlr_scene *scene = output->server->scene;
-
+	struct tinywl_server *server = output->server;
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
-		scene, output->wlr_output);
+		server->scene, output->wlr_output);
+
+	if (server->cal_active) {
+		struct tinywl_toplevel *v;
+		wl_list_for_each(v, &server->videos, video_link) {
+			bool show = v->scene_tree->node.enabled;
+			if (show && !v->cal_buffer) {
+				cal_apply_to_video(v);
+			}
+			if (v->cal_buffer) {
+				wlr_scene_node_set_enabled(&v->cal_buffer->node, show);
+				if (show) {
+					wlr_scene_node_raise_to_top(&v->cal_buffer->node);
+					cal_render(v);
+				}
+			}
+		}
+	}
 
 	wlr_scene_output_commit(scene_output, NULL);
 
@@ -848,6 +897,11 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 			video->tier_w <= 0 || video->tier_h <= 0) {
 		wlr_xdg_toplevel_set_size(video->xdg_toplevel, ow, oh);
 		wlr_scene_node_set_position(&video->scene_tree->node, s->x, top);
+		video->cal_disp_w = ow;
+		video->cal_disp_h = oh;
+		if (video->cal_buffer) {
+			wlr_scene_node_set_position(&video->cal_buffer->node, s->x, top);
+		}
 		return;
 	}
 	/* contain the content into the output (uniform scale, bars only on AR mismatch) */
@@ -862,6 +916,319 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 	int py = (int)lround(top + off_y - video->crop_t * scale);
 	wlr_xdg_toplevel_set_size(video->xdg_toplevel, tw, th);
 	wlr_scene_node_set_position(&video->scene_tree->node, px, py);
+	video->cal_disp_w = tw;
+	video->cal_disp_h = th;
+	if (video->cal_buffer) {
+		wlr_scene_node_set_position(&video->cal_buffer->node, px, py);
+	}
+}
+
+// Per-video GLES2 shader pass: gamma/contrast/per-channel RGB on the video plane.
+
+static const char CAL_VERT_SRC[] =
+	"attribute vec2 pos;\n"
+	"varying vec2 v_uv;\n"
+	"uniform vec2 u_uvscale;\n"
+	"void main() {\n"
+	"  v_uv = vec2(pos.x * 0.5 + 0.5, pos.y * 0.5 + 0.5) * u_uvscale;\n"
+	"  gl_Position = vec4(pos, 0.0, 1.0);\n"
+	"}\n";
+
+static const char CAL_FRAG_SRC[] =
+	"#extension GL_OES_EGL_image_external : require\n"
+	"precision highp float;\n"
+	"varying vec2 v_uv;\n"
+	"uniform samplerExternalOES tex;\n"
+	"uniform float u_gamma;\n"
+	"uniform float u_contrast;\n"
+	"uniform vec3 u_gain;\n"
+	"void main() {\n"
+	"  vec3 c = texture2D(tex, v_uv).rgb;\n"
+	"  c = pow(c, vec3(1.0 / u_gamma));\n"
+	"  c = (c - 0.5) * u_contrast + 0.5;\n"
+	"  c = clamp(c * u_gain, 0.0, 1.0);\n"
+	"  gl_FragColor = vec4(c, 1.0);\n"
+	"}\n";
+
+static GLuint cal_compile(GLenum type, const char *src) {
+	GLuint sh = glCreateShader(type);
+	glShaderSource(sh, 1, &src, NULL);
+	glCompileShader(sh);
+	GLint ok = GL_FALSE;
+	glGetShaderiv(sh, GL_COMPILE_STATUS, &ok);
+	if (!ok) {
+		char log[512];
+		glGetShaderInfoLog(sh, sizeof(log), NULL, log);
+		wlr_log(WLR_ERROR, "livi cal: shader compile failed: %s", log);
+		glDeleteShader(sh);
+		return 0;
+	}
+	return sh;
+}
+
+// Compile the calibration program. EGL context must be current.
+static bool cal_ensure_program(struct tinywl_server *server) {
+	if (server->cal_prog) return true;
+	if (server->cal_prog_failed) return false;
+	GLuint vs = cal_compile(GL_VERTEX_SHADER, CAL_VERT_SRC);
+	GLuint fs = cal_compile(GL_FRAGMENT_SHADER, CAL_FRAG_SRC);
+	if (!vs || !fs) {
+		if (vs) glDeleteShader(vs);
+		if (fs) glDeleteShader(fs);
+		server->cal_prog_failed = true;
+		return false;
+	}
+	GLuint prog = glCreateProgram();
+	glAttachShader(prog, vs);
+	glAttachShader(prog, fs);
+	glBindAttribLocation(prog, 0, "pos");
+	glLinkProgram(prog);
+	glDeleteShader(vs);
+	glDeleteShader(fs);
+	GLint ok = GL_FALSE;
+	glGetProgramiv(prog, GL_LINK_STATUS, &ok);
+	if (!ok) {
+		char log[512];
+		glGetProgramInfoLog(prog, sizeof(log), NULL, log);
+		wlr_log(WLR_ERROR, "livi cal: program link failed: %s", log);
+		glDeleteProgram(prog);
+		server->cal_prog_failed = true;
+		return false;
+	}
+	server->cal_prog = prog;
+	server->cal_loc_gamma = glGetUniformLocation(prog, "u_gamma");
+	server->cal_loc_contrast = glGetUniformLocation(prog, "u_contrast");
+	server->cal_loc_gain = glGetUniformLocation(prog, "u_gain");
+	server->cal_loc_tex = glGetUniformLocation(prog, "tex");
+	server->cal_loc_uvscale = glGetUniformLocation(prog, "u_uvscale");
+	return true;
+}
+
+// EGL/GLES image extension entry points, resolved at runtime via eglGetProcAddress.
+static PFNEGLCREATEIMAGEKHRPROC p_eglCreateImageKHR;
+static PFNEGLDESTROYIMAGEKHRPROC p_eglDestroyImageKHR;
+static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC p_glEGLImageTargetTexture2DOES;
+
+static bool cal_load_egl_ext(void) {
+	if (p_eglCreateImageKHR) {
+		return true;
+	}
+	p_eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
+	p_eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
+	p_glEGLImageTargetTexture2DOES =
+		(PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+	return p_eglCreateImageKHR && p_eglDestroyImageKHR && p_glEGLImageTargetTexture2DOES;
+}
+
+// EGLImage + GL texture + FBO for one swapchain buffer, cached on it via a wlr_addon.
+struct cal_target {
+	struct wlr_addon addon;
+	struct tinywl_server *server;
+	EGLImageKHR image;
+	GLuint tex;
+	GLuint fbo;
+};
+
+static void cal_target_destroy(struct wlr_addon *addon) {
+	struct cal_target *t = wl_container_of(addon, t, addon);
+	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(t->server->renderer);
+	EGLDisplay dpy = wlr_egl_get_display(egl);
+	eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, wlr_egl_get_context(egl));
+	glDeleteFramebuffers(1, &t->fbo);
+	glDeleteTextures(1, &t->tex);
+	p_eglDestroyImageKHR(dpy, t->image);
+	wlr_addon_finish(&t->addon);
+	free(t);
+}
+
+static const struct wlr_addon_interface cal_target_impl = {
+	.name = "livi_cal_target",
+	.destroy = cal_target_destroy,
+};
+
+// Get or build the FBO that renders into `buf`. EGL context must be current.
+static struct cal_target *cal_target_get(struct tinywl_server *server, struct wlr_buffer *buf) {
+	struct wlr_addon *existing = wlr_addon_find(&buf->addons, server, &cal_target_impl);
+	if (existing) {
+		struct cal_target *t = wl_container_of(existing, t, addon);
+		return t;
+	}
+	if (!cal_load_egl_ext()) {
+		return NULL;
+	}
+	struct wlr_dmabuf_attributes attribs;
+	if (!wlr_buffer_get_dmabuf(buf, &attribs)) {
+		return NULL;
+	}
+	EGLDisplay dpy = wlr_egl_get_display(wlr_gles2_renderer_get_egl(server->renderer));
+	EGLint a[50];
+	int i = 0;
+	a[i++] = EGL_WIDTH; a[i++] = attribs.width;
+	a[i++] = EGL_HEIGHT; a[i++] = attribs.height;
+	a[i++] = EGL_LINUX_DRM_FOURCC_EXT; a[i++] = (EGLint)attribs.format;
+	a[i++] = EGL_DMA_BUF_PLANE0_FD_EXT; a[i++] = attribs.fd[0];
+	a[i++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT; a[i++] = (EGLint)attribs.offset[0];
+	a[i++] = EGL_DMA_BUF_PLANE0_PITCH_EXT; a[i++] = (EGLint)attribs.stride[0];
+	if (attribs.modifier != DRM_FORMAT_MOD_INVALID) {
+		a[i++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT;
+		a[i++] = (EGLint)(attribs.modifier & 0xFFFFFFFF);
+		a[i++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT;
+		a[i++] = (EGLint)(attribs.modifier >> 32);
+	}
+	a[i++] = EGL_NONE;
+	EGLImageKHR img = p_eglCreateImageKHR(dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, a);
+	if (img == EGL_NO_IMAGE_KHR) {
+		wlr_log(WLR_ERROR, "livi cal: eglCreateImageKHR for target failed");
+		return NULL;
+	}
+	GLuint tex;
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	p_glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, img);
+	GLuint fbo;
+	glGenFramebuffers(1, &fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+	GLenum st = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	if (st != GL_FRAMEBUFFER_COMPLETE) {
+		wlr_log(WLR_ERROR, "livi cal: target FBO incomplete (0x%x)", st);
+		glDeleteFramebuffers(1, &fbo);
+		glDeleteTextures(1, &tex);
+		p_eglDestroyImageKHR(dpy, img);
+		return NULL;
+	}
+	struct cal_target *t = calloc(1, sizeof(*t));
+	t->server = server;
+	t->image = img;
+	t->tex = tex;
+	t->fbo = fbo;
+	wlr_addon_init(&t->addon, &buf->addons, server, &cal_target_impl);
+	return t;
+}
+
+// Pick the largest texture in the surface tree (waylandsink puts the video in a subsurface).
+struct cal_tex_find {
+	struct wlr_texture *tex;
+	int area;
+};
+
+static void cal_find_tex(struct wlr_surface *s, int sx, int sy, void *data) {
+	(void)sx;
+	(void)sy;
+	struct cal_tex_find *f = data;
+	struct wlr_texture *t = wlr_surface_get_texture(s);
+	if (t && t->width * t->height > f->area) {
+		f->area = t->width * t->height;
+		f->tex = t;
+	}
+}
+
+// Render the video texture through the calibration shader into a swapchain buffer and set it
+// on cal_buffer.
+static void cal_render(struct tinywl_toplevel *video) {
+	struct tinywl_server *server = video->server;
+	if (!video->cal_buffer) {
+		return;
+	}
+	struct wlr_surface *surface = video->xdg_toplevel->base->surface;
+	struct cal_tex_find fnd = {0};
+	wlr_surface_for_each_surface(surface, cal_find_tex, &fnd);
+	struct wlr_texture *src = fnd.tex;
+	if (!src) {
+		return;
+	}
+	int w = video->tier_w > 0 ? (int)lround(video->tier_w) : src->width;
+	int h = video->tier_h > 0 ? (int)lround(video->tier_h) : src->height;
+	float uvs_x = (float)w / (float)src->width;
+	float uvs_y = (float)h / (float)src->height;
+	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(server->renderer);
+	EGLDisplay dpy = wlr_egl_get_display(egl);
+	eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, wlr_egl_get_context(egl));
+	if (!cal_ensure_program(server)) {
+		return;
+	}
+	if (!video->cal_swapchain || video->cal_w != w || video->cal_h != h) {
+		if (video->cal_swapchain) {
+			wlr_swapchain_destroy(video->cal_swapchain);
+		}
+		const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server->renderer);
+		const struct wlr_drm_format *fmt =
+			fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
+		video->cal_swapchain = fmt ? wlr_swapchain_create(server->allocator, w, h, fmt) : NULL;
+		video->cal_w = w;
+		video->cal_h = h;
+	}
+	if (!video->cal_swapchain) {
+		return;
+	}
+	struct wlr_buffer *dst = wlr_swapchain_acquire(video->cal_swapchain);
+	if (!dst) {
+		return;
+	}
+	struct cal_target *t = cal_target_get(server, dst);
+	if (!t) {
+		wlr_buffer_unlock(dst);
+		return;
+	}
+	struct wlr_gles2_texture_attribs sa;
+	wlr_gles2_texture_get_attribs(src, &sa);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
+	glViewport(0, 0, w, h);
+	glDisable(GL_BLEND);
+	glUseProgram(server->cal_prog);
+	glUniform1f(server->cal_loc_gamma, server->cal_gamma);
+	glUniform1f(server->cal_loc_contrast, server->cal_contrast);
+	glUniform3f(server->cal_loc_gain, server->cal_gain[0], server->cal_gain[1], server->cal_gain[2]);
+	glUniform2f(server->cal_loc_uvscale, uvs_x, uvs_y);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(sa.target, sa.tex);
+	glTexParameteri(sa.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(sa.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glUniform1i(server->cal_loc_tex, 0);
+
+	static const GLfloat quad[] = { -1, -1, 1, -1, -1, 1, 1, 1 };
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, quad);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glDisableVertexAttribArray(0);
+
+	glBindTexture(sa.target, 0);
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glFlush();
+
+	wlr_scene_buffer_set_buffer(video->cal_buffer, dst);
+	if (video->cal_disp_w > 0 && video->cal_disp_h > 0) {
+		wlr_scene_buffer_set_dest_size(video->cal_buffer, video->cal_disp_w, video->cal_disp_h);
+	}
+	wlr_buffer_unlock(dst);
+}
+
+// Overlay the calibrated buffer on the video plane when calibration is active, else hide it.
+static void cal_apply_to_video(struct tinywl_toplevel *video) {
+	struct tinywl_server *server = video->server;
+	if (server->cal_active) {
+		if (!video->cal_buffer) {
+			video->cal_buffer = wlr_scene_buffer_create(server->layer_video, NULL);
+			video->cal_buffer->node.data = video;
+		}
+		apply_video_layout(video);
+		wlr_scene_node_raise_to_top(&video->cal_buffer->node);
+		wlr_scene_node_set_enabled(&video->cal_buffer->node, video->scene_tree->node.enabled);
+		cal_render(video);
+	} else if (video->cal_buffer) {
+		wlr_scene_node_set_enabled(&video->cal_buffer->node, false);
+	}
+}
+
+static void cal_apply_all(struct tinywl_server *server) {
+	struct tinywl_toplevel *v;
+	wl_list_for_each(v, &server->videos, video_link) {
+		cal_apply_to_video(v);
+	}
 }
 
 // Wrap a cairo ARGB32 image surface as a wlr_buffer so it can live in the scene graph.
@@ -1333,6 +1700,9 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		/* lay the new plane out: UI gets a titlebar, video fills the area below it */
 		if (toplevel->is_video) {
 			apply_video_layout(toplevel);
+			if (server->cal_active) {
+				cal_apply_to_video(toplevel);
+			}
 		} else {
 			apply_ui_layout(s);
 		}
@@ -1370,6 +1740,12 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 
 	if (toplevel->is_video) {
 		wl_list_remove(&toplevel->video_link);
+		if (toplevel->cal_buffer) {
+			wlr_scene_node_destroy(&toplevel->cal_buffer->node);
+		}
+		if (toplevel->cal_swapchain) {
+			wlr_swapchain_destroy(toplevel->cal_swapchain);
+		}
 	}
 	struct livi_screen *s = toplevel->screen;
 	if (s != NULL && s->ui == toplevel) {
@@ -1658,6 +2034,9 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 		struct tinywl_toplevel *v = find_video_by_tag(server, tag);
 		if (v != NULL) {
 			wlr_scene_node_set_enabled(&v->scene_tree->node, onoff != 0);
+			if (v->cal_buffer) {
+				wlr_scene_node_set_enabled(&v->cal_buffer->node, onoff != 0 && server->cal_active);
+			}
 		}
 		return;
 	}
@@ -1675,6 +2054,19 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 				wlr_scene_rect_set_color(s->backdrop, s->backdrop_color);
 			}
 		}
+		return;
+	}
+	double ga, co, cr, cg, cb;
+	if (sscanf(line, "gamma %lf %lf %lf %lf %lf", &ga, &co, &cr, &cg, &cb) == 5) {
+		server->cal_gamma = (float)ga;
+		server->cal_contrast = (float)co;
+		server->cal_gain[0] = (float)cr;
+		server->cal_gain[1] = (float)cg;
+		server->cal_gain[2] = (float)cb;
+		server->cal_active =
+			ga != 1.0 || co != 1.0 || cr != 1.0 || cg != 1.0 || cb != 1.0;
+		cal_apply_all(server);
+		return;
 	}
 }
 

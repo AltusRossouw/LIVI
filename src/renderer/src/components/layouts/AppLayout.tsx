@@ -119,6 +119,7 @@ export const AppLayout: FC<PropsWithChildren<AppLayoutProps>> = ({
         ref={mainRef}
         id="content-root"
         data-nav-hidden={hideNav || singleTab ? '1' : '0'}
+        data-nav-present={singleTab ? '0' : '1'}
         style={{
           flex: 1,
           minWidth: 0,

@@ -13,7 +13,7 @@ import {
   isClusterDisplayed,
   translateNavigation
 } from '@shared/utils'
-import { app, WebContents } from 'electron'
+import { app, WebContents, webContents } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import { usb } from 'usb'
@@ -210,7 +210,7 @@ export class ProjectionService {
 
   private lastClusterVideoWidth?: number
   private lastClusterVideoHeight?: number
-  private clusterRequested = false
+  private readonly clusterRequestedBy = new Set<number>()
   private lastClusterCodec: 'h264' | 'h265' | 'vp9' | 'av1' | null = null
 
   // Per-channel buffers for video chunks that arrive from the phone before
@@ -234,7 +234,7 @@ export class ProjectionService {
     const clusterToggled = prevClusterActive !== nextClusterActive
 
     if (clusterToggled && !nextClusterActive) {
-      this.clusterRequested = false
+      this.clusterRequestedBy.clear()
       this.lastClusterCodec = null
       this.lastClusterVideoWidth = undefined
       this.lastClusterVideoHeight = undefined
@@ -709,7 +709,7 @@ export class ProjectionService {
       // Unknown meta
     } else if (msg instanceof Command) {
       this.emitProjectionEvent({ type: 'command', message: msg })
-      if (typeof msg.value === 'number' && msg.value === 508 && this.clusterRequested) {
+      if (typeof msg.value === 'number' && msg.value === 508 && this.anyClusterRequested()) {
         try {
           this.driver.send(new SendCommand('requestClusterStreamFocus'))
         } catch {
@@ -806,9 +806,16 @@ export class ProjectionService {
     return screen === 'main' ? this.clusterVisible : true
   }
 
-  // The phone only encodes/transfers the cluster stream while it is shown
+  private anyClusterRequested(): boolean {
+    for (const id of this.clusterRequestedBy) {
+      const wc = webContents.fromId(id)
+      if (!wc || wc.isDestroyed()) this.clusterRequestedBy.delete(id)
+    }
+    return this.clusterRequestedBy.size > 0
+  }
+
   private clusterStreamWanted(): boolean {
-    return clusterTargetScreens(this.config).some((s) => this.clusterPlaneVisible(s))
+    return this.anyClusterRequested()
   }
 
   private syncClusterStreamFocus(): void {
@@ -1011,9 +1018,13 @@ export class ProjectionService {
         this.pendingStartupConnectTarget = t
       },
       getConfig: () => this.config,
-      setClusterRequested: (v) => {
-        this.clusterRequested = v
+      setClusterRequested: (id, wanted) => {
+        if (wanted) this.clusterRequestedBy.add(id)
+        else this.clusterRequestedBy.delete(id)
+        this.syncClusterStreamFocus()
       },
+      isMainClusterWindow: (id) => this.webContents?.id === id,
+      isClusterRequested: () => this.anyClusterRequested(),
       setClusterVisible: (v) => this.setClusterVisible(v),
       resetLastClusterVideoSize: () => {
         this.lastClusterVideoWidth = undefined

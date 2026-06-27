@@ -53,14 +53,27 @@ Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
 
 logo = Image("logo.png");
-sprite = Sprite(logo);
+sprite = Sprite();
+scaled_for_h = 0;
 
-# Re-center on every refresh; window size is 0 at init on some displays
+# Scale the logo to at most 75% of display height (keep aspect, no upscaling, fit width), then center.
 fun refresh() {
-  sprite.SetPosition(
-    Window.GetWidth() / 2 - logo.GetWidth() / 2,
-    Window.GetHeight() / 2 - logo.GetHeight() / 2,
-    10);
+  win_w = Window.GetWidth();
+  win_h = Window.GetHeight();
+  if (win_w > 0) {
+    if (win_h > 0) {
+      scale = win_h * 0.75 / logo.GetHeight();
+      if (scale > 1) scale = 1;
+      if (logo.GetWidth() * scale > win_w) scale = win_w / logo.GetWidth();
+      logo_w = logo.GetWidth() * scale;
+      logo_h = logo.GetHeight() * scale;
+      if (scaled_for_h != win_h) {
+        sprite.SetImage(logo.Scale(logo_w, logo_h));
+        scaled_for_h = win_h;
+      }
+      sprite.SetPosition(win_w / 2 - logo_w / 2, win_h / 2 - logo_h / 2, 10);
+    }
+  }
 }
 Plymouth.SetRefreshFunction(refresh);
 EOF

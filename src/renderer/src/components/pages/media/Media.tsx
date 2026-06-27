@@ -457,7 +457,7 @@ export const Media = ({ forceHydrate = false }: MediaProps = {}) => {
         style={{
           display: 'grid',
           gridAutoRows: 'auto',
-          rowGap: isTinyHeight ? 8 : 10,
+          rowGap: isTinyHeight ? 3 : 4,
           paddingBottom: isTinyHeight ? 0 : '0.5rem',
           width: '100%',
           boxSizing: 'border-box'

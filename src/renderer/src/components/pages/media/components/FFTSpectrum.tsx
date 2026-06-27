@@ -11,8 +11,8 @@ const LABEL_FONT_MAX = 16
 const LABEL_FONT_MIN = 9
 const MIN_FREQ = 20
 const MAX_FREQ = 20000
-const SPECTRUM_WIDTH_RATIO = 0.92
-const TARGET_FPS = 30
+const SPECTRUM_WIDTH_RATIO = 1.0
+const TARGET_FPS = 60
 
 // Label font scales with spectrum width; below LABEL_FONT_MIN labels are dropped and the margin freed.
 const labelMetrics = (specW: number) => {

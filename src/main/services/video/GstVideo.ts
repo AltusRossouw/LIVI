@@ -154,6 +154,7 @@ export function setStreamGamma(
   b: number
 ): void {
   currentGamma = { gamma, contrast, r, g, b }
+  if (useHostProcess) compositorControl.gamma(gamma, contrast, r, g, b)
   for (const p of livePlayers) p.applyGamma()
 }
 

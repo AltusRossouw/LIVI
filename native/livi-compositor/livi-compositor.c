@@ -149,11 +149,11 @@ struct tinywl_server {
 	struct livi_video_cfg video_cfgs[LIVI_MAX_VIDEO_CFGS];
 	int ctrl_fd;
 
-	// Display calibration state for the per-video shader pass. cal_active gates it.
+	// Display calibration state for the full-output shader pass. cal_active gates it.
 	bool cal_active;
 	float cal_gamma, cal_contrast, cal_gain[3];
 	GLuint cal_prog;
-	GLint cal_loc_gamma, cal_loc_contrast, cal_loc_gain, cal_loc_tex, cal_loc_uvscale;
+	GLint cal_loc_gamma, cal_loc_contrast, cal_loc_gain, cal_loc_tex;
 	bool cal_prog_failed;
 
 	// inner UI child (the -s startup command)
@@ -173,6 +173,9 @@ struct tinywl_output {
 	struct wl_listener frame;
 	struct wl_listener request_state;
 	struct wl_listener destroy;
+	// full-output calibration pass: scene composites into cal_inter, gamma shader into cal_final.
+	struct wlr_swapchain *cal_inter, *cal_final;
+	int cal_ow, cal_oh;
 };
 
 struct tinywl_toplevel {
@@ -197,12 +200,6 @@ struct tinywl_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
-
-	// Per-video calibration pass: the shaded scene_buffer and its swapchain.
-	struct wlr_scene_buffer *cal_buffer;
-	struct wlr_swapchain *cal_swapchain;
-	int cal_w, cal_h;
-	int cal_disp_w, cal_disp_h;   // on-screen size the shaded buffer is scaled to
 };
 
 struct tinywl_popup {
@@ -330,9 +327,6 @@ static void apply_cfg_to_video(struct tinywl_server *server, struct livi_video_c
 	}
 	if (cfg->has_visible) {
 		wlr_scene_node_set_enabled(&v->scene_tree->node, cfg->visible);
-		if (v->cal_buffer) {
-			wlr_scene_node_set_enabled(&v->cal_buffer->node, cfg->visible && v->server->cal_active);
-		}
 	}
 }
 
@@ -848,8 +842,7 @@ static void server_touch_frame(struct wl_listener *listener, void *data) {
 	wlr_seat_touch_notify_frame(server->seat);
 }
 
-static void cal_render(struct tinywl_toplevel *video);
-static void cal_apply_to_video(struct tinywl_toplevel *video);
+static bool cal_full_output(struct tinywl_output *output);
 
 static void output_frame(struct wl_listener *listener, void *data) {
 	struct tinywl_output *output = wl_container_of(listener, output, frame);
@@ -857,24 +850,9 @@ static void output_frame(struct wl_listener *listener, void *data) {
 	struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(
 		server->scene, output->wlr_output);
 
-	if (server->cal_active) {
-		struct tinywl_toplevel *v;
-		wl_list_for_each(v, &server->videos, video_link) {
-			bool show = v->scene_tree->node.enabled;
-			if (show && !v->cal_buffer) {
-				cal_apply_to_video(v);
-			}
-			if (v->cal_buffer) {
-				wlr_scene_node_set_enabled(&v->cal_buffer->node, show);
-				if (show) {
-					wlr_scene_node_raise_to_top(&v->cal_buffer->node);
-					cal_render(v);
-				}
-			}
-		}
+	if (!server->cal_active || !cal_full_output(output)) {
+		wlr_scene_output_commit(scene_output, NULL);
 	}
-
-	wlr_scene_output_commit(scene_output, NULL);
 
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -897,11 +875,6 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 			video->tier_w <= 0 || video->tier_h <= 0) {
 		wlr_xdg_toplevel_set_size(video->xdg_toplevel, ow, oh);
 		wlr_scene_node_set_position(&video->scene_tree->node, s->x, top);
-		video->cal_disp_w = ow;
-		video->cal_disp_h = oh;
-		if (video->cal_buffer) {
-			wlr_scene_node_set_position(&video->cal_buffer->node, s->x, top);
-		}
 		return;
 	}
 	/* contain the content into the output (uniform scale, bars only on AR mismatch) */
@@ -916,11 +889,6 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 	int py = (int)lround(top + off_y - video->crop_t * scale);
 	wlr_xdg_toplevel_set_size(video->xdg_toplevel, tw, th);
 	wlr_scene_node_set_position(&video->scene_tree->node, px, py);
-	video->cal_disp_w = tw;
-	video->cal_disp_h = th;
-	if (video->cal_buffer) {
-		wlr_scene_node_set_position(&video->cal_buffer->node, px, py);
-	}
 }
 
 // Per-video GLES2 shader pass: gamma/contrast/per-channel RGB on the video plane.
@@ -928,17 +896,15 @@ static void apply_video_layout(struct tinywl_toplevel *video) {
 static const char CAL_VERT_SRC[] =
 	"attribute vec2 pos;\n"
 	"varying vec2 v_uv;\n"
-	"uniform vec2 u_uvscale;\n"
 	"void main() {\n"
-	"  v_uv = vec2(pos.x * 0.5 + 0.5, pos.y * 0.5 + 0.5) * u_uvscale;\n"
+	"  v_uv = vec2(pos.x * 0.5 + 0.5, pos.y * 0.5 + 0.5);\n"
 	"  gl_Position = vec4(pos, 0.0, 1.0);\n"
 	"}\n";
 
 static const char CAL_FRAG_SRC[] =
-	"#extension GL_OES_EGL_image_external : require\n"
 	"precision highp float;\n"
 	"varying vec2 v_uv;\n"
-	"uniform samplerExternalOES tex;\n"
+	"uniform sampler2D tex;\n"
 	"uniform float u_gamma;\n"
 	"uniform float u_contrast;\n"
 	"uniform vec3 u_gain;\n"
@@ -1000,7 +966,6 @@ static bool cal_ensure_program(struct tinywl_server *server) {
 	server->cal_loc_contrast = glGetUniformLocation(prog, "u_contrast");
 	server->cal_loc_gain = glGetUniformLocation(prog, "u_gain");
 	server->cal_loc_tex = glGetUniformLocation(prog, "tex");
-	server->cal_loc_uvscale = glGetUniformLocation(prog, "u_uvscale");
 	return true;
 }
 
@@ -1108,127 +1073,98 @@ static struct cal_target *cal_target_get(struct tinywl_server *server, struct wl
 	return t;
 }
 
-// Pick the largest texture in the surface tree (waylandsink puts the video in a subsurface).
-struct cal_tex_find {
-	struct wlr_texture *tex;
-	int area;
-};
-
-static void cal_find_tex(struct wlr_surface *s, int sx, int sy, void *data) {
-	(void)sx;
-	(void)sy;
-	struct cal_tex_find *f = data;
-	struct wlr_texture *t = wlr_surface_get_texture(s);
-	if (t && t->width * t->height > f->area) {
-		f->area = t->width * t->height;
-		f->tex = t;
+// Composite the whole scene into an intermediate buffer, run the gamma shader over it, commit
+// the result. Covers UI + video uniformly, GPU->GPU, no readback. Returns false on any setup
+// failure so the caller falls back to a normal commit and never blacks out.
+static bool cal_full_output(struct tinywl_output *output) {
+	struct tinywl_server *server = output->server;
+	struct wlr_scene_output *scene_output =
+		wlr_scene_get_scene_output(server->scene, output->wlr_output);
+	if (scene_output == NULL) {
+		return false;
 	}
-}
-
-// Render the video texture through the calibration shader into a swapchain buffer and set it
-// on cal_buffer.
-static void cal_render(struct tinywl_toplevel *video) {
-	struct tinywl_server *server = video->server;
-	if (!video->cal_buffer) {
-		return;
+	int ow = output->wlr_output->width, oh = output->wlr_output->height;
+	if (ow <= 0 || oh <= 0) {
+		return false;
 	}
-	struct wlr_surface *surface = video->xdg_toplevel->base->surface;
-	struct cal_tex_find fnd = {0};
-	wlr_surface_for_each_surface(surface, cal_find_tex, &fnd);
-	struct wlr_texture *src = fnd.tex;
-	if (!src) {
-		return;
-	}
-	int w = video->tier_w > 0 ? (int)lround(video->tier_w) : src->width;
-	int h = video->tier_h > 0 ? (int)lround(video->tier_h) : src->height;
-	float uvs_x = (float)w / (float)src->width;
-	float uvs_y = (float)h / (float)src->height;
 	struct wlr_egl *egl = wlr_gles2_renderer_get_egl(server->renderer);
 	EGLDisplay dpy = wlr_egl_get_display(egl);
 	eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, wlr_egl_get_context(egl));
 	if (!cal_ensure_program(server)) {
-		return;
+		return false;
 	}
-	if (!video->cal_swapchain || video->cal_w != w || video->cal_h != h) {
-		if (video->cal_swapchain) {
-			wlr_swapchain_destroy(video->cal_swapchain);
-		}
-		const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server->renderer);
-		const struct wlr_drm_format *fmt =
-			fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_ARGB8888) : NULL;
-		video->cal_swapchain = fmt ? wlr_swapchain_create(server->allocator, w, h, fmt) : NULL;
-		video->cal_w = w;
-		video->cal_h = h;
+	const struct wlr_drm_format_set *fmts = wlr_renderer_get_render_formats(server->renderer);
+	const struct wlr_drm_format *fmt =
+		fmts ? wlr_drm_format_set_get(fmts, DRM_FORMAT_XRGB8888) : NULL;
+	if (fmt == NULL) {
+		return false;
 	}
-	if (!video->cal_swapchain) {
-		return;
+	if (!output->cal_inter || output->cal_ow != ow || output->cal_oh != oh) {
+		if (output->cal_inter) wlr_swapchain_destroy(output->cal_inter);
+		if (output->cal_final) wlr_swapchain_destroy(output->cal_final);
+		output->cal_inter = wlr_swapchain_create(server->allocator, ow, oh, fmt);
+		output->cal_final = wlr_swapchain_create(server->allocator, ow, oh, fmt);
+		output->cal_ow = ow;
+		output->cal_oh = oh;
 	}
-	struct wlr_buffer *dst = wlr_swapchain_acquire(video->cal_swapchain);
-	if (!dst) {
-		return;
+	if (!output->cal_inter || !output->cal_final) {
+		return false;
 	}
-	struct cal_target *t = cal_target_get(server, dst);
-	if (!t) {
-		wlr_buffer_unlock(dst);
-		return;
+
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	struct wlr_scene_output_state_options opts = { .swapchain = output->cal_inter };
+	if (!wlr_scene_output_build_state(scene_output, &state, &opts)
+			|| !(state.committed & WLR_OUTPUT_STATE_BUFFER) || state.buffer == NULL) {
+		wlr_output_state_finish(&state);
+		return false;
+	}
+
+	struct wlr_buffer *dst = wlr_swapchain_acquire(output->cal_final);
+	struct cal_target *t = dst ? cal_target_get(server, dst) : NULL;
+	struct wlr_texture *src = wlr_texture_from_buffer(server->renderer, state.buffer);
+	if (!t || !src) {
+		if (src) wlr_texture_destroy(src);
+		if (dst) wlr_buffer_unlock(dst);
+		wlr_output_state_finish(&state);
+		return false;
 	}
 	struct wlr_gles2_texture_attribs sa;
 	wlr_gles2_texture_get_attribs(src, &sa);
 
+	eglMakeCurrent(dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, wlr_egl_get_context(egl));
 	glBindFramebuffer(GL_FRAMEBUFFER, t->fbo);
-	glViewport(0, 0, w, h);
+	glViewport(0, 0, ow, oh);
 	glDisable(GL_BLEND);
 	glUseProgram(server->cal_prog);
 	glUniform1f(server->cal_loc_gamma, server->cal_gamma);
 	glUniform1f(server->cal_loc_contrast, server->cal_contrast);
 	glUniform3f(server->cal_loc_gain, server->cal_gain[0], server->cal_gain[1], server->cal_gain[2]);
-	glUniform2f(server->cal_loc_uvscale, uvs_x, uvs_y);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(sa.target, sa.tex);
 	glTexParameteri(sa.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(sa.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glUniform1i(server->cal_loc_tex, 0);
-
 	static const GLfloat quad[] = { -1, -1, 1, -1, -1, 1, 1, 1 };
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, quad);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glDisableVertexAttribArray(0);
-
 	glBindTexture(sa.target, 0);
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glFlush();
+	wlr_texture_destroy(src);
 
-	wlr_scene_buffer_set_buffer(video->cal_buffer, dst);
-	if (video->cal_disp_w > 0 && video->cal_disp_h > 0) {
-		wlr_scene_buffer_set_dest_size(video->cal_buffer, video->cal_disp_w, video->cal_disp_h);
-	}
+	wlr_output_state_set_buffer(&state, dst);
 	wlr_buffer_unlock(dst);
-}
-
-// Overlay the calibrated buffer on the video plane when calibration is active, else hide it.
-static void cal_apply_to_video(struct tinywl_toplevel *video) {
-	struct tinywl_server *server = video->server;
-	if (server->cal_active) {
-		if (!video->cal_buffer) {
-			video->cal_buffer = wlr_scene_buffer_create(server->layer_video, NULL);
-			video->cal_buffer->node.data = video;
-		}
-		apply_video_layout(video);
-		wlr_scene_node_raise_to_top(&video->cal_buffer->node);
-		wlr_scene_node_set_enabled(&video->cal_buffer->node, video->scene_tree->node.enabled);
-		cal_render(video);
-	} else if (video->cal_buffer) {
-		wlr_scene_node_set_enabled(&video->cal_buffer->node, false);
-	}
-}
-
-static void cal_apply_all(struct tinywl_server *server) {
-	struct tinywl_toplevel *v;
-	wl_list_for_each(v, &server->videos, video_link) {
-		cal_apply_to_video(v);
-	}
+	pixman_region32_t damage;
+	pixman_region32_init_rect(&damage, 0, 0, ow, oh);
+	wlr_output_state_set_damage(&state, &damage);
+	pixman_region32_fini(&damage);
+	bool ok = wlr_output_commit_state(output->wlr_output, &state);
+	wlr_output_state_finish(&state);
+	return ok;
 }
 
 // Wrap a cairo ARGB32 image surface as a wlr_buffer so it can live in the scene graph.
@@ -1451,6 +1387,9 @@ static void output_request_state(struct wl_listener *listener, void *data) {
 static void output_destroy(struct wl_listener *listener, void *data) {
 	struct tinywl_output *output = wl_container_of(listener, output, destroy);
 	struct livi_screen *s = output->screen;
+
+	if (output->cal_inter) wlr_swapchain_destroy(output->cal_inter);
+	if (output->cal_final) wlr_swapchain_destroy(output->cal_final);
 
 	if (s != NULL) {
 		s->wlr_output = NULL;
@@ -1700,9 +1639,6 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 		/* lay the new plane out: UI gets a titlebar, video fills the area below it */
 		if (toplevel->is_video) {
 			apply_video_layout(toplevel);
-			if (server->cal_active) {
-				cal_apply_to_video(toplevel);
-			}
 		} else {
 			apply_ui_layout(s);
 		}
@@ -1740,12 +1676,6 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 
 	if (toplevel->is_video) {
 		wl_list_remove(&toplevel->video_link);
-		if (toplevel->cal_buffer) {
-			wlr_scene_node_destroy(&toplevel->cal_buffer->node);
-		}
-		if (toplevel->cal_swapchain) {
-			wlr_swapchain_destroy(toplevel->cal_swapchain);
-		}
 	}
 	struct livi_screen *s = toplevel->screen;
 	if (s != NULL && s->ui == toplevel) {
@@ -2034,9 +1964,6 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 		struct tinywl_toplevel *v = find_video_by_tag(server, tag);
 		if (v != NULL) {
 			wlr_scene_node_set_enabled(&v->scene_tree->node, onoff != 0);
-			if (v->cal_buffer) {
-				wlr_scene_node_set_enabled(&v->cal_buffer->node, onoff != 0 && server->cal_active);
-			}
 		}
 		return;
 	}
@@ -2065,7 +1992,6 @@ static void ctrl_handle_line(struct tinywl_server *server, const char *line) {
 		server->cal_gain[2] = (float)cb;
 		server->cal_active =
 			ga != 1.0 || co != 1.0 || cr != 1.0 || cg != 1.0 || cb != 1.0;
-		cal_apply_all(server);
 		return;
 	}
 }
@@ -2232,6 +2158,9 @@ int main(int argc, char *argv[]) {
 	server.new_output.notify = server_new_output;
 	wl_signal_add(&server.backend->events.new_output, &server.new_output);
 
+	// Force the scene to composite every layer into our intermediate buffer so the full-output
+	// calibration pass can sample the whole frame.
+	setenv("WLR_SCENE_DISABLE_DIRECT_SCANOUT", "1", 1);
 	server.scene = wlr_scene_create();
 	server.scene_layout = wlr_scene_attach_output_layout(server.scene, server.output_layout);
 	// created in z-order: backdrop (bottom), video planes, UI, decoration, overlay (top)

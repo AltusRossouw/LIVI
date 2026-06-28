@@ -30,10 +30,7 @@ export const appearanceSchema: SettingsNode<Config> = {
       ],
       page: {
         title: 'Phone Appearance',
-        labelTitle: 'settings.phoneAppearance',
-        description:
-          'Light / dark appearance for the connected phone (Android Auto / CarPlay). Auto follows vehicle data (CAN, ambient sensor, dongle hint). Day or Night force the corresponding appearance on the phone when it connects.',
-        labelDescription: 'settings.phoneAppearanceDescription'
+        labelTitle: 'settings.phoneAppearance'
       }
     },
     {

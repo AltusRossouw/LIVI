@@ -27,7 +27,6 @@ import { GstVideo, type GstVideoCodec, probeGstCodecs } from '../../video/GstVid
 import { AaBtSockClient } from '../driver/aa/AaBtSockClient'
 import { AaBluetoothSupervisor } from '../driver/aa/aaBluetoothSupervisor'
 import { AaDriver } from '../driver/aa/aaDriver'
-import { runRendererAoapHandshake } from '../driver/aa/stack/aoap/rendererHandshake'
 import type { IPhoneDriver } from '../driver/IPhoneDriver'
 import { ProjectionDriverManager } from '../drivers/ProjectionDriverManager'
 import { type ProjectionIpcHost, registerProjectionIpc } from '../ipc'
@@ -948,13 +947,7 @@ export class ProjectionService {
         av1Supported: this.av1Supported,
         initialNightMode: deriveInitialNightMode(this.config.appearanceMode)
       }),
-      onPhoneReenumerate: (ms) => this.expectPhoneReenumeration(ms),
-      // macOS: ptpcamerad holds the phone's MTP interface, so node-usb cannot claim one to route
-      // EP0 through. The renderer's Chromium WebUSB sends the handshake claim-free instead.
-      rendererAoapHandshake:
-        process.platform === 'darwin'
-          ? (vendorId, productId) => this.runRendererAoapHandshake(vendorId, productId)
-          : undefined
+      onPhoneReenumerate: (ms) => this.expectPhoneReenumeration(ms)
     })
 
     this.arbiter = new TransportArbiter({
@@ -1140,14 +1133,6 @@ export class ProjectionService {
     } catch (err) {
       console.error('[ProjectionService] failed to upload icons', err)
     }
-  }
-
-  private async runRendererAoapHandshake(vendorId: number, productId: number): Promise<void> {
-    const wc = this.webContents
-    if (!wc || (typeof wc.isDestroyed === 'function' && wc.isDestroyed())) {
-      throw new Error('AOAP: no renderer attached for the WebUSB handshake')
-    }
-    await runRendererAoapHandshake(wc, vendorId, productId)
   }
 
   public attachRenderer(webContents: WebContents) {

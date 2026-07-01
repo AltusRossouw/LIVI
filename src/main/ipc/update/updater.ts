@@ -100,6 +100,7 @@ export class Updater {
 
       const file = updateSession.tmpFile
       updateSession.state = 'installing'
+      sendUpdateEvent({ phase: 'installing' })
 
       if (updateSession.platform === 'darwin') {
         try {
@@ -113,6 +114,7 @@ export class Updater {
       }
 
       await installOnLinuxFromFile(file)
+      sendUpdateEvent({ phase: 'relaunching' })
       await restartApp(this.runtimeState, this.services)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

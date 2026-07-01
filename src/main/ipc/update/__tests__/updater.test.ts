@@ -137,6 +137,7 @@ describe('Updater', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' })
     const {
       Updater,
+      sendUpdateEvent,
       downloadWithProgress,
       installOnLinuxFromFile,
       installOnMacFromFile,
@@ -149,7 +150,9 @@ describe('Updater', () => {
     await updater.perform({} as never, 'https://example.com/LIVI.AppImage')
     await updater.install()
 
+    expect(sendUpdateEvent).toHaveBeenCalledWith({ phase: 'installing' })
     expect(installOnLinuxFromFile).toHaveBeenCalledWith(expect.stringMatching(/\.AppImage$/))
+    expect(sendUpdateEvent).toHaveBeenCalledWith({ phase: 'relaunching' })
     expect(restartApp).toHaveBeenCalledTimes(1)
     expect(installOnMacFromFile).not.toHaveBeenCalled()
   })

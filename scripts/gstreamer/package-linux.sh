@@ -303,6 +303,9 @@ plugins=(
   libgstalsa.so
   libgstfaad.so
   libgstopus.so
+  libgstrtp.so
+  libgstudp.so
+  libgstrtpmanager.so
   # video parse + scale + GL sink (cross-platform)
   libgstvideoparsersbad.so
   libgstvideoconvertscale.so

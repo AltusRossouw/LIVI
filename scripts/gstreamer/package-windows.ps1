@@ -200,6 +200,9 @@ $plugins = @(
   "gstdirectsound.dll",
   "gstlibav.dll",
   "gstopus.dll",
+  "gstrtp.dll",
+  "gstudp.dll",
+  "gstrtpmanager.dll",
   # video parse + scale + GL sink
   "gstvideoparsersbad.dll",
   "gstvideoconvertscale.dll",

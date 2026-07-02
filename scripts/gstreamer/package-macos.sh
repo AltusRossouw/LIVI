@@ -165,6 +165,7 @@ plugins=(
   libgstosxaudio.dylib
   libgstrawparse.dylib
   libgstvolume.dylib
+  libgstopus.dylib
   # video parse + decode + scale
   libgstvideoparsersbad.dylib
   libgstapplemedia.dylib

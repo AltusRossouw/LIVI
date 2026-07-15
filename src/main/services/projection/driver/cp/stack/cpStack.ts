@@ -392,6 +392,15 @@ export class CpStack extends EventEmitter {
     if (req.method === 'RECORD') {
       console.log('[cpStack] RECORD (session started)')
       this._liveSession = session
+      // Event commands are only valid once the session has started (older iOS stalls
+      // the bring-up ~5s on a POST /command sent before RECORD). Push the initial
+      // night mode now, not on event-channel connect.
+      if (this._nightMode !== null) {
+        this._sendEventCommand(
+          session,
+          encodeBplist({ type: 'setNightMode', params: { nightMode: this._nightMode } })
+        )
+      }
       this.emit('session-active', this._normHost(session.peerHost))
       this._openIapMessageRelay(session)
       return { status: 200 }
@@ -626,12 +635,24 @@ export class CpStack extends EventEmitter {
         }
         session.eventSock = s
         this._active = session
-        if (this._nightMode !== null) {
-          this._sendEventCommand(
-            session,
-            encodeBplist({ type: 'setNightMode', params: { nightMode: this._nightMode } })
-          )
-        }
+        let enc: Buffer = Buffer.alloc(0)
+        let plain: Buffer = Buffer.alloc(0)
+        s.on('data', (chunk: Buffer) => {
+          const cipher = session.eventCipher
+          if (!cipher) return
+          enc = Buffer.concat([enc, chunk])
+          try {
+            const { data, rest } = cipher.decrypt(enc)
+            enc = rest
+            if (data.length) plain = Buffer.concat([plain, data])
+          } catch (err) {
+            console.warn(`[cpStack] event channel decrypt failed: ${(err as Error).message}`)
+            return
+          }
+          const { messages, rest } = parseMessages(plain)
+          plain = rest
+          for (const m of messages) this._onEventMessage(session, m)
+        })
         s.on('error', () => {})
         s.on('close', () => {
           console.log('[cpStack] event channel closed')
@@ -712,6 +733,28 @@ export class CpStack extends EventEmitter {
   }
 
   /** Send a bplist command to the phone over the encrypted event channel. */
+  /** The event channel is bidirectional reverse-HTTP: the phone both answers our
+   *  commands and sends its own requests, which MUST get a response (older iOS
+   *  blocks session bring-up on 5s request timeouts otherwise). */
+  private _onEventMessage(session: CpSession, msg: RtspRequest): void {
+    if (msg.method.startsWith('RTSP/') || msg.method.startsWith('HTTP/')) {
+      if (msg.path !== '200')
+        console.warn(`[cpStack] event response ${msg.path} ${msg.protocol ?? ''}`)
+      return
+    }
+    let decoded = ''
+    if (msg.body.length) {
+      try {
+        decoded = ` ${JSON.stringify(decodeBplist(msg.body))}`
+      } catch {
+        decoded = ` (${msg.body.length}B non-plist body)`
+      }
+    }
+    console.log(`[cpStack] event < ${msg.method} ${msg.path}${decoded}`)
+    if (!session.eventSock || !session.eventCipher) return
+    session.eventSock.write(session.eventCipher.encrypt(buildResponse(msg, { status: 200 })))
+  }
+
   private _sendEventCommand(s: CpSession, body: Buffer): void {
     if (!s.eventSock || !s.eventCipher) return
     s.eventCseq++
@@ -722,30 +765,6 @@ export class CpStack extends EventEmitter {
       `CSeq: ${s.eventCseq}\r\n\r\n`
     const msg = Buffer.concat([Buffer.from(head, 'utf8'), body])
     s.eventSock.write(s.eventCipher.encrypt(msg))
-  }
-
-  /**
-   * Take the main-audio resource so the phone streams media audio over CarPlay.
-   * modesChanged from the phone is only informational; the phone sets up the audio
-   * streams (100/101/102) only after we actively take mainAudio via changeModes.
-   */
-  private _sendChangeModes(s: CpSession): void {
-    const body = encodeBplist({
-      type: 'changeModes',
-      params: {
-        resources: [
-          {
-            resourceID: 2, // mainAudio
-            transferType: 1, // take
-            transferPriority: 500, // userInitiated
-            takeConstraint: 500, // userInitiated: phone can only take audio back on a user action
-            borrowConstraint: 100 // anytime
-          }
-        ]
-      }
-    })
-    console.log('[cpStack] → changeModes (take mainAudio)')
-    this._sendEventCommand(s, body)
   }
 
   private async _setupAudio(

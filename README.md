@@ -23,7 +23,7 @@ LIVI implements the CarPlay accessory side natively on Linux. Wireless sessions 
 - now-playing metadata incl. album art, turn-by-turn navigation data
 - touch, knob/D-Pad and hard-key input
 - day/night mode and GPS forwarding to the phone
-- multi-session: several phones are tracked in parallel, the active projection is switchable
+- multi-session with live switching between connected phones
 
 Wireless CarPlay requires a Bluetooth adapter and a Wi-Fi interface dedicated to the access point. Wired CarPlay works on any USB port.
 
@@ -51,7 +51,7 @@ dtoverlay=i2c-gpio,bus=2,i2c_gpio_sda=19,i2c_gpio_scl=26,i2c_gpio_delay_us=50
 - **Android Auto** (wired & wireless) on all platforms
 - **Apple CarPlay** (wired & wireless) on all platforms
 
-> **Supported USB adapters (for CarPlay):** Carlinkit **CPC200-CCPA** (wireless/wired) and **CPC200-CCPW** (wired)
+> **Supported USB adapters:** **CPC200-CCPA** (wireless/wired) and **CPC200-CCPW** (wired)
 
 ## Project Status
 
@@ -134,12 +134,12 @@ After this, the app will launch normally and future updates will work without ad
 
 ### USB Driver Requirement
 
-The Carlinkit dongle requires a compatible **WinUSB (winusb.sys)** driver on Windows.
+The dongle requires a compatible **WinUSB (winusb.sys)** driver on Windows.
 You can install it using a tool such as **Zadig** (libwdi): https://github.com/pbatard/libwdi/releases
 
 Steps:
 
-1. Plug in the Carlinkit dongle
+1. Plug in the dongle
 2. Start Zadig
 3. Select the dongle from the device list
 4. Install the **WinUSB (winusb.sys)** driver

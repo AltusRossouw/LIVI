@@ -192,13 +192,12 @@
 
       <h2>Features</h2>
       <ul>
+        <li><strong>Apple CarPlay</strong> (wired &amp; wireless) on Linux — requires an MFi authentication coprocessor</li>
         <li><strong>Android Auto</strong> (wired) on all platforms</li>
         <li><strong>Android Auto</strong> (wireless) on Linux</li>
-        <li><strong>Android Auto</strong> (wired &amp; wireless) via Carlinkit dongle on all platforms</li>
-        <li><strong>CarPlay</strong> (wired &amp; wireless) via Carlinkit dongle on all platforms</li>
+        <li><strong>Multi-session</strong> with live switching between connected phones</li>
         <li>Native, zero-copy video pipeline via GStreamer (hardware-accelerated decoding)</li>
         <li>Instrument cluster video stream support</li>
-        <li>Device switching</li>
         <li>iAP2 turn-by-turn navigation data support</li>
         <li>Audio metadata and playback state integration</li>
         <li>Unified low-latency audio backend via GStreamer</li>
@@ -236,13 +235,11 @@
         GPU end to end through the zero-copy GStreamer pipeline.
       </p>
 
-      <p>Android Auto is supported natively — wired on all platforms, wireless on Linux.</p>
-      <p>Additionally, compatible USB dongles provide CarPlay and dongle-mediated Android Auto (wired &amp; wireless) on all platforms.</p>
-
-      <p>Supported dongles include:</p>
-      <ul>
-        <li>Carlinkit CPC200 series (CCPA, CCPW)</li>
-      </ul>
+      <p>
+        On Linux, both Apple CarPlay and Android Auto are supported natively. Native CarPlay (wired &amp;
+        wireless) requires an MFi authentication coprocessor (see below). Android Auto is native — wired on
+        all platforms, wireless on Linux.
+      </p>
 
       <h2>Installation</h2>
       <p>
@@ -252,13 +249,27 @@
 
       <h2>How it works</h2>
       <p>
-        LIVI does not implement Carplay itself. It relies on compatible USB dongles that handle the
-        CarPlay protocol. These dongles usually ship with a <em>questionable</em> Android app — and
-        because we love Linux ❤️ and value our sanity, we decided to build a solution instead.
+        On Linux, LIVI implements the CarPlay and Android Auto accessory side natively. Wireless sessions
+        run over LIVI's own Wi-Fi access point with Bluetooth pairing, wired sessions run directly over the
+        USB cable. Video is decoded on the platform's hardware decoder and stays on the GPU end to end
+        through the zero-copy GStreamer pipeline.
       </p>
       <p>
-        A fully native implementation is technically possible, but legally messy. Using existing
-        dongles keeps those hurdles on the hardware manufacturers' side.
+        Native CarPlay authenticates against the phone with an Apple MFi coprocessor (see below). Android
+        Auto needs no extra hardware. A legacy USB-dongle path also remains for platforms without native
+        support (see <a href="#legacy-dongle">Legacy: USB dongle</a>).
+      </p>
+
+      <h2>MFi Authentication</h2>
+      <p>
+        Native CarPlay requires the accessory to authenticate against the phone using an Apple
+        <strong>MFi authentication coprocessor</strong>. This is a hardware chip, it cannot be emulated in
+        software, and LIVI does not ship or bypass it. You need a physical coprocessor (for example salvaged
+        from a certified CarPlay accessory or sourced as a module) wired to the I²C bus of your board.
+      </p>
+      <p>
+        Without a coprocessor, native CarPlay is unavailable. Dongle-based CarPlay (the dongle carries its
+        own auth chip) and all Android Auto paths work regardless.
       </p>
 
       <h2>Build Environment</h2>
@@ -302,6 +313,15 @@
         &emsp;
         <img src="images/media.png" alt="Media" width="42%" align="top" />
       </p>
+
+      <h2 id="legacy-dongle">Legacy USB dongle</h2>
+      <p>
+        A legacy path brings CarPlay to systems without native support: a USB dongle that carries its own
+        authentication chip and handles the protocol on the hardware side. It is the option for macOS and
+        Windows or for Linux setups without an MFi coprocessor. It still works, but it is no longer the focus
+        of development.
+      </p>
+      <p>Supported dongles: CPC200 series (CCPA, CCPW).</p>
 
       <h2>Documentation</h2>
       <p>

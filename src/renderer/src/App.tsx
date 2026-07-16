@@ -23,6 +23,15 @@ const START_PAGE_ROUTE: Record<string, string> = {
   telemetry: ROUTES.TELEMETRY
 }
 
+const VIEW_ROUTE: Record<string, string> = {
+  projection: ROUTES.HOME,
+  dash: ROUTES.TELEMETRY,
+  media: ROUTES.MEDIA,
+  camera: ROUTES.CAMERA,
+  settings: ROUTES.SETTINGS,
+  devices: `${ROUTES.SETTINGS}/devices`
+}
+
 function AppInner() {
   const appContext = useContext(AppContext)
   const [receivingVideo, setReceivingVideo] = useState(false)
@@ -281,6 +290,16 @@ function AppInner() {
     location.pathname,
     navigate
   ])
+
+  // External navigation request
+  const requestedView = useStatusStore((s) => s.requestedView)
+  const requestedViewNonce = useStatusStore((s) => s.requestedViewNonce)
+  useEffect(() => {
+    if (!requestedViewNonce) return
+    const route = requestedView ? VIEW_ROUTE[requestedView] : undefined
+    if (route && location.pathname !== route) navigate(route)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedViewNonce])
 
   return (
     <AppLayout navRef={navRef} mainRef={mainRef} receivingVideo={receivingVideo}>

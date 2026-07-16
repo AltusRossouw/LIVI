@@ -147,6 +147,11 @@ const applyTelemetryControls = (payload: unknown) => {
       useStatusStore.getState().setLights(msg.lights)
     }
   }
+
+  // Momentary navigation request
+  if (typeof msg.view === 'string') {
+    useStatusStore.getState().requestView(msg.view)
+  }
 }
 
 // Projection Store
@@ -599,6 +604,11 @@ export interface StatusStore {
   cameraFound: boolean
   clusterDashActive: boolean
 
+  // Momentary navigation request from an external control (telemetry `view`). The nonce
+  // bumps on every request so repeating the same view re-fires the navigation.
+  requestedView: string | null
+  requestedViewNonce: number
+
   setCameraFound: (found: boolean) => void
   setActiveProtocol: (protocol: ActiveProtocol) => void
   setDongleHardwarePresent: (present: boolean) => void
@@ -606,6 +616,7 @@ export interface StatusStore {
   setReverse: (reverse: boolean) => void
   setLights: (lights: boolean) => void
   setClusterDashActive: (active: boolean) => void
+  requestView: (view: string) => void
 }
 
 export const useStatusStore = create<StatusStore>((set, get) => ({
@@ -616,6 +627,8 @@ export const useStatusStore = create<StatusStore>((set, get) => ({
   isStreaming: false,
   cameraFound: false,
   clusterDashActive: false,
+  requestedView: null,
+  requestedViewNonce: 0,
 
   setCameraFound: (found) => set({ cameraFound: found }),
   setActiveProtocol: (protocol) => {
@@ -633,7 +646,9 @@ export const useStatusStore = create<StatusStore>((set, get) => ({
   setStreaming: (streaming) => set({ isStreaming: streaming }),
   setReverse: (reverse) => set({ reverse }),
   setLights: (lights) => set({ lights }),
-  setClusterDashActive: (active) => set({ clusterDashActive: active })
+  setClusterDashActive: (active) => set({ clusterDashActive: active }),
+  requestView: (view) =>
+    set((s) => ({ requestedView: view, requestedViewNonce: s.requestedViewNonce + 1 }))
 }))
 
 export const useProjectionActive = (): boolean =>

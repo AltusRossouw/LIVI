@@ -58,6 +58,7 @@
 //    lights / highBeam / hazards     ✓     ✓          TODO       ·
 //    parkingBrake                    ✓     ✓          TODO       ·
 //    nightMode                       ✓     ✓          ✓          ✓
+//    view (navigate UI)              ✓     ·          ·          ·
 //    fuelPct                         ✓     ✓          TODO       ·
 //    rangeKm                         ✓     ✓          ✓          ·
 //    fuelRateLph / consumption*      ✓     ·          TODO       ·
@@ -228,6 +229,9 @@ export type TelemetryPayload = {
   /** Force night mode for LIVI UI / AA / Dongle regardless of ambient sensor. */
   nightMode?: boolean
 
+  /** Navigate LIVI's UI straight to a screen. */
+  view?: 'projection' | 'dash' | 'media' | 'camera' | 'settings' | 'devices'
+
   // ── GNSS sub-block ─────────────────────────────────────────────────────
 
   /** GPS / GNSS fix data. See `GpsPayload`. */
@@ -315,6 +319,7 @@ export const TELEMETRY_ROUTES = {
 
   // External overrides
   nightMode: { dash: true, aa: true, dongle: true, cp: true },
+  view: { dash: true, aa: false, dongle: false, cp: false },
 
   // GNSS — whole sub-block consumed; per-field availability documented in GpsPayload.
   gps: { dash: true, aa: true, cp: true, dongle: true },

@@ -65,7 +65,9 @@ const liviState: any = {
 const statusState: any = {
   setCameraFound: vi.fn(),
   reverse: false,
-  cameraFound: false
+  cameraFound: false,
+  requestedView: null,
+  requestedViewNonce: 0
 }
 
 vi.mock('../store/store', () => ({

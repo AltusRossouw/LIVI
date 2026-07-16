@@ -107,7 +107,7 @@
     "rollup-plugin-visualizer": "^7.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2",
-    "vite": "^8.1.4",
+    "vite": "^8.1.5",
     "vite-plugin-electron": "^1.1.0",
     "vite-plugin-electron-renderer": "^1.0.0",
     "vitest": "^4.1.10"

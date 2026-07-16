@@ -114,9 +114,8 @@ def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2,
       profile, exactly like the manual BT toggle. Next tick it is disconnected and gets
       the Device1.Connect above.
 
-    `should_nudge(mac)` gates the Device1.Connect nudge. A phone that reconnects on its
-    own (CarPlay) returns False and is never paged, since the accessory-initiated page
-    just times out on it."""
+    `should_nudge(mac)` gates the Device1.Connect nudge to known phones (recorded in
+    devices.json after a first session)."""
 
     stale = {}          # mac -> consecutive "connected but no session" ticks
     last_connect = {}   # mac -> monotonic time of the last Device1.Connect nudge

@@ -724,13 +724,13 @@ class CpHandler:
             else:
                 raise Exception("identification failed")
 
-    def _on_connection(self, reader, writer, over_wifi=False, carkit=False, cid="", usb_serial=""):
+    def _on_connection(self, reader, writer, over_wifi=False, carkit=False, cid="", usb_serial="", bt_mac=""):
         if over_wifi and self._carkit_iap_count > 0:
             self._log("wired: keeping iAP2 on USB carkit, ignoring redundant CarPlay tunnel"
                       + (" (cid=%s)" % cid if cid else ""))
             return None
         label = "USB (carkit)" if carkit else ("Wi-Fi (CarPlay tunnel)" if over_wifi else "RFCOMM")
-        self._log("phone connected over " + label)
+        self._log("phone connected over " + label + (" mac=%s" % bt_mac if bt_mac else ""))
         self._active_sessions += 1
         if self._active_sessions == 1:
             self.ctx.set_session_active(True)
@@ -744,6 +744,8 @@ class CpHandler:
         elif not over_wifi:
             carplay_bonjour.reset()
             self._bt_writer = writer
+            if bt_mac:
+                self._remember_wireless_phone(bt_mac)
 
         direct = over_wifi or carkit
         transport = "usb" if carkit else "wifi" if over_wifi else "bt"
@@ -931,6 +933,18 @@ class CpHandler:
             "AutoConnect": True,
         })
         self._log("iAP2 Bluetooth profiles registered")
+
+    def _remember_wireless_phone(self, mac):
+        """Mark a wireless CarPlay iPhone trusted and record it so the reconnect worker
+        can page it back after a restart."""
+        try:
+            path = "%s/dev_%s" % (self.ctx.adapter_path, mac.replace(":", "_").upper())
+            dev = dbus.Interface(
+                self.ctx.bus.get_object("org.bluez", path), "org.freedesktop.DBus.Properties")
+            dev.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+        except Exception as e:
+            self._log("could not set iPhone trusted:", repr(e))
+        livi_sock.push({"type": "device", "src": "bt", "btMac": mac})
 
     def _unregister_bt_transport(self):
         bus = self.ctx.bus

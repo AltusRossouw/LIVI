@@ -25,32 +25,32 @@ ADAPTER_PATH = "/org/bluez/" + BT_ADAPTER
 def log(*args):
     print("[livi-helper]", *args, flush=True)
 
-_nudge_cache = {"mtime": None, "macs": frozenset()}
+_nudge_cache = {"mtime": None, "by_protocol": {}}
 
-def _androidauto_btmacs():
-    """btMacs of known Android Auto phones, read from devices.json (which holds only
-    phones that completed a session) and refreshed on mtime change. These are the only
-    phones that accept an accessory-initiated Device1.Connect."""
+def _btmacs_by_protocol():
+    """btMacs of known phones grouped by protocol, read from devices.json (which holds only
+    phones that completed a session) and refreshed on mtime change."""
     try:
         st = os.stat(DEVICES_FILE)
     except OSError:
-        return frozenset()
+        return {}
     if st.st_mtime != _nudge_cache["mtime"]:
-        macs = set()
+        by_protocol = {}
         try:
             with open(DEVICES_FILE) as f:
                 data = json.load(f)
             for d in data if isinstance(data, list) else []:
-                if d.get("protocol") == "androidauto" and d.get("btMac"):
-                    macs.add(d["btMac"].upper())
+                proto, mac = d.get("protocol"), d.get("btMac")
+                if proto and mac:
+                    by_protocol.setdefault(proto, set()).add(mac.upper())
         except (OSError, json.JSONDecodeError):
-            return _nudge_cache["macs"]
+            return _nudge_cache["by_protocol"]
         _nudge_cache["mtime"] = st.st_mtime
-        _nudge_cache["macs"] = frozenset(macs)
-    return _nudge_cache["macs"]
+        _nudge_cache["by_protocol"] = {k: frozenset(v) for k, v in by_protocol.items()}
+    return _nudge_cache["by_protocol"]
 
-def _should_nudge(mac):
-    return mac.upper() in _androidauto_btmacs()
+def _should_nudge(mac, protocol):
+    return mac.upper() in _btmacs_by_protocol().get(protocol, frozenset())
 
 class SharedCtx:
     def __init__(self, bus, loop):
@@ -384,7 +384,8 @@ def main():
                     lambda: (not ws["active"]) or ctx.session_active()
                             or bt_common.wifi_has_station(WIFI_IFACE),
                     log,
-                    should_nudge=lambda mac: ws["want_aa"] and _should_nudge(mac),
+                    should_nudge=lambda mac: (ws["want_aa"] and _should_nudge(mac, "androidauto"))
+                                             or (ws["want_cp"] and _should_nudge(mac, "carplay")),
                 )
         except Exception as e:
             log("wireless BT setup failed:", repr(e))

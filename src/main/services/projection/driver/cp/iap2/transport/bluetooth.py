@@ -16,6 +16,15 @@ PROFILE_INTERFACE = 'org.bluez.Profile1'
 AGENT_INTERFACE = 'org.bluez.Agent1'
 
 
+def _mac_from_device_path(path):
+    """Extract the peer BT MAC from a BlueZ device object path, empty string if malformed."""
+    tail = path.rsplit("/dev_", 1)[-1]
+    parts = tail.split("_")
+    if len(parts) != 6:
+        return ""
+    return ":".join(parts).upper()
+
+
 def ask(prompt):
     try:
         return raw_input(prompt)
@@ -84,13 +93,14 @@ class IAPProfile(dbus.service.Object):
                          in_signature='oha{sv}')
     def NewConnection(self, device, fd, opts):
         print("new bluetooth connection", device, self.__path)
+        bt_mac = _mac_from_device_path(str(device))
         raw_fd = fd.take()
         s = socket.fromfd(raw_fd, socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
         s.settimeout(None)
 
         async def on_connection():
             reader, writer = await asyncio.open_connection(sock=s)
-            self.on_connection(reader, writer)
+            self.on_connection(reader, writer, bt_mac=bt_mac)
 
         def _spawn():
             task = asyncio.create_task(on_connection())

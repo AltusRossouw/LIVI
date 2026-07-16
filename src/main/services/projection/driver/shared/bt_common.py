@@ -100,7 +100,8 @@ def wifi_has_station(iface, ctrl="/var/run/hostapd", timeout=3):
     return False
 
 
-def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2):
+def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2,
+                           should_nudge=None):
     """Daemon thread that gets a bonded phone back onto a fresh session after an app
     restart / reboot, so it doesn't hang until the user manually reconnects. Two cases,
     both skipped while `is_active()` reports a session is up:
@@ -111,7 +112,11 @@ def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2)
       connect, which sets the session flag within a tick, is never dropped) ->
       Device1.Disconnect. The bonded+trusted phone then reconnects fresh to our new
       profile, exactly like the manual BT toggle. Next tick it is disconnected and gets
-      the Device1.Connect above."""
+      the Device1.Connect above.
+
+    `should_nudge(mac)` gates the Device1.Connect nudge. A phone that reconnects on its
+    own (CarPlay) returns False and is never paged, since the accessory-initiated page
+    just times out on it."""
 
     stale = {}          # mac -> consecutive "connected but no session" ticks
     last_connect = {}   # mac -> monotonic time of the last Device1.Connect nudge
@@ -134,8 +139,9 @@ def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2)
                         stale[mac] = 0
                         if active:
                             continue
-                        # A disconnected CarPlay phone auto-connects on its own when it is
-                        # ready; just give it an occasional gentle nudge (no spam).
+                        if should_nudge and not should_nudge(mac):
+                            continue
+                        # Wake a phone that needs it with an occasional gentle nudge (no spam).
                         now = time.monotonic()
                         if now - last_connect.get(mac, -1e9) < connect_cooldown:
                             continue

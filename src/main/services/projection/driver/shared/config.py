@@ -26,6 +26,8 @@ def _load_from_json() -> dict:
 
 _JSON_CONFIG = _load_from_json()
 
+DEVICES_FILE = _get_config_path().parent / "devices.json"
+
 
 def _get_value(key: str, json_key: str, default: str) -> str:
     """config.json, then env var, then default."""

@@ -1,5 +1,6 @@
 import asyncio
 import ctypes
+import json
 import os
 import signal
 import subprocess
@@ -15,7 +16,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
 
 from shared import bt_common, wifi_ap
-from shared.config import BT_ADAPTER, BTNAME, WIFI_IFACE
+from shared.config import BT_ADAPTER, BTNAME, DEVICES_FILE, WIFI_IFACE
 
 AA_WIRELESS = os.environ.get("LIVI_AA_WIRELESS") == "1"
 CP_WIRELESS = os.environ.get("LIVI_CP_WIRELESS", "1") == "1"
@@ -23,6 +24,33 @@ ADAPTER_PATH = "/org/bluez/" + BT_ADAPTER
 
 def log(*args):
     print("[livi-helper]", *args, flush=True)
+
+_nudge_cache = {"mtime": None, "macs": frozenset()}
+
+def _androidauto_btmacs():
+    """btMacs of known Android Auto phones, read from devices.json (which holds only
+    phones that completed a session) and refreshed on mtime change. These are the only
+    phones that accept an accessory-initiated Device1.Connect."""
+    try:
+        st = os.stat(DEVICES_FILE)
+    except OSError:
+        return frozenset()
+    if st.st_mtime != _nudge_cache["mtime"]:
+        macs = set()
+        try:
+            with open(DEVICES_FILE) as f:
+                data = json.load(f)
+            for d in data if isinstance(data, list) else []:
+                if d.get("protocol") == "androidauto" and d.get("btMac"):
+                    macs.add(d["btMac"].upper())
+        except (OSError, json.JSONDecodeError):
+            return _nudge_cache["macs"]
+        _nudge_cache["mtime"] = st.st_mtime
+        _nudge_cache["macs"] = frozenset(macs)
+    return _nudge_cache["macs"]
+
+def _should_nudge(mac):
+    return mac.upper() in _androidauto_btmacs()
 
 class SharedCtx:
     def __init__(self, bus, loop):
@@ -356,6 +384,7 @@ def main():
                     lambda: (not ws["active"]) or ctx.session_active()
                             or bt_common.wifi_has_station(WIFI_IFACE),
                     log,
+                    should_nudge=lambda mac: ws["want_aa"] and _should_nudge(mac),
                 )
         except Exception as e:
             log("wireless BT setup failed:", repr(e))

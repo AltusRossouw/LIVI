@@ -3,8 +3,12 @@ import threading
 import time
 
 import dbus
-import avahi
 from gi.repository import GLib
+
+try:
+    import avahi
+except ImportError:
+    avahi = None
 
 from shared.config import AIRPLAY_PORT, PK, PI
 
@@ -43,6 +47,8 @@ def kick():
     loop: a fresh ServiceBrowser queries the network, the phone answers with its
     current port, and the next probe hits it. Stops once a connect succeeds. Only
     probes while the latch is clear, so it is a no-op during a live session."""
+    if avahi is None:
+        return
     GLib.idle_add(_start_kick)
 
 
@@ -163,6 +169,9 @@ def _publish(bus, server, name, txt):
 
 
 def start_service(device_id):
+    if avahi is None:
+        print("[cp] python3-avahi not installed, CarPlay discovery disabled", flush=True)
+        return
     bus = dbus.SystemBus()
     server = dbus.Interface(bus.get_object(avahi.DBUS_NAME, avahi.DBUS_PATH_SERVER), avahi.DBUS_INTERFACE_SERVER)
 

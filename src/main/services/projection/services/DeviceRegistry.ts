@@ -42,6 +42,13 @@ export type { DeviceView } from '@shared/types'
 
 type Ids = { btMac?: string; wifiMac?: string; usbUdid?: string; instanceId?: string; ip?: string }
 
+function normMac(v?: string): string | undefined {
+  if (!v) return v
+  const hex = v.replace(/[^0-9a-fA-F]/g, '')
+  if (hex.length === 12) return hex.toUpperCase().match(/.{2}/g)!.join(':')
+  return v.toUpperCase()
+}
+
 const IDENTITY_KEYS = [
   'btMac',
   'wifiMac',
@@ -90,8 +97,27 @@ export class DeviceRegistry {
   async load(): Promise<void> {
     try {
       const stored = JSON.parse(await fs.readFile(this.file, 'utf8')) as StoredDevice[]
-      this.entries = stored.map((s) => ({ ...s, presence: {} }))
+      this.entries = []
+      let collapsed = false
+      for (const s of stored) {
+        const e: DeviceEntry = { ...s, presence: {} }
+        e.btMac = normMac(e.btMac)
+        e.wifiMac = normMac(e.wifiMac)
+        const dups = this.matchAll({
+          btMac: e.btMac,
+          wifiMac: e.wifiMac,
+          usbUdid: e.usbUdid,
+          instanceId: e.instanceId
+        })
+        if (dups.length) {
+          this.mergeEntries([dups[0], e])
+          collapsed = true
+        } else {
+          this.entries.push(e)
+        }
+      }
       this.loadOk = true
+      if (collapsed) this.persist()
     } catch (e) {
       this.entries = []
       const code = (e as NodeJS.ErrnoException).code
@@ -130,10 +156,12 @@ export class DeviceRegistry {
   }
 
   private matchAll(ids: Ids): DeviceEntry[] {
+    const btMac = normMac(ids.btMac)
+    const wifiMac = normMac(ids.wifiMac)
     return this.entries.filter(
       (e) =>
-        (!!ids.btMac && e.btMac === ids.btMac) ||
-        (!!ids.wifiMac && e.wifiMac === ids.wifiMac) ||
+        (!!btMac && normMac(e.btMac) === btMac) ||
+        (!!wifiMac && normMac(e.wifiMac) === wifiMac) ||
         (!!ids.usbUdid && e.usbUdid === ids.usbUdid) ||
         (!!ids.instanceId && e.instanceId === ids.instanceId) ||
         (!!ids.ip && e.currentIp === ids.ip)
@@ -221,8 +249,8 @@ export class DeviceRegistry {
       instanceId: d.instanceId,
       ip: d.ip
     })
-    if (d.btMac) e.btMac = d.btMac
-    if (d.wifiMac) e.wifiMac = d.wifiMac
+    if (d.btMac) e.btMac = normMac(d.btMac)
+    if (d.wifiMac) e.wifiMac = normMac(d.wifiMac)
     if (d.usbUdid) e.usbUdid = d.usbUdid
     if (d.instanceId) e.instanceId = d.instanceId
     if (d.name) e.name = d.name
@@ -268,8 +296,8 @@ export class DeviceRegistry {
 
   noteName(btMac: string, name: string): void {
     if (!btMac || !name) return
-    const up = btMac.toUpperCase()
-    const e = this.entries.find((x) => x.btMac?.toUpperCase() === up)
+    const up = normMac(btMac)
+    const e = this.entries.find((x) => normMac(x.btMac) === up)
     if (!e || e.name === name) return
     e.name = name
     this.persist()
@@ -277,8 +305,9 @@ export class DeviceRegistry {
   }
 
   forget(id: string): DeviceEntry | undefined {
+    const nid = normMac(id)
     const idx = this.entries.findIndex(
-      (e) => e.btMac === id || e.usbUdid === id || e.wifiMac === id
+      (e) => normMac(e.btMac) === nid || e.usbUdid === id || normMac(e.wifiMac) === nid
     )
     if (idx < 0) return undefined
     const [removed] = this.entries.splice(idx, 1)

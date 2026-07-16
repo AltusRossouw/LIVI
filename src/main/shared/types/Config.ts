@@ -97,8 +97,7 @@ export type Config = {
   wifiType: '2.4ghz' | '5ghz'
   wifiChannel: number
 
-  // CarPlay MFi coprocessor: chip generation, i2c bus, power-enable GPIO
-  carPlayCpGen: number
+  // CarPlay MFi coprocessor: i2c bus, power-enable GPIO
   carPlayMfiI2cBus: number
   carPlayMfiPowerGpio: number
 

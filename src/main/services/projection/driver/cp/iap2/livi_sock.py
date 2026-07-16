@@ -23,7 +23,7 @@ import json
 import os
 import subprocess
 
-from iap2.mfi_auth_coprocessor import read_certificate, generate_challenge_response
+from iap2.mfi_auth_coprocessor import read_certificate, generate_challenge_response, protocol_major
 
 SOCK_PATH = "/tmp/cp-bt.sock"
 
@@ -75,7 +75,9 @@ def start(loop, on_tunnel, adapter, log, on_drop_iap2=None, on_command=None):
         try:
             if cmd == "certificate":
                 cert = await loop.run_in_executor(None, read_certificate)
-                await _reply(writer, {"ok": True, "data": base64.b64encode(bytes(cert)).decode()})
+                await _reply(writer, {"ok": True,
+                                      "data": base64.b64encode(bytes(cert)).decode(),
+                                      "protocolMajor": protocol_major()})
             elif cmd == "sign":
                 digest = base64.b64decode(arg)
                 sig = await loop.run_in_executor(None, lambda: generate_challenge_response(digest))

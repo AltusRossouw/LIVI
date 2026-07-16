@@ -88,11 +88,7 @@ describe('generalSchema', () => {
         labelKey: 'settings.mfi'
       })
     )
-    expect(mfi.children.map((x) => x.path)).toEqual([
-      'carPlayCpGen',
-      'carPlayMfiI2cBus',
-      'carPlayMfiPowerGpio'
-    ])
+    expect(mfi.children.map((x) => x.path)).toEqual(['carPlayMfiI2cBus', 'carPlayMfiPowerGpio'])
   })
 
   test('dongle settings route lives at the bottom with usb dongle, dashboard and gnss sections', () => {

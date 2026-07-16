@@ -759,21 +759,6 @@ export const generalSchema: SettingsNode<Config> = {
       children: [
         {
           type: 'number',
-          label: 'CP Gen',
-          labelKey: 'settings.cpGen',
-          path: 'carPlayCpGen',
-          min: 2,
-          max: 3,
-          step: 1,
-          default: 3,
-          displayValue: true,
-          page: {
-            title: 'CP Gen',
-            labelTitle: 'settings.cpGen'
-          }
-        },
-        {
-          type: 'number',
           label: 'I2C Bus',
           labelKey: 'settings.i2cBus',
           path: 'carPlayMfiI2cBus',

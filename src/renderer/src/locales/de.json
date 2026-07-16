@@ -22,7 +22,6 @@
     "wirelessCpEnabled": "Wireless CarPlay",
     "dongleSettings": "Dongle-Einstellungen",
     "mfi": "MFi",
-    "cpGen": "CP Gen",
     "i2cBus": "I2C-Bus",
     "mfiPowerGpio": "Power Pin",
     "DashboardInfo": "Dashboard-Informationen",

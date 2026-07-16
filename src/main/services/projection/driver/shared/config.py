@@ -53,7 +53,6 @@ BTNAME = _get_value("LIVI_BTNAME", "carName", "LIVI")
 BT_ADAPTER = _get_value("LIVI_BT_ADAPTER", "btAdapter", "hci0")
 
 # CarPlay MFi authentication coprocessor over i2c
-CP_GEN = int(_get_value("LIVI_CP_CP_GEN", "carPlayCpGen", "3"))
 MFI_I2C_BUS = int(_get_value("LIVI_CP_MFI_I2C_BUS", "carPlayMfiI2cBus", "2"))
 MFI_POWER_GPIO = _get_value("LIVI_CP_MFI_POWER_GPIO", "carPlayMfiPowerGpio", "21")
 

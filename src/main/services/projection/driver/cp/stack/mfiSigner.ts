@@ -13,4 +13,6 @@ export interface MfiSigner {
   certificate(): Promise<Buffer>
   /** Sign a digest with the chip's private key. */
   sign(digest: Buffer): Promise<Buffer>
+  /** Auth protocol major version reported by the chip: 2 (2.0C, SHA-1) or 3 (3.0, SHA-256). */
+  protocolMajor(): Promise<number>
 }

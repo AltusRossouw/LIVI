@@ -13,7 +13,9 @@ import type { MfiSigner } from './stack/mfiSigner'
 
 export const CP_BT_SOCK_PATH = '/tmp/cp-bt.sock'
 
-type RpcResponse = { ok: true; data?: string } | { ok: false; error: string }
+type RpcResponse =
+  | { ok: true; data?: string; protocolMajor?: number }
+  | { ok: false; error: string }
 
 export class CpHelperSockError extends Error {
   constructor(message: string) {
@@ -23,6 +25,8 @@ export class CpHelperSockError extends Error {
 }
 
 export class CpHelperSock implements MfiSigner {
+  private _protocolMajor: number | null = null
+
   constructor(private readonly path: string = CP_BT_SOCK_PATH) {}
 
   private request(line: string, timeoutMs = 8000): Promise<RpcResponse> {
@@ -74,9 +78,20 @@ export class CpHelperSock implements MfiSigner {
     return Buffer.from(res.data ?? '', 'base64')
   }
 
-  /** MFi accessory certificate, read from the coprocessor by the helper. */
-  certificate(): Promise<Buffer> {
-    return this.requestData('certificate')
+  /** MFi accessory certificate, read from the coprocessor by the helper. The same reply
+   *  carries the chip's auth protocol major version, cached for protocolMajor(). */
+  async certificate(): Promise<Buffer> {
+    const res = await this.request('certificate')
+    if (!res.ok) throw new CpHelperSockError(res.error)
+    if (typeof res.protocolMajor === 'number') this._protocolMajor = res.protocolMajor
+    return Buffer.from(res.data ?? '', 'base64')
+  }
+
+  /** Auth protocol major version reported by the chip (2 = SHA-1, 3 = SHA-256). Reads the
+   *  certificate once to learn it; defaults to 3 if the chip did not report a version. */
+  async protocolMajor(): Promise<number> {
+    if (this._protocolMajor == null) await this.certificate()
+    return this._protocolMajor ?? 3
   }
 
   /** Sign a digest with the coprocessor's private key. */

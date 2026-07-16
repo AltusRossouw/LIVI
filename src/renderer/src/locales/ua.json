@@ -22,7 +22,6 @@
     "wirelessCpEnabled": "Бездротовий CarPlay",
     "dongleSettings": "Налаштування донгла",
     "mfi": "MFi",
-    "cpGen": "Покоління CP",
     "i2cBus": "Шина I2C",
     "mfiPowerGpio": "Пін живлення",
     "DashboardInfo": "Інформація панелі приладів",

@@ -37,8 +37,9 @@ export async function handleAuthSetup(body: Buffer, signer: MfiSigner): Promise<
   const aesIv = sha1(Buffer.from('AES-IV'), shared).subarray(0, 16)
 
   const cert = await signer.certificate()
-  // Short certs (MFi 3.0) sign a SHA-256 digest; longer ones (2.0) use SHA-1.
-  const digest = cert.length <= 640 ? sha256(ourPub, peerPub) : sha1(ourPub, peerPub)
+  // 2.0C signs a SHA-1 digest, 3.0 signs SHA-256
+  const major = await signer.protocolMajor()
+  const digest = major === 2 ? sha1(ourPub, peerPub) : sha256(ourPub, peerPub)
   const sig = await signer.sign(digest)
   const encSig = aesCtr128(aesKey, aesIv, sig)
 

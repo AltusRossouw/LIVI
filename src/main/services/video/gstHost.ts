@@ -1,12 +1,12 @@
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { chmodSync, existsSync, readFileSync, unlinkSync } from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { app } from 'electron'
+import { gstEnv, resolveGStreamerRoot } from '../audio/gstreamer'
 
-// Where the gst-host child drops its crash backtrace: next to the AppImage when packaged,
-// else the cwd. Read back into the main log if the child dies on a signal.
+// Where the gst-host child drops its crash backtrace.
 function crashLogPath(): string {
   const appImage = process.env.APPIMAGE
   const dir = appImage ? path.dirname(appImage) : process.cwd()
@@ -73,8 +73,10 @@ class GstHost {
     })
     server.on('error', (e) => console.error('[gstHost] server error:', e.message))
     server.listen(sockPath, () => {
-      // LIVI_GST_PRELOAD LD_PRELOADs an override lib into the gst-host child only
       const env = { ...process.env }
+      const gstRoot = resolveGStreamerRoot()
+      if (gstRoot) Object.assign(env, gstEnv(gstRoot))
+      // LIVI_GST_PRELOAD LD_PRELOADs an override lib into the gst-host child only
       if (process.env.LIVI_GST_PRELOAD) env.LD_PRELOAD = process.env.LIVI_GST_PRELOAD
       env.GST_GL_WINDOW = 'surfaceless'
       env.GST_GL_PLATFORM = 'egl'
@@ -133,3 +135,34 @@ class GstHost {
 }
 
 export const gstHost = new GstHost()
+
+function resolveHostBinary(): string | null {
+  try {
+    const addonPath = require
+      .resolve('gst-video')
+      .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
+    return path.join(path.dirname(addonPath), 'build', 'Release', 'livi-gst-host')
+  } catch {
+    return null
+  }
+}
+
+export function probeCodecsViaHost(): Record<string, { hw: boolean; sw: boolean }> | null {
+  try {
+    const bin = resolveHostBinary()
+    if (!bin) return null
+    const env: NodeJS.ProcessEnv = { ...process.env }
+    const gstRoot = resolveGStreamerRoot()
+    if (gstRoot) Object.assign(env, gstEnv(gstRoot))
+    env.GST_GL_WINDOW = 'surfaceless'
+    env.GST_GL_PLATFORM = 'egl'
+    try {
+      chmodSync(bin, 0o755)
+    } catch {}
+    const out = execFileSync(bin, ['--probe'], { env, encoding: 'utf8', timeout: 10000 })
+    return JSON.parse(out.trim()) as Record<string, { hw: boolean; sw: boolean }>
+  } catch (e) {
+    console.error('[gstHost] codec probe failed:', (e as Error).message)
+    return null
+  }
+}

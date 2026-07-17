@@ -178,18 +178,16 @@ static const char* parser_for(const std::string& c) {
   return "h264parse";
 }
 
-// First decoder in the list whose factory is registered, falls back to the last entry (software)
+// First decoder in the list whose factory is registered, NULL when none of them is.
 static const char* pick_decoder(std::initializer_list<const char*> cands) {
-  const char* last = "";
   for (const char* c : cands) {
-    last = c;
     GstElementFactory* f = gst_element_factory_find(c);
     if (f) {
       gst_object_unref(f);
       return c;
     }
   }
-  return last;
+  return nullptr;
 }
 
 // Software decoders (everything else, vtdec/v4l2*/va*/d3d11*, is HW)
@@ -201,6 +199,14 @@ static bool is_hw_decoder(const char* name) {
   return true;
 }
 
+// Primary software decoder per codec, used to report SW availability and by LIVI_GST_SWDEC
+static const char* sw_decoder_for(const std::string& c) {
+  if (c == "h265") return "avdec_h265";
+  if (c == "vp9") return "vp9dec";
+  if (c == "av1") return "dav1ddec";
+  return "avdec_h264";
+}
+
 #ifndef LIVI_GST_HOST_STANDALONE
 static bool factory_exists(const char* name) {
   GstElementFactory* f = name && *name ? gst_element_factory_find(name) : nullptr;
@@ -210,23 +216,12 @@ static bool factory_exists(const char* name) {
   }
   return false;
 }
-
-// Primary software decoder per codec, used to report SW availability
-static const char* sw_decoder_for(const std::string& c) {
-  if (c == "h265") return "avdec_h265";
-  if (c == "vp9") return "vp9dec";
-  if (c == "av1") return "dav1ddec";
-  return "avdec_h264";
-}
 #endif
 
 // Best available decoder per codec, HW-first then software fallback
 static const char* decoder_for(const std::string& c) {
   if (getenv("LIVI_GST_SWDEC")) {
-    if (c == "h265") return "avdec_h265";
-    if (c == "vp9") return "vp9dec";
-    if (c == "av1") return "dav1ddec";
-    return "avdec_h264";
+    return pick_decoder({sw_decoder_for(c)});
   }
 #ifdef __APPLE__
   // HEVC on macOS uses avdec_h265, not vtdec: vtdec ignores sps_max_num_reorder_pics and adds
@@ -363,12 +358,42 @@ static void player_finalize(napi_env env, void* data, void* hint) {
 }
 #endif
 
+// Logs the decoder's negotiated output caps (format, resolution, memory) once per caps change.
+static GstPadProbeReturn decoded_caps_log_probe(GstPad*, GstPadProbeInfo* info, gpointer) {
+  GstEvent* ev = GST_PAD_PROBE_INFO_EVENT(info);
+  if (!ev || GST_EVENT_TYPE(ev) != GST_EVENT_CAPS) return GST_PAD_PROBE_OK;
+  GstCaps* caps = nullptr;
+  gst_event_parse_caps(ev, &caps);
+  if (caps && gst_caps_get_size(caps) > 0) {
+    GstStructure* s = gst_caps_get_structure(caps, 0);
+    const char* fmt = gst_structure_get_string(s, "format");
+    const char* drm = gst_structure_get_string(s, "drm-format");
+    int w = 0, h = 0;
+    gst_structure_get_int(s, "width", &w);
+    gst_structure_get_int(s, "height", &h);
+    GstCapsFeatures* feat = gst_caps_get_features(caps, 0);
+    gchar* fs = feat ? gst_caps_features_to_string(feat) : nullptr;
+    fprintf(stderr, "[gst_video] decoded format=%s%s%s %dx%d mem=%s\n",
+      fmt ? fmt : "?", drm ? " drm=" : "", drm ? drm : "", w, h,
+      fs && *fs ? fs : "SystemMemory");
+    if (fs) g_free(fs);
+  }
+  return GST_PAD_PROBE_OK;
+}
+
 // Build the decode + waylandsink pipeline for a codec. handle is the native window for the
 // mac/Windows overlay, unused on Linux. Returns NULL on parse failure.
 static Player* livi_create_player(const std::string& codec, guintptr handle) {
   // Two queues: before the decoder non-leaky (a stateless HW decoder needs every
   // frame for its reference chain), after the decoder leaky=downstream.
   const char* decoder = decoder_for(codec);
+  if (!decoder) {
+    fprintf(stderr,
+      "[gst_video] no decoder registered for %s. Install the GStreamer plugin providing it, "
+      "software decoding needs gstreamer1.0-libav (%s).\n",
+      codec.c_str(), sw_decoder_for(codec));
+    return nullptr;
+  }
 
   std::string presink;
 #if !defined(__APPLE__) && !defined(_WIN32)
@@ -391,8 +416,8 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
   };
 
   std::string desc = make_desc(cal);
-  fprintf(stderr, "[gst_video] codec=%s decoder=%s | %s\n",
-    codec.c_str(), decoder, desc.c_str());
+  fprintf(stderr, "[gst_video] codec=%s decoder=%s (%s) | %s\n",
+    codec.c_str(), decoder, is_hw_decoder(decoder) ? "hw" : "sw", desc.c_str());
 
   GError* err = nullptr;
   GstElement* pipeline = gst_parse_launch(desc.c_str(), &err);
@@ -426,6 +451,12 @@ static Player* livi_create_player(const std::string& codec, guintptr handle) {
 
   GstElement* dec = gst_bin_get_by_name(GST_BIN(pipeline), "dec");
   if (dec) {
+    GstPad* dsrc = gst_element_get_static_pad(dec, "src");
+    if (dsrc) {
+      gst_pad_add_probe(dsrc, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, decoded_caps_log_probe, NULL,
+        NULL);
+      gst_object_unref(dsrc);
+    }
     GstPad* dsp = gst_element_get_static_pad(dec, "sink");
     if (dsp) {
       // Only the Pi 4 stateful v4l2 decoders reject 1:4:5:1, the Pi 5 stateless ones accept it.
@@ -730,7 +761,30 @@ static void livi_host_main(const char* sockPath, const char* crashLogPath) {
 }
 
 #ifdef LIVI_GST_HOST_STANDALONE
+static int livi_probe_stdout() {
+  ensure_init();
+  const char* codecs[] = {"h264", "h265", "vp9", "av1"};
+  std::string out = "{";
+  for (int i = 0; i < 4; i++) {
+    const char* dec = decoder_for(codecs[i]);
+    bool hw = dec && is_hw_decoder(dec);
+    bool sw = pick_decoder({sw_decoder_for(codecs[i])}) != nullptr;
+    out += i ? ",\"" : "\"";
+    out += codecs[i];
+    out += "\":{\"hw\":";
+    out += hw ? "true" : "false";
+    out += ",\"sw\":";
+    out += sw ? "true" : "false";
+    out += "}";
+  }
+  out += "}";
+  printf("%s\n", out.c_str());
+  fflush(stdout);
+  return 0;
+}
+
 int main(int argc, char** argv) {
+  if (argc > 1 && strcmp(argv[1], "--probe") == 0) return livi_probe_stdout();
   const char* sock = argc > 1 ? argv[1] : "";
   const char* crash = argc > 2 ? argv[2] : "";
   livi_host_main(sock, crash);

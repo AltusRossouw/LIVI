@@ -52,6 +52,19 @@ vi.mock('node:os', () => ({ default: { tmpdir: () => '/tmp' }, tmpdir: () => '/t
 const { appOn } = vi.hoisted(() => ({ appOn: vi.fn() }))
 vi.mock('electron', () => ({ app: { on: appOn } }))
 
+const { resolveRootMock, gstEnvMock } = vi.hoisted(() => ({
+  resolveRootMock: vi.fn((): string | null => '/opt/gst'),
+  gstEnvMock: vi.fn((root: string) => ({
+    GST_PLUGIN_SYSTEM_PATH: '',
+    GST_PLUGIN_PATH: `${root}/lib/gstreamer-1.0`,
+    LD_LIBRARY_PATH: `${root}/lib`
+  }))
+}))
+vi.mock('../../audio/gstreamer', () => ({
+  resolveGStreamerRoot: resolveRootMock,
+  gstEnv: gstEnvMock
+}))
+
 type GstHostModule = typeof import('../gstHost')
 
 async function freshHost(): Promise<GstHostModule['gstHost']> {
@@ -150,6 +163,28 @@ describe('gstHost framing + transport', () => {
 
     expect(spawnMock).toHaveBeenCalledTimes(1)
     expect(createServerMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('spawns the host on the bundled GStreamer', async () => {
+    const gstHost = await freshHost()
+    gstHost.createPlayer(1, 'h264')
+
+    const env = spawnMock.mock.calls[0]![2].env
+    expect(env.LD_LIBRARY_PATH).toBe('/opt/gst/lib')
+    expect(env.GST_PLUGIN_PATH).toBe('/opt/gst/lib/gstreamer-1.0')
+    expect(env.GST_PLUGIN_SYSTEM_PATH).toBe('')
+    expect(env.GST_GL_WINDOW).toBe('surfaceless')
+    expect(env.GST_GL_PLATFORM).toBe('egl')
+  })
+
+  test('spawns with the plain environment when no bundle is present', async () => {
+    resolveRootMock.mockReturnValueOnce(null)
+    const gstHost = await freshHost()
+    gstHost.createPlayer(1, 'h264')
+
+    const env = spawnMock.mock.calls[0]![2].env
+    expect(env.LD_LIBRARY_PATH).toBeUndefined()
+    expect(env.GST_GL_WINDOW).toBe('surfaceless')
   })
 
   test('a socket close clears the active socket so later frames re-queue', async () => {

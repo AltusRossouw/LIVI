@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import net from 'node:net'
 import { app, BrowserWindow, type WebContents } from 'electron'
 import path from 'path'
-import { resolveGStreamerRoot } from '../audio/gstreamer'
-import { gstHost } from './gstHost'
+import { gstEnv, resolveBinary, resolveGStreamerRoot } from '../audio/gstreamer'
+import { gstHost, probeCodecsViaHost } from './gstHost'
 
 export type GstVideoCodec = 'h264' | 'h265' | 'vp9' | 'av1'
 
@@ -277,6 +278,18 @@ interface GstAddon {
 let addon: GstAddon | null = null
 let loadFailed = false
 
+function runningGstVersion(fallback: string): string {
+  const root = resolveGStreamerRoot()
+  const bin = resolveBinary('gst-launch-1.0')
+  if (!root || !bin) return fallback
+  try {
+    const out = execFileSync(bin, ['--version'], { env: gstEnv(root), encoding: 'utf8' })
+    const m = out.match(/GStreamer\s+(\S+)/)
+    if (m) return `GStreamer ${m[1]} (bundled)`
+  } catch {}
+  return fallback
+}
+
 // Windows has no system GStreamer
 function prepareWindowsRuntime(): void {
   if (process.platform !== 'win32') return
@@ -308,7 +321,7 @@ function load(): GstAddon | null {
     prepareWindowsRuntime()
     prepareMacRuntime()
     addon = require('gst-video') as GstAddon
-    console.log('[GstVideo]', addon.version())
+    console.log('[GstVideo]', runningGstVersion(addon.version()))
   } catch (e) {
     loadFailed = true
     console.error('[GstVideo] native addon load failed:', (e as Error).message)
@@ -321,6 +334,18 @@ function load(): GstAddon | null {
 export function probeGstCodecs(): GstCodecProbe {
   const none: GstCodecSupport = { hw: false, sw: false }
   const a = load()
+  if (process.platform === 'linux') {
+    const p = probeCodecsViaHost()
+    if (p?.h264 && p.h265 && p.vp9 && p.av1) {
+      return {
+        h264: { hw: !!p.h264.hw, sw: !!p.h264.sw },
+        h265: { hw: !!p.h265.hw, sw: !!p.h265.sw },
+        vp9: { hw: !!p.vp9.hw, sw: !!p.vp9.sw },
+        av1: { hw: !!p.av1.hw, sw: !!p.av1.sw }
+      }
+    }
+    // host probe unavailable: fall through to the in-process addon
+  }
   if (!a) return { h264: none, h265: none, vp9: none, av1: none }
   try {
     return a.probeCodecs()

@@ -284,6 +284,7 @@ jobs:
 
           chmod +x scripts/gstreamer/package-linux.sh
           chmod +x scripts/gstreamer/smoke-test-linux.sh
+          chmod +x scripts/gstreamer/build-patched-linux.sh
 
           docker run --rm --platform=linux/arm64/v8 \
             -v "${GITHUB_WORKSPACE}:/work" \
@@ -315,6 +316,8 @@ jobs:
                 libc6 \
                 libgcc-s1 \
                 libstdc++6
+
+              scripts/gstreamer/build-patched-linux.sh
 
               scripts/gstreamer/package-linux.sh "assets/gstreamer/linux-arm64"
               scripts/gstreamer/smoke-test-linux.sh "assets/gstreamer/linux-arm64"

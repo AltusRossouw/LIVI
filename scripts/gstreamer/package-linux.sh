@@ -43,7 +43,8 @@ is_system_excluded() {
     */libdrm.so.*|*/libgbm.so.*|*/libGL.so.*|*/libEGL.so.*|*/libGLESv2.so.*|\
     */libGLdispatch.so.*|*/libOpenGL.so.*|*/libglapi.so.*|*/libgallium*.so.*|\
     */libva.so.*|*/libva-drm.so.*|*/libva-x11.so.*|*/libv4l2.so.*|*/libv4lconvert.so.*|\
-    */libvulkan.so.*|*/libudev.so.*|*/libgudev-1.0.so.*)
+    */libvulkan.so.*|*/libudev.so.*|*/libgudev-1.0.so.*|\
+    */libssh.so.*|*/libssh2.so.*)
       return 0
       ;;
     *)
@@ -310,6 +311,7 @@ plugins=(
   libgstvideoparsersbad.so
   libgstvideoconvertscale.so
   libgstopengl.so
+  libgstlibav.so
 )
 
 for plugin in "${plugins[@]}"; do

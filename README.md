@@ -84,14 +84,6 @@ The `install.sh` script performs the following tasks:
 2. downloads the latest LIVI AppImage
 3. creates an autostart entry so the application launches automatically on boot
 4. creates a desktop shortcut for easy access
-5. applies the Raspberry Pi HEVC decoder patch if the system GStreamer is affected (see note below)
-
-> [!NOTE]
-> **Raspberry Pi HEVC (1080p) hardware decode** uses the system GStreamer `v4l2codecs` plugin. GStreamer **1.26.x before 1.26.11** (currently shipped by Raspberry Pi OS) has a SAND-crop bug that breaks zero-copy at 1080p and leaves the main video layer black. The installer detects an affected version and rebuilds the patched plugin from the distribution source automatically. If you do not use the installer, apply it manually from a LIVI checkout on the Pi:
->
-> ```bash
-> bash scripts/gstreamer/patch-pi-v4l2codecs.sh
-> ```
 
 On first launch, LIVI detects if the udev rule for USB access is missing and prompts you to install it. The rule grants USB access to connected Android phones (wired Android Auto), iPhones (wired CarPlay) and to the USB dongle.
 

@@ -279,10 +279,10 @@ let addon: GstAddon | null = null
 let loadFailed = false
 
 function runningGstVersion(fallback: string): string {
-  const root = resolveGStreamerRoot()
-  const bin = resolveBinary('gst-launch-1.0')
-  if (!root || !bin) return fallback
   try {
+    const root = resolveGStreamerRoot()
+    const bin = resolveBinary('gst-launch-1.0')
+    if (!root || !bin) return fallback
     const out = execFileSync(bin, ['--version'], { env: gstEnv(root), encoding: 'utf8' })
     const m = out.match(/GStreamer\s+(\S+)/)
     if (m) return `GStreamer ${m[1]} (bundled)`
@@ -317,6 +317,13 @@ function prepareMacRuntime(): void {
 
 function load(): GstAddon | null {
   if (addon || loadFailed) return addon
+  // Linux uses gstHost + --probe, never the in-process addon (which links the system GStreamer
+  // that the bundle replaces). Log the bundled version and skip the load.
+  if (useHostProcess) {
+    loadFailed = true
+    console.log('[GstVideo]', runningGstVersion('GStreamer (bundled)'))
+    return null
+  }
   try {
     prepareWindowsRuntime()
     prepareMacRuntime()

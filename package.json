@@ -55,7 +55,6 @@
     "@mui/material": "^9.2.0",
     "@mui/system": "^9.2.0",
     "@noble/ciphers": "^2.2.0",
-    "fft.js": "^4.0.4",
     "gst-video": "workspace:*",
     "i18next": "^26.3.6",
     "protobufjs": "^8.7.1",

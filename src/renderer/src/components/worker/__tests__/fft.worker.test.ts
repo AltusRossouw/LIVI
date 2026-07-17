@@ -1,13 +1,11 @@
-const createComplexArrayMock = vi.fn()
-const realTransformMock = vi.fn()
-const completeSpectrumMock = vi.fn()
+const createSpectrumMock = vi.fn()
+const transformMock = vi.fn()
 
-vi.mock('fft.js', () => ({
-  default: vi.fn(function () {
+vi.mock('../fft', () => ({
+  FFT: vi.fn(function () {
     return {
-      createComplexArray: createComplexArrayMock,
-      realTransform: realTransformMock,
-      completeSpectrum: completeSpectrumMock
+      createSpectrum: createSpectrumMock,
+      transform: transformMock
     }
   })
 }))
@@ -20,11 +18,10 @@ describe('fft.worker', () => {
     vi.resetModules()
     postedMessages = []
 
-    createComplexArrayMock.mockReset()
-    realTransformMock.mockReset()
-    completeSpectrumMock.mockReset()
+    createSpectrumMock.mockReset()
+    transformMock.mockReset()
 
-    createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
+    createSpectrumMock.mockReturnValue(new Float64Array(16))
     ;(global as any).self = {
       postMessage: vi.fn((message: any, transfer?: unknown) => {
         postedMessages.push({ message, transfer })
@@ -50,9 +47,9 @@ describe('fft.worker', () => {
       }
     } as MessageEvent)
 
-    const { default: FFT } = await import('fft.js')
+    const { FFT } = await import('../fft')
     expect(FFT).toHaveBeenCalledWith(8)
-    expect(createComplexArrayMock).toHaveBeenCalledTimes(1)
+    expect(createSpectrumMock).toHaveBeenCalledTimes(1)
   })
 
   test('does nothing for pcm before init', async () => {
@@ -64,7 +61,7 @@ describe('fft.worker', () => {
     } as MessageEvent)
 
     expect(postedMessages).toHaveLength(0)
-    expect(realTransformMock).not.toHaveBeenCalled()
+    expect(transformMock).not.toHaveBeenCalled()
   })
 
   test('does not emit bins when pcm buffer is shorter than fftSize', async () => {
@@ -85,13 +82,13 @@ describe('fft.worker', () => {
     } as MessageEvent)
 
     expect(postedMessages).toHaveLength(0)
-    expect(realTransformMock).not.toHaveBeenCalled()
+    expect(transformMock).not.toHaveBeenCalled()
   })
 
   test('processes one fft segment and posts normalized bins', async () => {
-    createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
+    createSpectrumMock.mockReturnValue(new Float64Array(16))
 
-    realTransformMock.mockImplementation((output: number[]) => {
+    transformMock.mockImplementation((output: Float64Array) => {
       for (let i = 0; i < output.length; i++) output[i] = 0
 
       // put some energy into a few bins
@@ -119,8 +116,7 @@ describe('fft.worker', () => {
       }
     } as MessageEvent)
 
-    expect(realTransformMock).toHaveBeenCalledTimes(1)
-    expect(completeSpectrumMock).toHaveBeenCalledTimes(1)
+    expect(transformMock).toHaveBeenCalledTimes(1)
     expect(postedMessages).toHaveLength(1)
 
     const payload = postedMessages[0].message
@@ -135,8 +131,8 @@ describe('fft.worker', () => {
   })
 
   test('processes multiple fft segments from one pcm message', async () => {
-    createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
-    realTransformMock.mockImplementation((output: number[]) => {
+    createSpectrumMock.mockReturnValue(new Float64Array(16))
+    transformMock.mockImplementation((output: Float64Array) => {
       for (let i = 0; i < output.length; i++) output[i] = 0
       output[2] = 10
       output[3] = 5
@@ -158,13 +154,13 @@ describe('fft.worker', () => {
       }
     } as MessageEvent)
 
-    expect(realTransformMock).toHaveBeenCalledTimes(5)
+    expect(transformMock).toHaveBeenCalledTimes(5)
     expect(postedMessages).toHaveLength(5)
   })
 
   test('keeps leftover samples in ring buffer across pcm messages', async () => {
-    createComplexArrayMock.mockReturnValue(new Array(16).fill(0))
-    realTransformMock.mockImplementation((output: number[]) => {
+    createSpectrumMock.mockReturnValue(new Float64Array(16))
+    transformMock.mockImplementation((output: Float64Array) => {
       for (let i = 0; i < output.length; i++) output[i] = 0
       output[2] = 10
       output[3] = 5
@@ -195,7 +191,7 @@ describe('fft.worker', () => {
       }
     } as MessageEvent)
 
-    expect(realTransformMock).toHaveBeenCalledTimes(1)
+    expect(transformMock).toHaveBeenCalledTimes(1)
     expect(postedMessages).toHaveLength(1)
   })
 
@@ -207,6 +203,6 @@ describe('fft.worker', () => {
     } as MessageEvent)
 
     expect(postedMessages).toHaveLength(0)
-    expect(realTransformMock).not.toHaveBeenCalled()
+    expect(transformMock).not.toHaveBeenCalled()
   })
 })

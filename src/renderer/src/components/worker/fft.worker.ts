@@ -1,30 +1,20 @@
-import FFT from 'fft.js'
+import { FFT } from './fft'
 
 // Worker for FFT: init with parameters
 const FLOOR_DB = -80
 const MIN_FREQ = 20
 
-// A-Weighting
-function aWeight(freq: number): number {
-  const f2 = freq * freq
-  const ra = (f2 + 20.6 ** 2) * (f2 + 12200 ** 2) * Math.sqrt((f2 + 107.7 ** 2) * (f2 + 737.9 ** 2))
-  const rb = 12200 ** 2 * f2 * f2
-  return rb / ra
-}
-
 let fftSize: number
 let points: number
 let sampleRate: number
 let windowFunc: Float32Array
-let aWeightTable: Float32Array
 let fftInstance: FFT
-let fftOutput: number[]
+let fftOutput: Float64Array
 let ringBuffer = new Float32Array(0)
 
 // reusable buffers
 let input: Float32Array
 let sums: Float32Array
-let counts: Uint16Array
 
 // precomputed log-scale constants
 let logMin: number
@@ -42,22 +32,13 @@ self.onmessage = (e: MessageEvent) => {
       windowFunc[i] = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (fftSize - 1))
     }
 
-    // A-Weighting table
-    const A_WEIGHT_1KHZ = aWeight(1000)
-    aWeightTable = new Float32Array(fftSize / 2 + 1)
-    for (let i = 1; i <= fftSize / 2; i++) {
-      const freq = (i * sampleRate) / fftSize
-      aWeightTable[i] = Math.sqrt(aWeight(freq) / A_WEIGHT_1KHZ)
-    }
-
     fftInstance = new FFT(fftSize)
-    fftOutput = fftInstance.createComplexArray()
+    fftOutput = fftInstance.createSpectrum()
     ringBuffer = new Float32Array(0)
 
     // reusable buffers
     input = new Float32Array(fftSize)
     sums = new Float32Array(points)
-    counts = new Uint16Array(points)
 
     // log scale constants
     logMin = Math.log10(MIN_FREQ)
@@ -80,35 +61,31 @@ self.onmessage = (e: MessageEvent) => {
       }
 
       // FFT
-      fftInstance.realTransform(fftOutput, input)
-      fftInstance.completeSpectrum(fftOutput)
+      fftInstance.transform(fftOutput, input)
 
-      // reuse sums/counts buffers
+      // reuse sums buffer
       sums.fill(0)
-      counts.fill(0)
 
       const half = fftSize / 2
+      const scale = half * half
 
       for (let i = 1; i <= half; i++) {
         const re = fftOutput[2 * i]
         const im = fftOutput[2 * i + 1]
-        const mag = Math.hypot(re, im) / (fftSize / 2)
-        const wmag = mag * aWeightTable[i]
         const freq = (i * sampleRate) / fftSize
         if (freq < MIN_FREQ || freq > sampleRate / 2) continue
         const pos = (Math.log10(freq) - logMin) / logDen
         const idx = Math.floor(pos * points)
         if (idx >= 0 && idx < points) {
-          sums[idx] += wmag
-          counts[idx]++
+          sums[idx] += (re * re + im * im) / scale
         }
       }
 
       // dB normalization
       const bins = new Float32Array(points)
       for (let i = 0; i < points; i++) {
-        const avg = counts[i] > 0 ? sums[i] / counts[i] : 0
-        const db = Math.min(Math.max(20 * Math.log10(avg + 1e-12), FLOOR_DB), 0)
+        const amp = Math.sqrt(sums[i])
+        const db = Math.min(Math.max(20 * Math.log10(amp + 1e-12), FLOOR_DB), 0)
         bins[i] = (db - FLOOR_DB) / -FLOOR_DB
       }
 

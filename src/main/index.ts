@@ -8,9 +8,10 @@ import { setupLifecycle } from '@main/app/lifecycle'
 installMainProcessErrorHandlers()
 
 import { registerIpc } from '@main/ipc'
-import { configEvents } from '@main/ipc/utils'
+import { configEvents, saveSettings } from '@main/ipc/utils'
 import { registerAppProtocol } from '@main/protocol/appProtocol'
 import { checkAndInstallGvfsGuard, startPhoneSuppression } from '@main/services/gvfsPhoneGuard'
+import { checkMissingPackages } from '@main/services/packageCheck'
 import { checkAndInstallHelperSudoers } from '@main/services/projection/driver/helper/helperSudoers'
 import { ProjectionService } from '@main/services/projection/services/ProjectionService'
 import { TelemetrySocket } from '@main/services/Socket'
@@ -126,6 +127,11 @@ app.whenReady().then(async () => {
   if (win && process.platform === 'linux') {
     await checkAndInstallGvfsGuard(win)
     startPhoneSuppression()
+  }
+
+  if (win && process.platform === 'linux') {
+    const { dismissed } = await checkMissingPackages(win, runtimeState.config.dismissedPackages)
+    if (dismissed) saveSettings(runtimeState, { dismissedPackages: dismissed })
   }
 
   projectionService.applyConfigPatch(runtimeState.config)

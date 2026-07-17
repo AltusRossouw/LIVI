@@ -26,23 +26,25 @@ APPIMAGE_DIR="$(dirname "$APPIMAGE_PATH")"
 RULE_FILE="/etc/udev/rules.d/99-LIVI.rules"
 TEMPLATE_NAME="99-LIVI.rules.template"
 
+# Package list comes from scripts/install/packages.txt, the single source the app checks too.
+MANIFEST_URL="https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/packages.txt"
+livi_packages() {
+  local here manifest tmp section
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  manifest="$here/../packages.txt"
+  if [ ! -f "$manifest" ]; then
+    tmp="$(mktemp)"
+    curl -fsSL "$MANIFEST_URL" -o "$tmp" || { echo "Error: cannot obtain packages.txt" >&2; return 1; }
+    manifest="$tmp"
+  fi
+  for section in "$@"; do
+    grep -E "^${section}\|" "$manifest" | cut -d '|' -f2
+  done
+}
+
 echo "→ Installing required packages"
 sudo apt-get update
-sudo apt-get install -y \
-  curl \
-  xdg-user-dirs \
-  cage \
-  seatd \
-  wlr-randr \
-  pipewire wireplumber pipewire-pulse \
-  gstreamer1.0-plugins-base \
-  gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad \
-  gstreamer1.0-gl \
-  gstreamer1.0-libav \
-  gstreamer1.0-tools \
-  python3-dbus python3-gi python3-avahi \
-  bluez hostapd dnsmasq-base iw rfkill
+sudo apt-get install -y $(livi_packages core lite | tr '\n' ' ')
 
 # pymobiledevice3 drives wired CarPlay over usbmux/lockdown
 pip3 install --break-system-packages --ignore-installed -q pymobiledevice3 \

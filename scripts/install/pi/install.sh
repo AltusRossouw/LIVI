@@ -29,20 +29,26 @@ for tool in curl xdg-user-dir pkexec; do
   fi
 done
 
-# Ensure the runtime deps LIVI needs: GStreamer video pipeline,
-# wireless AP (hostapd/dnsmasq) and Bluetooth pairing stack
+# Package list comes from scripts/install/packages.txt, the single source the app checks too.
+MANIFEST_URL="https://raw.githubusercontent.com/f-io/LIVI/main/scripts/install/packages.txt"
+livi_packages() {
+  local here manifest tmp section
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  manifest="$here/../packages.txt"
+  if [ ! -f "$manifest" ]; then
+    tmp="$(mktemp)"
+    curl -fsSL "$MANIFEST_URL" -o "$tmp" || { echo "Error: cannot obtain packages.txt" >&2; return 1; }
+    manifest="$tmp"
+  fi
+  for section in "$@"; do
+    grep -E "^${section}\|" "$manifest" | cut -d '|' -f2
+  done
+}
+
+# Raspberry Pi OS ships a desktop session, so only the core packages are needed here.
 echo "→ Ensuring GStreamer, wireless AP and Bluetooth runtime packages"
 sudo apt-get update
-sudo apt-get install -y \
-  gstreamer1.0-plugins-base \
-  gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-bad \
-  gstreamer1.0-gl \
-  gstreamer1.0-libav \
-  gstreamer1.0-tools \
-  avahi-daemon \
-  python3-dbus python3-gi python3-avahi \
-  bluez hostapd dnsmasq-base iw rfkill
+sudo apt-get install -y $(livi_packages core | tr '\n' ' ')
 
 # pymobiledevice3 drives wired CarPlay over usbmux/lockdown
 pip3 install --break-system-packages --ignore-installed -q pymobiledevice3 \

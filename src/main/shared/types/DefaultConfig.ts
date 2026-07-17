@@ -3,6 +3,7 @@ import { DEFAULT_BINDINGS } from '@shared/types'
 import { CarType, HandDriveType, MicType, PhoneWorkMode } from '@shared/types/Config'
 
 export const DEFAULT_CONFIG: Config = {
+  dismissedPackages: [],
   projectionWidth: 1280,
   projectionHeight: 720,
   projectionFps: 60,

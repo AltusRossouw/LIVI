@@ -236,6 +236,9 @@ export type Config = {
   dongleIcon180?: string
   dongleIcon256?: string
 
+  // System packages the user chose not to be asked about again
+  dismissedPackages: string[]
+
   // Key bindings
   bindings: KeyBindings
 }

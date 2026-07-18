@@ -11,7 +11,7 @@ vi.mock('../SettingsFieldControl', () => ({
 vi.mock('../SettingsFieldPage', () => ({
   SettingsFieldPage: () => <div data-testid="field-page" />
 }))
-vi.mock('../../../devices', () => ({
+vi.mock('../../pages/devices', () => ({
   Devices: () => <div data-testid="devices-tiles" />
 }))
 vi.mock('../stackItem', () => ({

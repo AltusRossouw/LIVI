@@ -7,9 +7,20 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar'
 import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone'
 import WifiOutlinedIcon from '@mui/icons-material/WifiOutlined'
 import { useTheme } from '@mui/material'
+import { alpha, styled } from '@mui/material/styles'
 import { useLiviStore } from '@renderer/store/store'
 import { useNavigate } from 'react-router'
 import { type DeviceView, forgetDevice, selectDevice, useDevices } from './useDevices'
+
+const FocusButton = styled('button')(({ theme }) => ({
+  transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+  '&:focus-visible': {
+    outline: 'none',
+    transform: 'scale(1.03)',
+    boxShadow: `0 0 0 4px ${alpha(theme.palette.secondary.main, 0.55)}`
+  },
+  '&:focus': { outline: 'none' }
+}))
 
 const protocolLabel = (p?: DeviceView['protocol']): string =>
   p === 'carplay' ? 'CarPlay' : p === 'androidauto' ? 'Android Auto' : 'Device'
@@ -164,7 +175,7 @@ export const Devices = () => {
             key={d.id}
             style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
           >
-            <button
+            <FocusButton
               type="button"
               onClick={() => onPick(d)}
               disabled={offline}
@@ -269,8 +280,8 @@ export const Devices = () => {
                   {active ? 'Active' : offline ? 'Not available' : 'Available'}
                 </span>
               </div>
-            </button>
-            <button
+            </FocusButton>
+            <FocusButton
               type="button"
               onClick={() => (d.source === 'dongle' ? forgetDongle(d.id) : forgetDevice(d.id))}
               aria-label="Delete device"
@@ -288,7 +299,7 @@ export const Devices = () => {
               }}
             >
               <CloseIcon sx={{ fontSize: 20 }} />
-            </button>
+            </FocusButton>
           </div>
         )
       })}

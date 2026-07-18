@@ -35,6 +35,7 @@ export type DriverManagerDeps = {
   onCpDisconnected: (session: IPhoneDriver) => void
   onCpPresence?: (session: IPhoneDriver, presence: Record<string, unknown>) => void
   onCpHelperPresence?: (presence: Record<string, unknown>) => void
+  onCpHelperConnect?: () => void
   onCpCreated?: (session: IPhoneDriver) => void
   onCpReleased?: (session: IPhoneDriver) => void
   getCpConfigSeed: () => AaConfigSeed
@@ -158,7 +159,8 @@ export class ProjectionDriverManager {
     const mgr = new CpManager({
       getConfig: this.deps.getConfig,
       onSpawn: (session) => this.onCpSpawn(session),
-      onHelperPresence: (p) => this.deps.onCpHelperPresence?.(p)
+      onHelperPresence: (p) => this.deps.onCpHelperPresence?.(p),
+      onHelperConnect: () => this.deps.onCpHelperConnect?.()
     })
     this.cpManager = mgr
 
@@ -194,14 +196,25 @@ export class ProjectionDriverManager {
     this.cpManager?.setClusterStreamActive(active)
   }
 
-  releaseCp(): void {
+  async releaseCp(): Promise<void> {
     if (!this.cpManager) return
     const mgr = this.cpManager
     this.cpManager = null
     try {
-      mgr.close()
+      await mgr.close()
     } catch (e) {
       console.warn('[ProjectionDriverManager] cpManager.close threw on release', e)
+    }
+  }
+
+  async releaseAa(): Promise<void> {
+    if (!this.aaManager) return
+    const mgr = this.aaManager
+    this.aaManager = null
+    try {
+      await mgr.close()
+    } catch (e) {
+      console.warn('[ProjectionDriverManager] aaManager.close threw on release', e)
     }
   }
 

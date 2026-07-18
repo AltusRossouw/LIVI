@@ -67,9 +67,33 @@ describe('SessionManager', () => {
         instanceId: 'inst-1'
       })
 
-      expect(s.device.btMac).toBe('AA:BB:CC:DD:EE:FF')
+      expect(s.device.btMac).toBe('aa:bb:cc:dd:ee:ff')
       expect(s.device.wifiMac).toBe('11:22:33:44:55:66')
       expect(s.device.instanceId).toBe('inst-1')
+    })
+  })
+
+  describe('mac case-insensitive identity', () => {
+    it('matches one session across mixed btMac casing instead of forking a twin', () => {
+      const mgr = mkManager()
+      const btDriver = mkDriver()
+      const wifiDriver = mkDriver()
+
+      const s1 = mgr.upsert(btDriver, 'carplay', 'bt', { btMac: '0C:6A:C4:4E:F3:2A' })
+      const s2 = mgr.upsert(wifiDriver, 'carplay', 'wifi', {
+        btMac: '0c:6a:c4:4e:f3:2a',
+        wifiMac: 'f2:83:07:13:fb:88'
+      })
+
+      expect(s2).toBe(s1)
+      expect(mgr.all()).toHaveLength(1)
+    })
+
+    it('resolves byDevice when the picker id is upper and the session stored lower', () => {
+      const mgr = mkManager()
+      const s = mgr.upsert(mkDriver(), 'carplay', 'wifi', { btMac: '0c:6a:c4:4e:f3:2a' })
+
+      expect(mgr.byDevice({ btMac: '0C:6A:C4:4E:F3:2A' })).toBe(s)
     })
   })
 

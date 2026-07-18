@@ -49,10 +49,10 @@ export function useDevices(): DeviceView[] {
   return devices
 }
 
-export function selectDevice(id: string): void {
-  api()
-    ?.ipc?.selectDevice?.(id)
-    ?.catch?.(() => {})
+export function selectDevice(id: string): Promise<{ ok: boolean }> {
+  const p = api()?.ipc?.selectDevice?.(id)
+  if (!p) return Promise.resolve({ ok: false })
+  return p.catch(() => ({ ok: false }))
 }
 
 export function forgetDevice(id: string): void {

@@ -33,6 +33,7 @@ export class AaManager {
   private _server: net.Server | null = null
   private readonly _wiredBridges = new Map<string, UsbAoapBridge>()
   private readonly _sessions = new Set<AaSession>()
+  private readonly _wirelessPeer = new Map<AaSession, string>()
 
   private _hevcSupported = false
   private _vp9Supported = false
@@ -90,11 +91,12 @@ export class AaManager {
   startWireless(): void {
     if (this._server) return
     const server = net.createServer({ allowHalfOpen: true }, (sock) => {
-      const remote = `${sock.remoteAddress}:${sock.remotePort}`
-      console.log(`[AaManager] wireless connection from ${remote}`)
+      const ip = sock.remoteAddress ?? ''
+      console.log(`[AaManager] wireless connection from ${ip}:${sock.remotePort}`)
       sock.setNoDelay(true)
       sock.setTimeout(30_000)
-      this._spawn(sock, false, null)
+      this._supersedeWireless(ip)
+      this._spawn(sock, false, null, undefined, ip)
     })
     server.on('error', (err) => console.warn(`[AaManager] wireless server error: ${err.message}`))
     this._server = server
@@ -115,6 +117,39 @@ export class AaManager {
     for (const s of [...this._sessions]) {
       if (!s.isWiredMode()) void s.close()
     }
+  }
+
+  async close(): Promise<void> {
+    if (this._server) {
+      try {
+        this._server.close()
+      } catch {
+        /* already closed */
+      }
+      this._server = null
+    }
+    const sessions = [...this._sessions]
+    this._sessions.clear()
+    await Promise.all(
+      sessions.map((s) =>
+        s
+          .close()
+          .catch((e) =>
+            console.warn(`[AaManager] session close threw on close: ${(e as Error).message}`)
+          )
+      )
+    )
+    const bridges = [...this._wiredBridges.values()]
+    this._wiredBridges.clear()
+    await Promise.all(
+      bridges.map((b) =>
+        b
+          .stop()
+          .catch((e) =>
+            console.warn(`[AaManager] wired bridge stop threw on close: ${(e as Error).message}`)
+          )
+      )
+    )
   }
 
   // ── Wired AOAP bring-up ────────────────────────────────────────────────────
@@ -177,7 +212,8 @@ export class AaManager {
     socket: net.Socket,
     wired: boolean,
     wiredBridge: UsbAoapBridge | null,
-    key?: string
+    key?: string,
+    wirelessIp?: string
   ): void {
     const session = new AaSession({
       socket,
@@ -187,13 +223,26 @@ export class AaManager {
       seed: this._seed()
     })
     this._sessions.add(session)
+    if (wirelessIp) this._wirelessPeer.set(session, wirelessIp)
     session.once('disconnected', () => {
       this._sessions.delete(session)
+      this._wirelessPeer.delete(session)
       if (wired && key && this._wiredBridges.get(key) === wiredBridge) {
         this._wiredBridges.delete(key)
       }
     })
     this._onSpawn(session)
+  }
+
+  // Close any existing wireless session from the same phone-IP.
+  private _supersedeWireless(ip: string): void {
+    if (!ip) return
+    for (const [session, peer] of this._wirelessPeer) {
+      if (peer === ip) {
+        console.log(`[AaManager] wireless reconnect from ${ip} — dropping the superseded session`)
+        void session.close()
+      }
+    }
   }
 }
 

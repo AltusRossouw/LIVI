@@ -10,6 +10,7 @@ type DepStubs = {
   dongleSessionActive: boolean
   wiredAaSessionActive: boolean
   wiredCpSessionActive: boolean
+  wiredSession: boolean
   onChange: Mock
   onShouldStop: Mock
   onShouldAutoStart: Mock
@@ -25,6 +26,7 @@ function makeArbiter(overrides: Partial<DepStubs> = {}) {
     dongleSessionActive: false,
     wiredAaSessionActive: false,
     wiredCpSessionActive: false,
+    wiredSession: false,
     onChange: vi.fn(),
     onShouldStop: vi.fn(async () => {}),
     onShouldAutoStart: vi.fn(),
@@ -39,6 +41,7 @@ function makeArbiter(overrides: Partial<DepStubs> = {}) {
     isDongleSessionActive: () => stubs.dongleSessionActive,
     isWiredAaSessionActive: () => stubs.wiredAaSessionActive,
     isWiredCpSessionActive: () => stubs.wiredCpSessionActive,
+    hasWiredSession: () => stubs.wiredSession,
     onChange: stubs.onChange,
     onShouldStop: stubs.onShouldStop,
     onShouldAutoStart: stubs.onShouldAutoStart,
@@ -175,7 +178,24 @@ describe('TransportArbiter', () => {
     })
 
     test('detach stops the wired AA session if it owns the transport', async () => {
-      const { arbiter, stubs } = makeArbiter({ wiredAaSessionActive: true, active: 'aa' })
+      const { arbiter, stubs } = makeArbiter({
+        wiredAaSessionActive: true,
+        wiredSession: true,
+        active: 'aa'
+      })
+      arbiter.markPhoneConnected(true, fakeDevice())
+      arbiter.markPhoneConnected(false)
+      vi.advanceTimersByTime(1_000)
+
+      expect(stubs.onWiredPhoneGone).toHaveBeenCalledTimes(1)
+    })
+
+    test('detach stops a held wired session even when another transport is active', async () => {
+      const { arbiter, stubs } = makeArbiter({
+        wiredAaSessionActive: false,
+        wiredSession: true,
+        active: 'cp'
+      })
       arbiter.markPhoneConnected(true, fakeDevice())
       arbiter.markPhoneConnected(false)
       vi.advanceTimersByTime(1_000)
@@ -184,7 +204,11 @@ describe('TransportArbiter', () => {
     })
 
     test('re-attach during detach debounce commits the detach inline', async () => {
-      const { arbiter, stubs } = makeArbiter({ wiredAaSessionActive: true, active: 'aa' })
+      const { arbiter, stubs } = makeArbiter({
+        wiredAaSessionActive: true,
+        wiredSession: true,
+        active: 'aa'
+      })
       arbiter.markPhoneConnected(true, fakeDevice())
       arbiter.markPhoneConnected(false)
       // Re-plug while debounce is still pending

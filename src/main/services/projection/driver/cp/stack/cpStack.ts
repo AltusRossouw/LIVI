@@ -278,11 +278,6 @@ export class CpStack extends EventEmitter {
         this.emit('session-ended')
       }
     })
-    session.heartbeat = setInterval(() => {
-      const ctrlMs = Number(process.hrtime.bigint() - session.lastCtrlReadNs) / 1e6
-      const recv = session.audioMeta.map((m) => m.stream.getLastRecvSample()).join(',')
-      console.log(`[cpStack hb] alive ctrlRead=${ctrlMs.toFixed(0)}ms audioRecvSample=[${recv}]`)
-    }, 1000)
   }
 
   private _teardown(session: CpSession): void {

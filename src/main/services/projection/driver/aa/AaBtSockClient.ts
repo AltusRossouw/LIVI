@@ -107,14 +107,6 @@ export class AaBtSockClient {
     return (await this.request(`remove ${mac}`, timeoutMs)) as ActionResponse
   }
 
-  // Tell the BT reconnect worker to pause (true) or resume (false)
-  async setSessionActive(active: boolean, timeoutMs = 5000): Promise<ActionResponse> {
-    return (await this.request(
-      `session-active ${active ? 'true' : 'false'}`,
-      timeoutMs
-    )) as ActionResponse
-  }
-
   // Kick every associated Wi-Fi station off the AP
   async deauthApClients(timeoutMs = 5000): Promise<ActionResponse> {
     return (await this.request('deauth-ap', timeoutMs)) as ActionResponse
@@ -122,7 +114,14 @@ export class AaBtSockClient {
 
   // Open a event subscription
   subscribe(
-    onEvent: (ev: { event: string; mac?: string; path?: string; command?: string }) => void,
+    onEvent: (ev: {
+      event: string
+      mac?: string
+      path?: string
+      command?: string
+      btMac?: string
+      instanceId?: string
+    }) => void,
     onClose?: () => void
   ): { close: () => void } {
     const sock = net.createConnection(this.path)

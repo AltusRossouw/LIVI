@@ -136,10 +136,10 @@ export const Devices = () => {
   const navigate = useNavigate()
   const forgetDongle = useLiviStore((s) => s.forgetBluetoothPairedDevice)
 
-  const onPick = (d: DeviceView) => {
+  const onPick = async (d: DeviceView) => {
     if (d.status === 'offline') return
-    selectDevice(d.id)
-    navigate('/')
+    const r = await selectDevice(d.id)
+    if (r.ok) navigate('/')
   }
 
   return (
@@ -165,6 +165,7 @@ export const Devices = () => {
       {devices.map((d) => {
         const active = d.status === 'active'
         const offline = d.status === 'offline'
+        const selectable = typeof d.session === 'number'
         const accent = active
           ? theme.palette.secondary.main
           : offline
@@ -178,7 +179,7 @@ export const Devices = () => {
             <FocusButton
               type="button"
               onClick={() => onPick(d)}
-              disabled={offline}
+              disabled={!selectable}
               style={{
                 position: 'relative',
                 width: 'clamp(150px, 24vw, 210px)',
@@ -194,7 +195,7 @@ export const Devices = () => {
                 background: theme.palette.background.paper,
                 color: theme.palette.text.primary,
                 opacity: offline ? 0.4 : 1,
-                cursor: offline ? 'default' : 'pointer'
+                cursor: selectable ? 'pointer' : 'default'
               }}
             >
               {typeof d.session === 'number' ? (

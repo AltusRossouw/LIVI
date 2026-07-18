@@ -23,6 +23,7 @@ export type ArbiterDeps = {
   isDongleSessionActive: () => boolean
   isWiredAaSessionActive: () => boolean
   isWiredCpSessionActive: () => boolean
+  hasWiredSession: () => boolean
   onChange: () => void
   onShouldStop: () => Promise<void>
   onShouldAutoStart: () => void

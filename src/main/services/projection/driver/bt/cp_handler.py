@@ -126,7 +126,6 @@ class CpHandler:
         self._server = None
         self._client = None
         self._bt_writer = None
-        self._active_sessions = 0
         self._tasks = set()
         self._peers = set()
         self._vehicle_status = {}
@@ -731,9 +730,6 @@ class CpHandler:
             return None
         label = "USB (carkit)" if carkit else ("Wi-Fi (CarPlay tunnel)" if over_wifi else "RFCOMM")
         self._log("phone connected over " + label + (" mac=%s" % bt_mac if bt_mac else ""))
-        self._active_sessions += 1
-        if self._active_sessions == 1:
-            self.ctx.set_session_active(True)
         if carkit:
             self._carkit_iap_count += 1
             carplay_bonjour.reset()
@@ -878,10 +874,6 @@ class CpHandler:
                 self._log("session ended:", repr(e))
             finally:
                 self._peers.discard(peer)
-                self._active_sessions -= 1
-                if self._active_sessions <= 0:
-                    self._active_sessions = 0
-                    self.ctx.set_session_active(False)
                 if carkit:
                     self._carkit_iap_count -= 1
                 if not over_wifi and self._bt_writer is writer:
@@ -1038,6 +1030,18 @@ class CpHandler:
                 fn(enabled)
             else:
                 self.set_cp_wireless(enabled)
+            return True
+        if cmd == "reconnect-targets":
+            try:
+                targets = json.loads(arg) if arg.strip() else {}
+            except Exception:
+                targets = {}
+            if not isinstance(targets, dict):
+                targets = {}
+            self._log("reconnect-targets:", targets)
+            fn = getattr(self.ctx, "set_reconnect_targets", None)
+            if callable(fn):
+                fn(targets)
             return True
         return False
 

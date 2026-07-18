@@ -25,6 +25,13 @@ export async function restartApp(
     } catch {}
 
     try {
+      const teardown = services.projectionService.shutdownWirelessSessions()
+      await Promise.race([teardown, new Promise((r) => setTimeout(r, 8000))])
+    } catch (e) {
+      console.warn('[MAIN] shutdownWirelessSessions failed (continuing restart):', e)
+    }
+
+    try {
       await services.usbService?.gracefulReset()
     } catch (e) {
       console.warn('[MAIN] gracefulReset failed (continuing restart):', e)

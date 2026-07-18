@@ -41,10 +41,14 @@ export interface SessionManagerDeps {
   onActiveChanged?: (next: ProjectionSession | null, prev: ProjectionSession | null) => void
 }
 
+function normMac(v?: string): string | undefined {
+  return v ? v.toLowerCase() : v
+}
+
 function idsOverlap(a: SessionDeviceIds, b: SessionDeviceIds): boolean {
   return (
-    (!!a.btMac && a.btMac === b.btMac) ||
-    (!!a.wifiMac && a.wifiMac === b.wifiMac) ||
+    (!!a.btMac && normMac(a.btMac) === normMac(b.btMac)) ||
+    (!!a.wifiMac && normMac(a.wifiMac) === normMac(b.wifiMac)) ||
     (!!a.usbUdid && a.usbUdid === b.usbUdid) ||
     (!!a.instanceId && a.instanceId === b.instanceId) ||
     (!!a.controllerId && a.controllerId === b.controllerId) ||
@@ -140,7 +144,8 @@ export class SessionManager {
     // or undefined value (a wifi/Bonjour presence carries usbUdid:"" and must not clear it).
     for (const key of Object.keys(device) as (keyof SessionDeviceIds)[]) {
       const value = device[key]
-      if (value !== undefined && value !== '') s.device[key] = value
+      if (value === undefined || value === '') continue
+      s.device[key] = key === 'btMac' || key === 'wifiMac' ? value.toLowerCase() : value
     }
     // CarPlay wiredness follows the accumulated udid, not the caller-passed transport.
     if (protocol === 'carplay') s.transport = s.device.usbUdid ? 'usb' : 'wifi'

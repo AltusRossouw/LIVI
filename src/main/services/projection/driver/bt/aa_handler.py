@@ -22,10 +22,6 @@ from shared.config import BT_ADAPTER, BTNAME, CHANNEL, PASSPHRASE, SSID, WIFI_IF
 
 AA_PORT = int(os.environ.get("LIVI_PORT", "5277"))
 
-# Set by AaHandler so the aa-bt.sock 'session-active' command also feeds the shared
-# reconnect worker's session state.
-_session_hook = None
-
 # ── Debug gate ────────────────────────────────────────────────────────────────
 DEBUG = os.environ.get("DEBUG") == "1"
 
@@ -123,6 +119,55 @@ def _recv_frame(sock: socket.socket) -> tuple[int, bytes]:
     proto = _recv_exactly(sock, length) if length > 0 else b""
     return msg_id, proto
 
+def _read_varint(buf: bytes, i: int) -> tuple[int, int]:
+    val = 0
+    shift = 0
+    while True:
+        b = buf[i]
+        i += 1
+        val |= (b & 0x7F) << shift
+        if not b & 0x80:
+            return val, i
+        shift += 7
+
+def _wpp_instance_id(data: bytes) -> str:
+    """WifiVersionResponse field 6 (message) -> field 1 (string) = instanceId."""
+    try:
+        i, n = 0, len(data)
+        while i < n:
+            tag, i = _read_varint(data, i)
+            field, wire = tag >> 3, tag & 7
+            if wire == 2:
+                ln, i = _read_varint(data, i)
+                val = data[i:i + ln]
+                i += ln
+                if field == 6:
+                    j = 0
+                    while j < len(val):
+                        t2, j = _read_varint(val, j)
+                        if t2 & 7 == 2:
+                            l2, j = _read_varint(val, j)
+                            v2 = val[j:j + l2]
+                            j += l2
+                            if t2 >> 3 == 1:
+                                return v2.decode("utf-8", "replace")
+                        elif t2 & 7 == 0:
+                            _, j = _read_varint(val, j)
+                        else:
+                            break
+            elif wire == 0:
+                _, i = _read_varint(data, i)
+            else:
+                break
+    except Exception:
+        pass
+    return ""
+
+def _emit_aa_device(mac: str, data: bytes) -> None:
+    iid = _wpp_instance_id(data)
+    if iid:
+        _push_event({"event": "aa-device", "btMac": mac.upper(), "instanceId": iid})
+
 # ── WiFi handshake ──────────────────────
 
 def _is_tcp_listening(port: int) -> bool:
@@ -188,6 +233,7 @@ def _run_wifi_handshake(sock: socket.socket, mac: str):
             if msg_id == 5:
                 dprint(f"[aa-bt] WPP: WifiVersionResponse hex={data.hex()}",
                       flush=True)
+                _emit_aa_device(mac, data)
                 _pending = None
             else:
                 _pending = (msg_id, data)
@@ -233,6 +279,7 @@ def _run_wifi_handshake(sock: socket.socket, mac: str):
             elif msg_id == 5:    # late WifiVersionResponse
                 dprint(f"[aa-bt] WPP: WifiVersionResponse hex={data.hex()}",
                       flush=True)
+                _emit_aa_device(mac, data)
 
             elif msg_id != 7:
                 dprint(f"[aa-bt] WPP: unknown msgId={msg_id} len={len(data)} "
@@ -518,10 +565,6 @@ _last_phone_mac:   str = ""
 
 # HFP Service Level Connection state
 hfp_slc_established: bool = False
-
-# Set True while an AA session is running (wired or wireless).
-_session_active: bool = False
-_session_active_lock = threading.Lock()
 
 # Set True only when HFP RegisterProfile succeeds.
 _hfp_profile_registered: bool = False
@@ -864,7 +907,6 @@ def _start_event_server() -> None:
       connect-full <mac>   → {"ok": true} or {"ok": false, "error": "..."}
       disconnect <mac>     → {"ok": true} or {"ok": false, "error": "..."}
       remove <mac>            → {"ok": true} or {"ok": false, "error": "..."}
-      session-active <bool>   → {"ok": true, "active": true|false}
       deauth-ap               → {"ok": true, "count": N}  (kicks Wi-Fi clients)
     """
     try:
@@ -909,18 +951,6 @@ def _start_event_server() -> None:
                     return {"ok": False, "error": "remove requires a MAC argument"}
                 ok, err = _device_remove(arg)
                 return {"ok": ok} if ok else {"ok": False, "error": err}
-            if cmd == "session-active":
-                value = arg.strip().lower()
-                if value not in ("true", "false"):
-                    return {"ok": False, "error": "session-active expects true|false"}
-                global _session_active
-                with _session_active_lock:
-                    _session_active = (value == "true")
-                    new_value = _session_active
-                if _session_hook is not None:
-                    _session_hook(new_value)
-                dprint(f"[aa-bt] session active: {new_value}", flush=True)
-                return {"ok": True, "active": new_value}
             if cmd == "deauth-ap":
                 count = deauth_all_clients()
                 dprint(f"[aa-bt] deauth-ap: kicked {count} client(s)", flush=True)
@@ -1276,8 +1306,6 @@ class AaHandler:
         self._ad_manager = None
         self._media_iface = None
         self._objs = {}
-        global _session_hook
-        _session_hook = ctx.set_session_active
 
     def register(self):
         bus = self.ctx.bus

@@ -1,17 +1,15 @@
 """Shared BlueZ device management + reconnect worker for the LIVI wireless helpers.
 
-Protocol-agnostic (no AA/CP specifics): enumerate paired devices, check connection,
-Device1.Connect (wakes the phone and re-establishes its auto-connect profiles),
-disconnect, and a periodic reconnect worker that keeps a bonded phone connected so it
-auto-reconnects after an app restart / reboot instead of waiting for the phone.
-
-Written to become the shared module of the unified BT/WiFi helper; it lives under the
-CP tree for now only so it stages/packages without new plumbing.
+Enumerate paired devices, Device1.Connect/ConnectProfile, Device1.Disconnect, and a
+periodic worker that nudges bonded phones back onto a session.
 """
 
+import os
 import subprocess
 import threading
 import time
+
+_DBG = os.environ.get("LIVI_CP_DEBUG", os.environ.get("DEBUG", "")) not in ("", "0", "false", "False")
 
 
 def _busctl(*args, timeout=10):
@@ -43,10 +41,6 @@ def _is_device_path(path):
     return "/dev_" in path and path.count("/") >= 4
 
 
-def is_connected(adapter, mac):
-    return _get_property(_dev_path(adapter, mac), "org.bluez.Device1", "Connected").lower().endswith("true")
-
-
 def list_paired(adapter, timeout=5):
     """Return [{mac, name, connected}] for every paired BlueZ device."""
     rc, out, _ = _busctl("tree", "--list", "org.bluez", timeout=timeout)
@@ -70,10 +64,15 @@ def list_paired(adapter, timeout=5):
     return devices
 
 
-def connect(adapter, mac, timeout=15):
-    """Device1.Connect: wake the phone and (re)establish its auto-connect profiles."""
-    rc, _, err = _busctl("call", "org.bluez", _dev_path(adapter, mac),
-                         "org.bluez.Device1", "Connect", timeout=timeout)
+def connect(adapter, mac, uuid=None, timeout=15):
+    """With uuid, Device1.ConnectProfile(uuid); otherwise Device1.Connect."""
+    dev = _dev_path(adapter, mac)
+    if uuid:
+        rc, _, err = _busctl("call", "org.bluez", dev,
+                             "org.bluez.Device1", "ConnectProfile", "s", uuid, timeout=timeout)
+    else:
+        rc, _, err = _busctl("call", "org.bluez", dev,
+                             "org.bluez.Device1", "Connect", timeout=timeout)
     return rc == 0, err.strip()
 
 
@@ -83,80 +82,66 @@ def disconnect(adapter, mac, timeout=10):
     return rc == 0, err.strip()
 
 
-def wifi_has_station(iface, ctrl="/var/run/hostapd", timeout=3):
-    """True if any client is associated with our hostapd AP. Once the phone joins Wi-Fi
-    the projection session lives there (the BT/iAP2 link drops), so this is the real
-    'session up' signal for the reconnect worker — leave BT alone while it is True.
-    hostapd_cli list_sta prints one station MAC per line, nothing when none/AP down."""
-    for exe in ("/usr/sbin/hostapd_cli", "/sbin/hostapd_cli", "hostapd_cli"):
-        try:
-            r = subprocess.run([exe, "-p", ctrl, "-i", iface, "list_sta"],
-                               capture_output=True, text=True, timeout=timeout)
-        except FileNotFoundError:
-            continue
-        except subprocess.TimeoutExpired:
-            return False
-        return any(":" in ln for ln in r.stdout.splitlines())
-    return False
+def start_reconnect_worker(adapter, is_active, log, interval=2.0, stale_secs=10.0,
+                           should_nudge=None, profile_for=None):
+    """Daemon thread. Every `interval`s, for each paired device (both branches skipped
+    while `is_active()` is true):
 
+    - disconnected -> Device1.Connect/ConnectProfile nudge (one in flight per device).
+    - connected but no session for `stale_secs` -> Device1.Disconnect.
 
-def start_reconnect_worker(adapter, is_active, log, interval=5.0, stale_ticks=2,
-                           should_nudge=None):
-    """Daemon thread that gets a bonded phone back onto a fresh session after an app
-    restart / reboot, so it doesn't hang until the user manually reconnects. Two cases,
-    both skipped while `is_active()` reports a session is up:
+    `should_nudge(mac)` selects which macs to nudge; `profile_for(mac)` gives the
+    ConnectProfile UUID (None -> generic Connect)."""
 
-    - paired + DISCONNECTED -> Device1.Connect (wake it).
-    - paired + CONNECTED but no session (a stale link from a previous app instance):
-      after `stale_ticks` consecutive ticks with no session (so a genuinely fresh
-      connect, which sets the session flag within a tick, is never dropped) ->
-      Device1.Disconnect. The bonded+trusted phone then reconnects fresh to our new
-      profile, exactly like the manual BT toggle. Next tick it is disconnected and gets
-      the Device1.Connect above.
-
-    `should_nudge(mac)` gates the Device1.Connect nudge to known phones (recorded in
-    devices.json after a first session)."""
-
-    stale = {}          # mac -> consecutive "connected but no session" ticks
-    last_connect = {}   # mac -> monotonic time of the last Device1.Connect nudge
-    connect_cooldown = 45.0  # Device1.Connect is async + slow; never overlap/spam it
+    inflight = set()      # macs with a nudge thread running
+    stale_since = {}      # mac -> monotonic time it went connected-but-no-session
 
     def _connect_async(mac):
-        # Fire-and-forget: Device1.Connect blocks for a cold phone and bluez keeps
-        # trying after our timeout, so run it off the loop and just log the outcome.
-        ok, err = connect(adapter, mac, timeout=25)
-        log(f"reconnect: {mac} " + ("connected" if ok else f"connect nudge failed: {err}"))
+        try:
+            uuid = profile_for(mac) if profile_for else None
+            ok, err = connect(adapter, mac, uuid=uuid, timeout=25)
+            log(f"reconnect: {mac} " + ("connected" if ok else f"connect nudge failed: {err}"))
+        finally:
+            inflight.discard(mac)
 
     def _loop():
         while True:
             time.sleep(interval)
             try:
                 active = is_active()
-                for d in list_paired(adapter):
+                paired = list_paired(adapter)
+                if _DBG:
+                    log("reconnect tick: paired=%d active=%s [%s]" % (
+                        len(paired), active,
+                        ", ".join("%s:%s" % (d["mac"], "conn" if d["connected"] else "disc")
+                                  for d in paired)))
+                for d in paired:
                     mac = d["mac"]
                     if not d["connected"]:
-                        stale[mac] = 0
+                        stale_since.pop(mac, None)
                         if active:
+                            if _DBG:
+                                log("reconnect: %s skip (is_active true)" % mac)
                             continue
                         if should_nudge and not should_nudge(mac):
+                            if _DBG:
+                                log("reconnect: %s skip (not known for enabled protocol)" % mac)
                             continue
-                        # Wake a phone that needs it with an occasional gentle nudge (no spam).
-                        now = time.monotonic()
-                        if now - last_connect.get(mac, -1e9) < connect_cooldown:
+                        if mac in inflight:
                             continue
-                        last_connect[mac] = now
-                        log(f"reconnect: {mac} paired+disconnected -> Device1.Connect (nudge)")
+                        inflight.add(mac)
+                        log(f"reconnect: {mac} paired+disconnected -> nudge")
                         threading.Thread(target=_connect_async, args=(mac,), daemon=True).start()
                         continue
                     # connected
-                    if active:
-                        stale[mac] = 0
+                    if active or (should_nudge and not should_nudge(mac)):
+                        stale_since.pop(mac, None)
                         continue
-                    stale[mac] = stale.get(mac, 0) + 1
-                    if stale[mac] >= stale_ticks:
+                    t0 = stale_since.setdefault(mac, time.monotonic())
+                    if time.monotonic() - t0 >= stale_secs:
                         log(f"reconnect: {mac} connected but no session -> Disconnect (clear stale)")
                         disconnect(adapter, mac)
-                        stale[mac] = 0
+                        stale_since.pop(mac, None)
             except Exception as e:
                 log(f"reconnect worker error: {e!r}")
 

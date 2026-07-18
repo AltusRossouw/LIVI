@@ -117,6 +117,7 @@ describe('setupLifecycle', () => {
       beginShutdown: vi.fn(),
       disconnectPhone: vi.fn(() => Promise.resolve()),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -148,6 +149,7 @@ describe('setupLifecycle', () => {
       beginShutdown: vi.fn(),
       disconnectPhone: vi.fn(() => Promise.resolve()),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -192,6 +194,7 @@ describe('setupLifecycle', () => {
       }),
       disconnectPhone: vi.fn(() => Promise.resolve()),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(() => Promise.resolve())
     }
     const usbService = {
@@ -232,6 +235,7 @@ describe('setupLifecycle', () => {
           })
       ),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(() => Promise.resolve())
     }
 
@@ -279,6 +283,7 @@ describe('setupLifecycle', () => {
       beginShutdown: vi.fn(),
       disconnectPhone: vi.fn(() => Promise.resolve()),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(
         () =>
           new Promise<void>((resolve) => {
@@ -326,6 +331,7 @@ describe('setupLifecycle', () => {
       beginShutdown: vi.fn(),
       disconnectPhone: vi.fn(() => Promise.resolve()),
       disconnectHostBtPhones: vi.fn(() => Promise.resolve()),
+      shutdownWirelessSessions: vi.fn(() => Promise.resolve()),
       stop: vi.fn(() => Promise.resolve())
     }
 

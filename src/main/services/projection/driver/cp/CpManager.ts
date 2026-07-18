@@ -28,8 +28,8 @@ interface PendingDevice {
 export interface CpManagerOptions {
   getConfig: () => Config
   onSpawn: (session: CpSession) => void
-  /** Registry-level (session-independent) helper presence: hostapd wifi + Bonjour/carkit device. */
   onHelperPresence: (presence: Record<string, unknown>) => void
+  onHelperConnect?: () => void
 }
 
 function str(v: unknown): string {
@@ -55,11 +55,13 @@ export class CpManager {
   private readonly _getConfig: () => Config
   private readonly _onSpawn: (session: CpSession) => void
   private readonly _onHelperPresence: (presence: Record<string, unknown>) => void
+  private readonly _onHelperConnect: (() => void) | undefined
 
   constructor(opts: CpManagerOptions) {
     this._getConfig = opts.getConfig
     this._onSpawn = opts.onSpawn
     this._onHelperPresence = opts.onHelperPresence
+    this._onHelperConnect = opts.onHelperConnect
   }
 
   /** The shared MFi signer + BlueZ control socket. */
@@ -146,10 +148,13 @@ export class CpManager {
       console.log(`[CpManager] listening on :${CP_CONTROL_PORT} (dual-stack)`)
     )
     this._server = server
-    this._eventSub = this._helper.subscribeEvents((ev) => this._onHelperEvent(ev))
+    this._eventSub = this._helper.subscribeEvents(
+      (ev) => this._onHelperEvent(ev),
+      () => this._onHelperConnect?.()
+    )
   }
 
-  close(): void {
+  async close(): Promise<void> {
     this._eventSub?.close()
     this._eventSub = null
     if (this._server) {
@@ -160,10 +165,19 @@ export class CpManager {
       }
       this._server = null
     }
-    for (const s of [...this._sessions]) void s.close()
+    const sessions = [...this._sessions]
     this._sessions.clear()
     this._liveSession = null
     this._pendingDevices.length = 0
+    await Promise.all(
+      sessions.map((s) =>
+        s
+          .close()
+          .catch((e) =>
+            console.warn(`[CpManager] session close threw on close: ${(e as Error).message}`)
+          )
+      )
+    )
   }
 
   private _spawn(sock: net.Socket): void {
@@ -321,7 +335,9 @@ export class CpManager {
   private _bufferPending(ids: PendingDevice): void {
     if (!ids.btMac && !ids.wifiMac && !ids.usbUdid) return
     const i = this._pendingDevices.findIndex(
-      (d) => (ids.btMac && d.btMac === ids.btMac) || (ids.usbUdid && d.usbUdid === ids.usbUdid)
+      (d) =>
+        (ids.btMac && d.btMac?.toLowerCase() === ids.btMac.toLowerCase()) ||
+        (ids.usbUdid && d.usbUdid === ids.usbUdid)
     )
     if (i >= 0) this._pendingDevices[i] = { ...this._pendingDevices[i], ...ids }
     else this._pendingDevices.push(ids)

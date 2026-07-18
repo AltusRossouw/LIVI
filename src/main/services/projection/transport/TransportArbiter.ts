@@ -88,7 +88,7 @@ export class TransportArbiter {
           '[TransportArbiter] wired phone re-attach during detach debounce — committing detach inline'
         )
         this.clearOverrideIfUndetected()
-        if (this.deps.isWiredAaSessionActive() || this.deps.isWiredCpSessionActive()) {
+        if (this.deps.hasWiredSession()) {
           this.deps.onWiredPhoneGone()
           this.deps.onShouldAutoStart()
         }
@@ -119,7 +119,7 @@ export class TransportArbiter {
       console.log('[TransportArbiter] wired phone marked disconnected')
       this.clearOverrideIfUndetected()
 
-      if (this.deps.isWiredAaSessionActive() || this.deps.isWiredCpSessionActive()) {
+      if (this.deps.hasWiredSession()) {
         this.deps.onWiredPhoneGone()
       }
 

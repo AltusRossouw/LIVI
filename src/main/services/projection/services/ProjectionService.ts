@@ -191,6 +191,7 @@ export class ProjectionService {
   private aaBtSubscription: { close: () => void } | null = null
   private aaBtNameByMac = new Map<string, string>()
   private connectedAaBtMac = ''
+  private readonly aaBtMacByInstance = new Map<string, string>()
   private audioMonitor: AudioDeviceMonitorHandle | null = null
   private readonly statusFile = new StatusFileWriter()
 
@@ -209,14 +210,19 @@ export class ProjectionService {
     getAaBtMac: () => this.connectedAaBtMac,
     getDongleConnectedMac: () => this.dongleConnectedMac,
     getDongleDevList: () => this.dongleDevList,
-    emit: (p) => this.emitProjectionEvent(p)
+    emit: (p) => this.emitProjectionEvent(p),
+    pushReconnectTargets: (targets) => {
+      this.drivers
+        .getCpManager()
+        ?.helper.sendReconnectTargets(targets)
+        .catch(() => {})
+    }
   })
   private aaBtActive = false
   private cpActive = false
   private wirelessPhoneInRange = false
   private btInitialQueryDone = false
   private isSwitching = false
-  private sessionActiveSent: boolean | null = null
 
   private aaTransport(session: AaSession): SessionTransport {
     return session.isWiredMode() ? 'usb' : 'wifi'
@@ -389,12 +395,7 @@ export class ProjectionService {
     const wired = session.isWiredMode()
     const instanceId = typeof p.instanceId === 'string' ? p.instanceId : undefined
     const wifiMac = !wired && typeof p.wifiMac === 'string' ? p.wifiMac : undefined
-    const btMac =
-      !wired &&
-      this.connectedAaBtMac &&
-      !this.cpClaimedBtMacs().has(this.connectedAaBtMac.toUpperCase())
-        ? this.connectedAaBtMac
-        : undefined
+    const btMac = !wired && instanceId ? this.aaBtMacByInstance.get(instanceId) : undefined
     this.deviceRegistry.noteDevice({
       btMac,
       instanceId,
@@ -544,7 +545,6 @@ export class ProjectionService {
 
     if (wantAaWireless && !this.aaBtActive) {
       this.aaBtActive = true
-      this.sessionActiveSent = null
       this.drivers.startAaWireless()
       this.openAaBtSubscription()
       this.populateAaBtPairedListInitial()
@@ -559,7 +559,6 @@ export class ProjectionService {
       this.closeAaBtSubscription()
       this.setWirelessPhoneInRange(false)
       this.btInitialQueryDone = false
-      this.sessionActiveSent = null
       this.drivers.stopAaWireless()
     }
 
@@ -571,7 +570,7 @@ export class ProjectionService {
       this.drivers.startCp()
     } else if (!wantCp && this.cpActive) {
       this.cpActive = false
-      this.drivers.releaseCp()
+      void this.drivers.releaseCp()
     }
     // cpWireless only toggles the wireless CP BT profile live over the control socket.
     if (this.cpActive && !restarting && this.btCpWireless !== wantCpWireless) {
@@ -1119,12 +1118,21 @@ export class ProjectionService {
     this.systemSound.dispose()
     this.audioMonitor?.stop()
     this.audioMonitor = null
+  }
+
+  public async shutdownWirelessSessions(): Promise<void> {
+    await this.drivers.releaseAa()
+    await this.drivers.releaseCp()
+    try {
+      await this.aaBtSock.deauthApClients()
+    } catch {
+      /* best-effort */
+    }
     if (this.helperSupervisor) {
       const sup = this.helperSupervisor
       this.helperSupervisor = null
-      sup.stop().catch(() => {})
+      await sup.stop().catch(() => {})
     }
-    this.drivers.releaseCp()
   }
 
   constructor() {
@@ -1153,6 +1161,7 @@ export class ProjectionService {
       onCpDisconnected: (s) => this.onCpDisconnected(s as CpSession),
       onCpPresence: (s, p) => this.onCpPresence(s as CpSession, p),
       onCpHelperPresence: (p) => this.onCpHelperPresence(p),
+      onCpHelperConnect: () => this.deviceController.resendReconnectTargets(),
       onCpCreated: (s) => this.attachCodecCapture(s as CpSession),
       onCpReleased: () => {},
       getCpConfigSeed: () => ({
@@ -1189,6 +1198,14 @@ export class ProjectionService {
       isDongleSessionActive: () => this.getActiveTransport() === 'dongle',
       isWiredAaSessionActive: () => this.started && this.isActiveAaWired(),
       isWiredCpSessionActive: () => this.started && this.isActiveCpWired(),
+      hasWiredSession: () =>
+        this.started &&
+        this.sessions
+          .all()
+          .some(
+            (s) =>
+              s.transport === 'usb' && (s.protocol === 'androidauto' || s.protocol === 'carplay')
+          ),
       onChange: () => this.emitTransportState(),
       onShouldStop: async () => {
         const a = this.sessions.active()
@@ -1469,25 +1486,6 @@ export class ProjectionService {
       type: 'transportState',
       payload: this.arbiter.getSnapshot()
     })
-    if (this.aaBtActive) {
-      const aaActive = this.getActiveTransport() === 'aa'
-      void this.setSessionActive(aaActive)
-    }
-  }
-
-  /** Tell the BT reconnect worker to pause while an AA session is active. */
-  private async setSessionActive(active: boolean): Promise<void> {
-    if (!this.aaBtActive || this.sessionActiveSent === active) return
-    this.sessionActiveSent = active
-    try {
-      await this.aaBtSock.setSessionActive(active)
-    } catch (e) {
-      this.sessionActiveSent = null
-      // ENOENT during early startup is expected; supervisor IPC socket not up yet
-      if (!(e instanceof Error && e.message.includes('ENOENT'))) {
-        console.warn(`[ProjectionService] setSessionActive(${active}) failed`, e)
-      }
-    }
   }
 
   public async switchTransport(): Promise<{ ok: boolean; active: Transport | null }> {
@@ -1897,6 +1895,12 @@ export class ProjectionService {
         (ev) => {
           if (ev.event === 'input' && ev.command) {
             this.dispatchRemoteInput(ev.command)
+            return
+          }
+          if (ev.event === 'aa-device') {
+            if (typeof ev.btMac === 'string' && typeof ev.instanceId === 'string') {
+              this.aaBtMacByInstance.set(ev.instanceId, ev.btMac)
+            }
             return
           }
           this.refreshAaBtPairedList({

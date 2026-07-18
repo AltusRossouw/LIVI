@@ -15,12 +15,17 @@ export type DeviceControllerDeps = {
   getDongleConnectedMac: () => string
   getDongleDevList: () => DevListEntry[]
   emit: (payload: ProjectionEvent) => void
+  pushReconnectTargets: (targets: Record<string, string | null>) => void
 }
+
+// The phone's iAP service UUID, used as the CarPlay reconnect ConnectProfile target.
+const IAP_PROFILE_UUID = '00000000-deca-fade-deca-deafdecacafe'
 
 // Builds the unified device-picker view (native registry + dongle list) and
 // serves the picker commands: select routes to a session, forget unpairs BT.
 export class DeviceController {
   private lastDeviceViewsSig = ''
+  private lastReconnectSig = ''
 
   constructor(private readonly deps: DeviceControllerDeps) {}
 
@@ -70,11 +75,40 @@ export class DeviceController {
   }
 
   emitDevices(): void {
+    this.reconcileReconnectTargets()
     const views = this.buildDeviceViews()
     const sig = JSON.stringify(views)
     if (sig === this.lastDeviceViewsSig) return
     this.lastDeviceViewsSig = sig
     this.deps.emit({ type: 'devices', payload: views })
+  }
+
+  resendReconnectTargets(): void {
+    this.reconcileReconnectTargets(true)
+  }
+
+  private reconcileReconnectTargets(force = false): void {
+    const reg = this.deps.deviceRegistry
+    const targets: Record<string, string | null> = {}
+    for (const e of reg.list()) {
+      if (!e.btMac || !(e.protocol || e.name)) continue
+      const sess = this.deps.sessions().byDevice({
+        btMac: e.btMac,
+        wifiMac: e.wifiMac,
+        usbUdid: e.usbUdid,
+        instanceId: e.instanceId,
+        ip: e.currentIp
+      })
+      if (sess) continue
+      targets[e.btMac.toUpperCase()] = e.protocol === 'carplay' ? IAP_PROFILE_UUID : null
+    }
+    const sig = Object.keys(targets)
+      .sort()
+      .map((m) => `${m}=${targets[m] ?? ''}`)
+      .join(',')
+    if (!force && sig === this.lastReconnectSig) return
+    this.lastReconnectSig = sig
+    this.deps.pushReconnectTargets(targets)
   }
 
   private buildDeviceViews(): DeviceView[] {

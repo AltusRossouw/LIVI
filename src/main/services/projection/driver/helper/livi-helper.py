@@ -1,6 +1,5 @@
 import asyncio
 import ctypes
-import json
 import os
 import signal
 import subprocess
@@ -16,7 +15,7 @@ from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
 
 from shared import bt_common, wifi_ap
-from shared.config import BT_ADAPTER, BTNAME, DEVICES_FILE, WIFI_IFACE
+from shared.config import BT_ADAPTER, BTNAME, WIFI_IFACE
 
 AA_WIRELESS = os.environ.get("LIVI_AA_WIRELESS") == "1"
 CP_WIRELESS = os.environ.get("LIVI_CP_WIRELESS", "1") == "1"
@@ -25,33 +24,6 @@ ADAPTER_PATH = "/org/bluez/" + BT_ADAPTER
 def log(*args):
     print("[livi-helper]", *args, flush=True)
 
-_nudge_cache = {"mtime": None, "by_protocol": {}}
-
-def _btmacs_by_protocol():
-    """btMacs of known phones grouped by protocol, read from devices.json (which holds only
-    phones that completed a session) and refreshed on mtime change."""
-    try:
-        st = os.stat(DEVICES_FILE)
-    except OSError:
-        return {}
-    if st.st_mtime != _nudge_cache["mtime"]:
-        by_protocol = {}
-        try:
-            with open(DEVICES_FILE) as f:
-                data = json.load(f)
-            for d in data if isinstance(data, list) else []:
-                proto, mac = d.get("protocol"), d.get("btMac")
-                if proto and mac:
-                    by_protocol.setdefault(proto, set()).add(mac.upper())
-        except (OSError, json.JSONDecodeError):
-            return _nudge_cache["by_protocol"]
-        _nudge_cache["mtime"] = st.st_mtime
-        _nudge_cache["by_protocol"] = {k: frozenset(v) for k, v in by_protocol.items()}
-    return _nudge_cache["by_protocol"]
-
-def _should_nudge(mac, protocol):
-    return mac.upper() in _btmacs_by_protocol().get(protocol, frozenset())
-
 class SharedCtx:
     def __init__(self, bus, loop):
         self.bus = bus
@@ -59,15 +31,15 @@ class SharedCtx:
         self.adapter_path = ADAPTER_PATH
         self.loop = loop
         self.log = log
-        self._session = {"v": False}
+        self.reconnect_targets = {}
         self.set_aa_wireless = None
         self.set_cp_wireless = None
 
-    def set_session_active(self, active):
-        self._session["v"] = bool(active)
-
-    def session_active(self):
-        return self._session["v"]
+    def set_reconnect_targets(self, targets):
+        if isinstance(targets, dict):
+            self.reconnect_targets = {m.upper(): u for m, u in targets.items() if m}
+        else:
+            self.reconnect_targets = {m.upper(): None for m in targets if m}
 
 AGENT_IFACE = "org.bluez.Agent1"
 
@@ -381,11 +353,10 @@ def main():
                 ws["worker"] = True
                 bt_common.start_reconnect_worker(
                     BT_ADAPTER,
-                    lambda: (not ws["active"]) or ctx.session_active()
-                            or bt_common.wifi_has_station(WIFI_IFACE),
+                    lambda: (not ws["active"]),
                     log,
-                    should_nudge=lambda mac: (ws["want_aa"] and _should_nudge(mac, "androidauto"))
-                                             or (ws["want_cp"] and _should_nudge(mac, "carplay")),
+                    should_nudge=lambda mac: mac.upper() in ctx.reconnect_targets,
+                    profile_for=lambda mac: ctx.reconnect_targets.get(mac.upper()),
                 )
         except Exception as e:
             log("wireless BT setup failed:", repr(e))

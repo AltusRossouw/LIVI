@@ -135,7 +135,14 @@ export class CpHelperSock implements MfiSigner {
     if (!res.ok) throw new CpHelperSockError(res.error)
   }
 
-  subscribeEvents(onEvent: (ev: Record<string, unknown>) => void): { close: () => void } {
+  async sendReconnectTargets(targets: Record<string, string | null>): Promise<void> {
+    await this.request(`reconnect-targets ${JSON.stringify(targets)}`)
+  }
+
+  subscribeEvents(
+    onEvent: (ev: Record<string, unknown>) => void,
+    onConnect?: () => void
+  ): { close: () => void } {
     let closed = false
     let sock: net.Socket | null = null
     const connect = (): void => {
@@ -143,7 +150,10 @@ export class CpHelperSock implements MfiSigner {
       const s = net.createConnection(this.path)
       sock = s
       let buf = ''
-      s.on('connect', () => s.write('subscribe\n'))
+      s.on('connect', () => {
+        s.write('subscribe\n')
+        onConnect?.()
+      })
       s.on('data', (d: Buffer) => {
         buf += d.toString('utf8')
         let nl = buf.indexOf('\n')

@@ -173,6 +173,7 @@ export function buildInfoPlist(cfg: CpStackConfig): PlistValue {
     model: 'LIVI',
     manufacturer: 'LIVI',
     deviceID: cfg.deviceId,
+    bluetoothIDs: [cfg.deviceId],
     name: cfg.deviceName,
     rightHandDrive: false,
     keepAliveLowPower: true,

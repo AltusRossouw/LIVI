@@ -45,8 +45,8 @@ type Ids = { btMac?: string; wifiMac?: string; usbUdid?: string; instanceId?: st
 function normMac(v?: string): string | undefined {
   if (!v) return v
   const hex = v.replace(/[^0-9a-fA-F]/g, '')
-  if (hex.length === 12) return hex.toUpperCase().match(/.{2}/g)!.join(':')
-  return v.toUpperCase()
+  if (hex.length === 12) return hex.toLowerCase().match(/.{2}/g)!.join(':')
+  return v.toLowerCase()
 }
 
 const IDENTITY_KEYS = [
@@ -134,7 +134,7 @@ export class DeviceRegistry {
   }
 
   private stableKey(e: DeviceEntry): string | null {
-    return e.btMac ?? e.usbUdid ?? e.wifiMac ?? null
+    return e.btMac ?? e.usbUdid ?? e.wifiMac ?? e.instanceId ?? null
   }
 
   private persist(): void {

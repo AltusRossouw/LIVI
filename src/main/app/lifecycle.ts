@@ -60,6 +60,7 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
     const tUsbStop = 500
     const tDisconnect = 800
     const tCarplayStop = 6000
+    const tWirelessShutdown = 8000
 
     // Global watchdog: log only
     const watchdogMs = process.platform === 'darwin' ? 10000 : 3000
@@ -75,6 +76,14 @@ export function setupLifecycle(runtimeState: runtimeStateProps, services: Servic
       usbService?.beginShutdown()
 
       stopPhoneSuppression()
+
+      await measureStep('projection.shutdownWirelessSessions()', async () => {
+        await withTimeout(
+          'projection.shutdownWirelessSessions()',
+          projectionService.shutdownWirelessSessions(),
+          tWirelessShutdown
+        )
+      })
 
       await measureStep('usbService.stop()', async () => {
         await withTimeout('usbService.stop()', usbService?.stop?.() ?? Promise.resolve(), tUsbStop)

@@ -14,6 +14,9 @@ _DEV_ADDR_CANDIDATES = (0x10, 0x11)
 _BUSY_RETRY_S = 0.0005
 _IO_TIMEOUT_S = 2.0
 _PROBE_TIMEOUT_S = 2.0
+_AUTH_POLL_S = 0.01
+# Signing time (measured): ~440ms for a 3.0 and 2.0C, ~1645ms for a 2.0B
+_AUTH_TIMEOUT_S = 3.0
 # Opened lazily by init() so importing this module never touches i2c/GPIO.
 bus = None
 # Auth protocol major version reported by the chip (2 = SHA-1 / 20-byte challenge,
@@ -172,7 +175,8 @@ def generate_challenge_response(challenge):
                    "start authentication")
 
         time.sleep(0.01)
-        for _ in range(10):
+        deadline = time.monotonic() + _AUTH_TIMEOUT_S
+        while True:
             try:
                 bus.i2c_rdwr(smbus2.i2c_msg.write(DEV_ADDR, [0x10]))
                 status_msg = smbus2.i2c_msg.read(DEV_ADDR, 1)
@@ -181,13 +185,13 @@ def generate_challenge_response(challenge):
                     break
             except OSError:
                 pass
-            time.sleep(0.1)
-        else:
-            try:
-                err = _read_i2c(0x05, 1)[0]
-                raise Exception(f"timeout or auth failed (error code 0x{err:02X})")
-            except Exception as e:
-                raise Exception("timeout or auth failed, and failed to read error code") from e
+            if time.monotonic() >= deadline:
+                try:
+                    err = "0x%02X" % _read_i2c(0x05, 1)[0]
+                except Exception:
+                    err = "unreadable"
+                raise Exception(f"timeout or auth failed (error code {err})")
+            time.sleep(_AUTH_POLL_S)
 
         size = Word.unpack(_read_i2c(0x11, 2))[0]
         return _read_i2c(0x12, size)

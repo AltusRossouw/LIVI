@@ -314,6 +314,8 @@ class IAP2Connection:
 
     def close(self):
         self._input.feed_eof()
+        if self._receive_loop_task and self._receive_loop_task is not asyncio.current_task():
+            self._receive_loop_task.cancel()
 
     def _write_packet(self, payload=None, seq=0, control=0, session_id=0):
         self._cumulative_received = 0

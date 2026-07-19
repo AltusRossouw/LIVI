@@ -749,6 +749,7 @@ class CpHandler:
         async def iap_handler():
             peer = _IapPeer(cid)
             self._peers.add(peer)
+            conn = None
             try:
                 cert = await self.loop.run_in_executor(None, read_certificate)
                 conn = IAP2Connection(writer, reader, self.loop, max_outgoing=4, zero_ack=direct,
@@ -874,6 +875,12 @@ class CpHandler:
                 self._log("session ended:", repr(e))
             finally:
                 self._peers.discard(peer)
+                if conn is not None:
+                    conn.close()
+                try:
+                    writer.close()
+                except Exception:
+                    pass
                 if carkit:
                     self._carkit_iap_count -= 1
                 if not over_wifi and self._bt_writer is writer:

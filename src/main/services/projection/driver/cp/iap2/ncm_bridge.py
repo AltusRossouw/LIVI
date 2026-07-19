@@ -193,6 +193,12 @@ class NcmBridge:
                            capture_output=True, timeout=5)
         subprocess.run(["nmcli", "device", "set", self.ifname, "managed", "no"],
                        capture_output=True, timeout=10)
+        # One peer on this link, so skip duplicate address detection.
+        try:
+            with open("/proc/sys/net/ipv6/conf/%s/accept_dad" % self.ifname, "w") as f:
+                f.write("0")
+        except OSError:
+            pass
         subprocess.run(["ip", "link", "set", self.ifname, "up"],
                        capture_output=True, timeout=5)
 

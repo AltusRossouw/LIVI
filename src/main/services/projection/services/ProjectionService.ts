@@ -551,7 +551,6 @@ export class ProjectionService {
         .then(() => {
           this.emitTransportState()
           this.connectConfiguredAudioDevices().catch(() => {})
-          return this.tryAutoConnect()
         })
         .catch(() => {})
     } else if (!wantAaWireless && this.aaBtActive) {
@@ -1828,7 +1827,10 @@ export class ProjectionService {
 
   // Pick a target from the paired list and fire a single Connect
   private async tryAutoConnect(opts: { force?: boolean } = {}): Promise<void> {
-    if (!this.aaBtActive) return
+    if (!this.aaBtActive) {
+      console.log('[ProjectionService] autoconnect: skipped (wireless AA not active)')
+      return
+    }
     // Don't poke the phone over BT while a wired session is already running
     if (this.started && this.isActiveAaWired()) {
       console.log('[ProjectionService] autoconnect: skipped (wired AA session active)')
@@ -1848,7 +1850,13 @@ export class ProjectionService {
     }
     // Audio devices being connected doesn't count — we still want to wake the phone
     const phones = devices.filter((d) => isPhoneLikeCod(d.class))
-    if (phones.some((d) => d.connected)) return
+    const connected = phones.filter((d) => d.connected)
+    if (connected.length > 0) {
+      console.log(
+        `[ProjectionService] autoconnect: skipped (already connected: ${connected.map((d) => d.mac).join(', ')})`
+      )
+      return
+    }
 
     const lastMac = this.config.lastConnectedAaBtMac
     const preferred = lastMac ? phones.find((d) => d.mac === lastMac) : null

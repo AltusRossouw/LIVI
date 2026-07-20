@@ -64,16 +64,29 @@ def list_paired(adapter, timeout=5):
     return devices
 
 
-def connect(adapter, mac, uuid=None, timeout=15):
+def connect(adapter, mac, uuid=None, timeout=40):
     """With uuid, Device1.ConnectProfile(uuid); otherwise Device1.Connect."""
     dev = _dev_path(adapter, mac)
+    call = ["--timeout=%d" % int(timeout), "call", "org.bluez", dev, "org.bluez.Device1"]
     if uuid:
-        rc, _, err = _busctl("call", "org.bluez", dev,
-                             "org.bluez.Device1", "ConnectProfile", "s", uuid, timeout=timeout)
+        call += ["ConnectProfile", "s", uuid]
     else:
-        rc, _, err = _busctl("call", "org.bluez", dev,
-                             "org.bluez.Device1", "Connect", timeout=timeout)
+        call += ["Connect"]
+    rc, _, err = _busctl(*call, timeout=timeout + 5)
     return rc == 0, err.strip()
+
+
+def is_connect_in_progress(err):
+    """BlueZ is already attempting this device, so the call was not a failure."""
+    return "In Progress" in (err or "")
+
+
+def is_timeout(err):
+    return "TimeoutExpired" in (err or "") or "Connection timed out" in (err or "")
+
+
+# Rounds of 'In Progress' after which BlueZ's attempt is treated as wedged.
+_STUCK_ROUNDS = 3
 
 
 def disconnect(adapter, mac, timeout=10):
@@ -101,20 +114,42 @@ def start_reconnect_worker(adapter, is_active, log, interval=2.0, stale_secs=10.
     stale_since = {}      # mac -> monotonic time it went connected-but-no-session
     backoff = {}          # mac -> current retry delay in seconds
     next_try = {}         # mac -> monotonic time the next nudge is allowed
+    stuck = {}            # mac -> consecutive 'In Progress' replies
+
+    def _clear_pending(mac, why):
+        """Abort BlueZ's own connection attempt, which otherwise blocks the device."""
+        log(f"reconnect: {mac} clearing stuck connect attempt ({why})")
+        disconnect(adapter, mac)
 
     def _connect_async(mac):
         try:
             uuid = profile_for(mac) if profile_for else None
-            ok, err = connect(adapter, mac, uuid=uuid, timeout=25)
+            ok, err = connect(adapter, mac, uuid=uuid)
             if ok:
                 backoff.pop(mac, None)
                 next_try.pop(mac, None)
+                stuck.pop(mac, None)
                 log(f"reconnect: {mac} connected")
-            else:
-                delay = min(max_backoff, max(interval, backoff.get(mac, interval) * 2))
-                backoff[mac] = delay
-                next_try[mac] = time.monotonic() + delay
-                log(f"reconnect: {mac} connect nudge failed: {err} (retry in {delay:.0f}s)")
+                return
+            if is_connect_in_progress(err):
+                # Not a failure, so it must not advance the backoff. But if BlueZ
+                # stays busy for several rounds the attempt is wedged, so abort it.
+                n = stuck.get(mac, 0) + 1
+                stuck[mac] = n
+                next_try[mac] = time.monotonic() + interval
+                if n >= _STUCK_ROUNDS:
+                    stuck.pop(mac, None)
+                    _clear_pending(mac, f"{n} rounds in progress")
+                else:
+                    log(f"reconnect: {mac} already connecting, waiting")
+                return
+            stuck.pop(mac, None)
+            if is_timeout(err):
+                _clear_pending(mac, "connect timed out")
+            delay = min(max_backoff, max(interval, backoff.get(mac, interval) * 2))
+            backoff[mac] = delay
+            next_try[mac] = time.monotonic() + delay
+            log(f"reconnect: {mac} connect nudge failed: {err} (retry in {delay:.0f}s)")
         finally:
             inflight.discard(mac)
 

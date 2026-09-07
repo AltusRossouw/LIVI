@@ -10,9 +10,11 @@ members = [
     "crates/livi-aa",
     "crates/livi-session-io",
     "crates/livi-dongle",
+    "crates/livi-link-provision",
     "bin/mfi-probe",
     "bin/livi-helperd",
-    "bin/livi-usbproxy",
+    "bin/livi-link",
+    "bin/livi-link-provision",
     "bin/muxd-probe",
     "bin/usb-probe",
 ]

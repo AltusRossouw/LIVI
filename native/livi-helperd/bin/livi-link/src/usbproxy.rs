@@ -6,6 +6,7 @@
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -19,12 +20,12 @@ fn active_attach() -> &'static Mutex<Option<Arc<AtomicBool>>> {
     ACTIVE.get_or_init(|| Mutex::new(None))
 }
 
-fn main() {
+pub fn run() -> ExitCode {
     let listener = match TcpListener::bind(("0.0.0.0", PORT)) {
         Ok(l) => l,
         Err(e) => {
             eprintln!("[usbproxy] bind :{PORT}: {e}");
-            std::process::exit(1);
+            return ExitCode::FAILURE;
         }
     };
     println!("[usbproxy] listening on :{PORT}");
@@ -41,6 +42,7 @@ fn main() {
             Err(e) => eprintln!("[usbproxy] accept: {e}"),
         }
     }
+    ExitCode::SUCCESS
 }
 
 fn read_line(s: &mut TcpStream) -> Result<String, String> {

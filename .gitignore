@@ -73,3 +73,7 @@ Thumbs.db
 # Logs
 *.log
 *.log*
+
+# LIVI Link dongle stack — build output, committed by the CI job only
+assets/livi-link/*.gz
+assets/livi-link/MANIFEST.md5

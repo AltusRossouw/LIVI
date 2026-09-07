@@ -22,12 +22,13 @@ It is a standalone cross-platform head unit with a native, zero-copy GStreamer v
 ## Native Connectivity
 
 - **Apple CarPlay** (wired & wireless) on Linux — requires [MFi Authentication](#mfi-authentication)
+- **Apple CarPlay** (wired) on Mac — requires [LIVI Link](LIVI-LINK.md)
 - **Android Auto** (wired) on all platforms
 - **Android Auto** (wireless) on Linux
 
 ## Native Apple CarPlay
 
-LIVI implements the CarPlay accessory side natively on Linux. Wireless sessions run over LIVI's own Wi-Fi access point with Bluetooth pairing, wired sessions run directly over the USB cable (no OTG required).
+LIVI implements the CarPlay accessory side natively. On Linux that covers wireless and wired sessions, on macOS wired sessions through [LIVI Link](LIVI-LINK.md). Wireless sessions run over LIVI's own Wi-Fi access point with Bluetooth pairing, wired sessions run directly over the USB cable (no OTG required).
 
 - main + instrument cluster video (H.264/H.265, hardware decoded, zero-copy)
 - audio playback, phone calls, microphone uplink
@@ -36,21 +37,27 @@ LIVI implements the CarPlay accessory side natively on Linux. Wireless sessions 
 - day/night mode and GPS forwarding to the phone
 - multi-session with live switching between connected phones
 
-Wireless CarPlay requires a Bluetooth adapter and a Wi-Fi interface dedicated to the access point. Wired CarPlay works on any USB port.
+Wireless CarPlay requires a Bluetooth adapter and a Wi-Fi interface dedicated to the access point. Wired CarPlay works on any USB port. On macOS the phone connects to LIVI Link rather than to the Mac.
 
 
 ## MFi Authentication
 
-CarPlay requires the accessory to authenticate against the phone using an Apple **MFi authentication coprocessor**. This is a hardware chip, it cannot be emulated in software, and LIVI does not ship or bypass it. You need a physical coprocessor (e.g. salvaged from a certified CarPlay accessory or sourced as a module) wired to the I²C bus of your board.
+CarPlay requires the accessory to authenticate against the phone. The usual way is an Apple **MFi authentication coprocessor**, a hardware chip that cannot be emulated and that LIVI neither ships nor bypasses. Two routes:
 
-LIVI talks to the chip directly. Configuration (`config.json`):
+- **On the board** — a coprocessor wired to the I²C bus
+- **Over the network** — [LIVI Link](LIVI-LINK.md)
+
+
+LIVI does not support Apple's Basic Accessory Authentication on MacOS, but may in the future.
+
+For a chip on the board, configuration (`config.json`):
 
 | Key                   | Default | Description                          |
 | --------------------- | ------- | ------------------------------------ |
 | `carPlayMfiI2cBus`    | `2`     | I²C bus number the coprocessor is on |
 | `carPlayMfiPowerGpio` | `21`    | GPIO that powers the coprocessor     |
 
-Without a coprocessor, native CarPlay is unavailable. Dongle-based CarPlay and all Android Auto paths work regardless.
+Without one of these, native CarPlay is unavailable. All Android Auto paths work regardless.
 
 
 ## Wireless

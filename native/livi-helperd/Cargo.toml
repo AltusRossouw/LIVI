@@ -16,6 +16,7 @@ members = [
     "bin/livi-link",
     "bin/livi-link-provision",
     "bin/muxd-probe",
+    "bin/mac-usbmuxd-probe",
     "bin/usb-probe",
 ]
 

@@ -112,8 +112,9 @@ fn start_carplay_seam(link: Arc<LinkPresence>) {
     });
 
     tokio::spawn(identify_on_link(link.clone(), auth.clone()));
-    tokio::spawn(crate::wired::watch(auth, identity, cp.clone(), bcast.clone(), state, link));
-    println!("[helperd] wired CarPlay watcher started, waiting for the LIVI Link");
+    tokio::spawn(crate::wired::watch(auth.clone(), identity.clone(), cp.clone(), bcast.clone(), state.clone(), link.clone()));
+    tokio::spawn(crate::wired::watch_usbmuxd(auth, identity, cp.clone(), bcast.clone(), state, link));
+    println!("[helperd] wired CarPlay watchers started (dongle + system usbmuxd), waiting for the LIVI Link");
 
     let pk = env_s("LIVI_CP_PK", "");
     let pi = env_s("LIVI_CP_PI", "");

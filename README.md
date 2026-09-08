@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt='LIVI' src='docs/images/banner.png' width="1200" />
+  <img alt='LIVI' src='docs/media/banner.png' width="1200" />
 </p>
 
 # LIVI – Linux In-Vehicle Infotainment
@@ -37,7 +37,7 @@ LIVI implements the CarPlay accessory side natively. On Linux that covers wirele
 - day/night mode and GPS forwarding to the phone
 - multi-session with live switching between connected phones
 
-Wireless CarPlay requires a Bluetooth adapter and a Wi-Fi interface dedicated to the access point. Wired CarPlay works on any USB port. On macOS the phone connects to LIVI Link rather than to the Mac.
+Wireless CarPlay requires a Bluetooth adapter and a Wi-Fi interface dedicated to the access point. Wired CarPlay works on any USB port.
 
 
 ## MFi Authentication
@@ -73,9 +73,9 @@ Dedicated Interface reserves the Wi-Fi adapter for the access point and brings i
 Configure under Settings → General → Connections.
 
 <p align="center">
-  <img src="docs/images/connections.png" alt="Connection settings" width="42%" align="top" />
+  <img src="docs/media/connections.png" alt="Connection settings" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/wifi.png" alt="Wi-Fi access point settings" width="42%" align="top" />
+  <img src="docs/media/wifi.png" alt="Wi-Fi access point settings" width="42%" align="top" />
 </p>
 
 
@@ -94,7 +94,7 @@ Switch from the device list, or bind a key under Settings → General → Key Bi
 Manage under Settings → Devices.
 
 <p align="center">
-  <img src="docs/images/devices.png" alt="Connected devices" width="70%" />
+  <img src="docs/media/devices.png" alt="Connected devices" width="70%" />
 </p>
 
 
@@ -109,9 +109,9 @@ The pass only runs while a value differs from its default, so a display that nee
 Configure under Settings → Appearance → Contrast / Gamma and Settings → Appearance → Color.
 
 <p align="center">
-  <img src="docs/images/contrast_gamma.png" alt="Contrast and gamma calibration" width="42%" align="top" />
+  <img src="docs/media/contrast_gamma.png" alt="Contrast and gamma calibration" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/color.png" alt="Colour channel calibration" width="42%" align="top" />
+  <img src="docs/media/color.png" alt="Colour channel calibration" width="42%" align="top" />
 </p>
 
 
@@ -138,7 +138,7 @@ pnpm -C scripts/tools run telemetry:set _repeatMs=1000 speedKph=90 rpm=2500
 ```
 
 <p align="center">
-  <img src="docs/images/telemetry.png" alt="Telemetry Dashboard" width="70%" />
+  <img src="docs/media/telemetry.png" alt="Telemetry Dashboard" width="70%" />
 </p>
 
 
@@ -166,9 +166,9 @@ mirrored to `gpsData.json` for external tools.
 On a Raspberry Pi 5, `/dev/ttyAMA0` on GPIO 14/15 (PIN 8/10) does not exist until `dtoverlay=uart0` is set in `config.txt`.
 
 <p align="center">
-  <img src="docs/images/gps/gps_hw.png" alt="GPS module info" width="42%" align="top" />
+  <img src="docs/media/gps/gps_hw.png" alt="GPS module info" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/gps/gps_info.png" alt="GPS data info" width="42%" align="top" />
+  <img src="docs/media/gps/gps_info.png" alt="GPS data info" width="42%" align="top" />
 </p>
 
 
@@ -182,12 +182,12 @@ Configure each window under Settings → Window Settings
 Settings → General → Tab Settings.
 
 <p align="center">
-  <img src="docs/images/multi-display/dash.png" alt="Dash Screen" width="70%" />
+  <img src="docs/media/multi-display/dash.png" alt="Dash Screen" width="70%" />
 </p>
 
 <p align="center">
-  <img src="docs/images/multi-display/auxilary.png" alt="Aux Screen" width="34%" align="top" />
-  <img src="docs/images/multi-display/livi.png" alt="Main Screen" width="34%" align="top" />
+  <img src="docs/media/multi-display/auxilary.png" alt="Aux Screen" width="34%" align="top" />
+  <img src="docs/media/multi-display/livi.png" alt="Main Screen" width="34%" align="top" />
 </p>
 
 
@@ -198,28 +198,28 @@ Stream resolution, view area insets, and safe area can be configured independent
 ### Main Stream
 Video: 1280x720 - View Area: 0/0/100/0 (T/B/L/R) - Safe Area: 100/100/100/100 (T/B/L/R) - Draw Outside: true
 <p align="center">
-  <img src="docs/images/area/main_safe_area_view_area_aa.png" alt="Safe area main stream Android Auto" width="70%" />
+  <img src="docs/media/area/main_safe_area_view_area_aa.png" alt="Safe area main stream Android Auto" width="70%" />
 </p>
 
 ### Cluster Stream
 Video: 1920x1080 - View Area: 0/0/0/0 (T/B/L/R) - Safe Area: 120/20/500/500 (T/B/L/R)
 <p align="center">
-  <img src="docs/images/area/dash_safe_area_aa.png" alt="Safe area cluster stream Android Auto" width="70%" />
+  <img src="docs/media/area/dash_safe_area_aa.png" alt="Safe area cluster stream Android Auto" width="70%" />
 </p>
 
 
 ## Images
 
 <p align="center">
-  <img src="docs/images/cp.png" alt="CarPlay" width="42%" align="center" />
+  <img src="docs/media/cp.png" alt="CarPlay" width="42%" align="center" />
   &emsp;
-  <img src="docs/images/aa.png" alt="Android Auto" width="42%" align="center" />
+  <img src="docs/media/aa.png" alt="Android Auto" width="42%" align="center" />
 </p>
 
 <p align="center">
-  <img src="docs/images/media.png" alt="Media" width="42%" align="top" />
+  <img src="docs/media/media.png" alt="Media" width="42%" align="top" />
   &emsp;
-  <img src="docs/images/settings.png" alt="Settings" width="42%" align="top" />
+  <img src="docs/media/settings.png" alt="Settings" width="42%" align="top" />
 </p>
 
 

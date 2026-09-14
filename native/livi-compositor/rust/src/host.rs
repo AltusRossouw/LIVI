@@ -445,10 +445,17 @@ pub fn panel_mm(state: &LiviState, screen_idx: usize) -> Option<(i32, i32)> {
         .as_ref()?;
     let info = outputs.info(output)?;
     let (w, h) = info.physical_size;
-    if w > 0 && h > 0 {
-        Some((w, h))
+    if w <= 0 || h <= 0 {
+        return None;
+    }
+    // wl_output reports the panel's unrotated mm; our screen size is post-transform.
+    if matches!(
+        info.transform,
+        CTransform::_90 | CTransform::_270 | CTransform::Flipped90 | CTransform::Flipped270
+    ) {
+        Some((h, w))
     } else {
-        None
+        Some((w, h))
     }
 }
 
@@ -528,7 +535,9 @@ impl SctkOutputHandler for LiviState {
     fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _output: WlOutput) {
         crate::ctrl::send_panels(self);
     }
-    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _output: WlOutput) {}
+    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _output: WlOutput) {
+        crate::ctrl::send_panels(self);
+    }
     fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _output: WlOutput) {}
 }
 

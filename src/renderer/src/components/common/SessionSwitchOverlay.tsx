@@ -1,39 +1,17 @@
 import { useEffect, useState } from 'react'
-
-type SessionEvent = { type?: string; position?: number; total?: number }
-type Bridge = {
-  projection?: { ipc?: { onEvent?: (cb: (e: unknown, ...a: unknown[]) => void) => () => void } }
-}
+import { useLiviStore } from '../../store/store'
 
 export function SessionSwitchOverlay() {
+  const sessions = useLiviStore((s) => s.sessions)
   const [content, setContent] = useState<{ position: number; total: number; tick: number } | null>(
     null
   )
 
   useEffect(() => {
-    const handler = (_evt: unknown, ...args: unknown[]) => {
-      const ev = (args[0] ?? {}) as SessionEvent
-      if (ev?.type !== 'session') return
-      const position = typeof ev.position === 'number' ? ev.position : 0
-      const total = typeof ev.total === 'number' ? ev.total : 0
-      if (position < 1) return
-      setContent((prev) => ({ position, total, tick: (prev?.tick ?? 0) + 1 }))
-    }
-
-    const w = window as unknown as Bridge
-    let unsubscribe: (() => void) | undefined
-    if (typeof w.projection?.ipc?.onEvent === 'function') {
-      const maybe = w.projection.ipc.onEvent(handler)
-      if (typeof maybe === 'function') unsubscribe = maybe
-    }
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe()
-        } catch {}
-      }
-    }
-  }, [])
+    const { position, total } = sessions
+    if (position < 1) return
+    setContent((prev) => ({ position, total, tick: (prev?.tick ?? 0) + 1 }))
+  }, [sessions])
 
   if (!content) return null
 

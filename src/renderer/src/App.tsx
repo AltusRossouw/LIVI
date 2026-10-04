@@ -14,9 +14,8 @@ import { AppLayout } from './components/layouts/AppLayout'
 import { Cluster, Projection } from './components/pages'
 import { AppContext } from './context'
 import { useActiveControl, useFocus, useKeyDown } from './hooks'
-import type { KeyCommand } from './hooks/keysControl/types'
 import { appRoutes } from './routes/appRoutes'
-import { useLiviStore, useStatusStore } from './store/store'
+import { reportPath, sendInput, useLiviStore, useStatusStore } from './store/store'
 import { broadcastMediaKey } from './utils/broadcastMediaKey'
 import { updateCameras } from './utils/cameraDetection'
 import { getWindowRole } from './utils/windowRole'
@@ -24,8 +23,6 @@ import { getWindowRole } from './utils/windowRole'
 function AppInner() {
   const appContext = useContext(AppContext)
   const [receivingVideo, setReceivingVideo] = useState(false)
-  const [commandCounter, setCommandCounter] = useState(0)
-  const [keyCommand, setKeyCommand] = useState('')
   const editingField = appContext?.keyboardNavigation?.focusedElId
   const location = useLocation()
 
@@ -47,17 +44,16 @@ function AppInner() {
   const cameFromSettingsSubRef = useRef(false)
 
   useEffect(() => {
-    window.app?.reportPath?.(location.pathname)
+    reportPath(location.pathname)
   }, [location.pathname])
 
-  // Subscribe to main-process media key broadcasts
   useEffect(() => {
     return window.app?.onMediaKey?.((command) => {
       window.dispatchEvent(new CustomEvent('car-media-key', { detail: { command } }))
     })
   }, [])
 
-  // Track input mode globally (for CSS that must behave differently on touch vs mouse)
+  // The input mode lets CSS tell touch, mouse and keys apart.
   useEffect(() => {
     const setMode = (mode: 'mouse' | 'touch' | 'keys') => {
       document.documentElement.dataset.input = mode
@@ -76,7 +72,6 @@ function AppInner() {
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, true)
 
-    // default
     setMode('keys')
 
     return () => {
@@ -174,9 +169,7 @@ function AppInner() {
     focusFirstInMain,
     moveFocusLinear,
     isFormField,
-    activateControl,
-    onSetKeyCommand: setKeyCommand,
-    onSetCommandCounter: setCommandCounter
+    activateControl
   })
 
   useEffect(() => {
@@ -191,7 +184,7 @@ function AppInner() {
     return () => document.removeEventListener('keydown', handler, true)
   }, [onKeyDown])
 
-  // PTT release: dispatch on keyup, blur, or visibility loss.
+  // A lost keyup must never leave PTT held, so blur and hiding release it too.
   useEffect(() => {
     if (!settings) return
     const binding = settings.bindings?.voiceAssistant
@@ -202,8 +195,7 @@ function AppInner() {
     const dispatchRelease = () => {
       if (!pressed) return
       pressed = false
-      setKeyCommand('voiceAssistantRelease' as KeyCommand)
-      setCommandCounter((p) => p + 1)
+      sendInput({ kind: 'key', code: binding, down: false })
       broadcastMediaKey('voiceAssistantRelease')
     }
 
@@ -259,7 +251,6 @@ function AppInner() {
       return
     }
 
-    // reverse off: restore the previous route
     if (reverseAutoSwitchActiveRef.current && location.pathname === ROUTES.CAMERA) {
       const back = reverseBackPathRef.current as string
       reverseAutoSwitchActiveRef.current = false
@@ -276,7 +267,6 @@ function AppInner() {
     navigate
   ])
 
-  // External navigation request
   const requestedPath = useStatusStore((s) => s.requestedPath)
   const clearRequestedPath = useStatusStore((s) => s.clearRequestedPath)
   useEffect(() => {
@@ -297,12 +287,9 @@ function AppInner() {
           receivingVideo={receivingVideo}
           setReceivingVideo={setReceivingVideo}
           settings={settings}
-          command={keyCommand as KeyCommand}
-          commandCounter={commandCounter}
         />
       )}
-      {/* Single cluster overlay, owns the plane reveal. A telemetry dash hosting the
-          cluster drives it. */}
+      {/* The only cluster overlay, it owns the plane reveal. */}
       {settings && (
         <Cluster visible={clusterDashActive} showLoadingPlaceholder={!clusterDashActive} />
       )}

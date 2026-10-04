@@ -1,4 +1,3 @@
-export * from './AudioDecode'
 export * from './Config'
 export * from './DefaultConfig'
 export * from './DeviceView'

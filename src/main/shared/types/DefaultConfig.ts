@@ -117,5 +117,7 @@ export const DEFAULT_CONFIG: Config = {
   bindings: DEFAULT_BINDINGS,
   carplayIcon120: '',
   carplayIcon180: '',
-  carplayIcon256: ''
+  carplayIcon256: '',
+  // 0,0 counts as no fix, the entry only lets a saved one through validate()
+  lastKnownGps: { lat: 0, lng: 0, ts: 0 }
 }

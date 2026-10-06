@@ -105,8 +105,6 @@ jobs:
     env:
       BUILD_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
       HUSKY: 0
-      ELECTRON_CACHE: .cache/electron
-      ELECTRON_BUILDER_CACHE: .cache/electron-builder
 
     strategy:
       fail-fast: false
@@ -125,32 +123,6 @@ jobs:
           key: pnpm-store-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             pnpm-store-${{ matrix.os }}-${{ matrix.arch }}-
-
-      - name: Cache build caches (vite/esbuild)
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules/.vite
-            node_modules/.cache
-          key: build-cache-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            build-cache-${{ matrix.os }}-${{ matrix.arch }}-
-
-      - name: Cache Electron downloads
-        uses: actions/cache@v5
-        with:
-          path: .cache/electron
-          key: electron-cache-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('package.json', 'pnpm-lock.yaml') }}
-          restore-keys: |
-            electron-cache-${{ matrix.os }}-${{ matrix.arch }}-
-
-      - name: Cache electron-builder binaries
-        uses: actions/cache@v5
-        with:
-          path: .cache/electron-builder
-          key: eb-cache-${{ matrix.os }}-${{ matrix.arch }}-${{ hashFiles('package.json', 'pnpm-lock.yaml', 'electron-builder.yml') }}
-          restore-keys: |
-            eb-cache-${{ matrix.os }}-${{ matrix.arch }}-
 
       - name: Setup Node + pnpm
         id: pnpm

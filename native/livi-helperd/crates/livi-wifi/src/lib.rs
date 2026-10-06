@@ -25,14 +25,17 @@ pub fn regulatory_country() -> Option<String> {
     None
 }
 
-#[cfg(not(target_os = "linux"))]
-pub fn station_rates(_iface: &str) -> Option<(u32, u32)> {
-    None
+/// `rates` in Mbps as (down, up) of the first station that reports any. Down is what the
+/// phone sends us (station RX), up what we send it (station TX).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Stations {
+    pub count: usize,
+    pub rates: Option<(u32, u32)>,
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn station_count(_iface: &str) -> usize {
-    0
+pub fn stations(_iface: &str) -> Stations {
+    Stations::default()
 }
 
 #[cfg(target_os = "linux")]
@@ -209,47 +212,59 @@ fn width_mhz(raw: u32) -> u32 {
     }
 }
 
-/// Mbps as (down, up): down is what the phone sends us (station RX), up what we send it
-/// (station TX).
+/// The AIC8800 driver asks its firmware about every station.
 #[cfg(target_os = "linux")]
-pub fn station_rates(iface: &str) -> Option<(u32, u32)> {
-    let name = std::ffi::CString::new(iface).ok()?;
+pub fn stations(iface: &str) -> Stations {
+    let Ok(name) = std::ffi::CString::new(iface) else {
+        return Stations::default();
+    };
     let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
     if index == 0 {
-        return None;
+        return Stations::default();
     }
-    let fd = open().ok()?;
-    let family = family_id(&fd).ok()?;
-    let request = message(
-        family,
-        NL80211_CMD_GET_STATION,
-        NLM_F_DUMP,
-        &attr(ATTR_IFINDEX, &index.to_ne_bytes()),
-    );
-    for payload in call(&fd, &request).ok()? {
-        for (kind, info) in Attrs(&payload[..]) {
-            if kind != ATTR_STA_INFO {
-                continue;
-            }
-            let mut down = None;
-            let mut up = None;
-            for (what, rate) in Attrs(info) {
-                match what {
-                    STA_INFO_RX_BITRATE => down = rate_mbps(rate),
-                    STA_INFO_TX_BITRATE => up = rate_mbps(rate),
-                    _ => {}
-                }
-            }
-            if down.is_some() || up.is_some() {
-                return Some((down.unwrap_or(0), up.unwrap_or(0)));
-            }
+    let request = |family| {
+        message(
+            family,
+            NL80211_CMD_GET_STATION,
+            NLM_F_DUMP,
+            &attr(ATTR_IFINDEX, &index.to_ne_bytes()),
+        )
+    };
+    open()
+        .and_then(|fd| call(&fd, &request(family_id(&fd)?)))
+        .map(|payloads| stations_in(&payloads))
+        .unwrap_or_default()
+}
+
+fn stations_in(payloads: &[Vec<u8>]) -> Stations {
+    let mut found = Stations::default();
+    for payload in payloads {
+        // One answer per station, each with a nested STA_INFO.
+        let Some(info) =
+            Attrs(&payload[..]).find_map(|(kind, info)| (kind == ATTR_STA_INFO).then_some(info))
+        else {
+            continue;
+        };
+        found.count += 1;
+        found.rates = found.rates.or_else(|| rates_of(info));
+    }
+    found
+}
+
+fn rates_of(info: &[u8]) -> Option<(u32, u32)> {
+    let mut down = None;
+    let mut up = None;
+    for (what, rate) in Attrs(info) {
+        match what {
+            STA_INFO_RX_BITRATE => down = rate_mbps(rate),
+            STA_INFO_TX_BITRATE => up = rate_mbps(rate),
+            _ => {}
         }
     }
-    None
+    (down.is_some() || up.is_some()).then(|| (down.unwrap_or(0), up.unwrap_or(0)))
 }
 
 /// Prefers the 32-bit rate, both are in 100 kbps.
-#[cfg(target_os = "linux")]
 fn rate_mbps(attrs: &[u8]) -> Option<u32> {
     let mut wide = None;
     let mut narrow = None;
@@ -265,34 +280,6 @@ fn rate_mbps(attrs: &[u8]) -> Option<u32> {
         }
     }
     Some(wide.or(narrow)? / 10)
-}
-
-#[cfg(target_os = "linux")]
-pub fn station_count(iface: &str) -> usize {
-    let Ok(name) = std::ffi::CString::new(iface) else {
-        return 0;
-    };
-    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-    if index == 0 {
-        return 0;
-    }
-    let Ok(fd) = open() else {
-        return 0;
-    };
-    let Ok(family) = family_id(&fd) else {
-        return 0;
-    };
-    let request = message(
-        family,
-        NL80211_CMD_GET_STATION,
-        NLM_F_DUMP,
-        &attr(ATTR_IFINDEX, &index.to_ne_bytes()),
-    );
-    let Ok(payloads) = call(&fd, &request) else {
-        return 0;
-    };
-    // One answer per station, each with a nested STA_INFO.
-    payloads.iter().filter(|p| Attrs(&p[..]).any(|(kind, _)| kind == ATTR_STA_INFO)).count()
 }
 
 #[cfg(target_os = "linux")]
@@ -587,5 +574,21 @@ mod tests {
         assert_eq!(super::width_mhz(3), 80);
         assert_eq!(super::width_mhz(5), 160);
         assert_eq!(super::width_mhz(99), 0);
+    }
+
+    #[test]
+    fn one_station_dump_counts_the_phones_and_takes_the_first_rates() {
+        let mut info =
+            attr(STA_INFO_RX_BITRATE, &attr(RATE_INFO_BITRATE32, &8660u32.to_ne_bytes()));
+        info.extend(attr(STA_INFO_TX_BITRATE, &attr(RATE_INFO_BITRATE, &4000u16.to_ne_bytes())));
+        let phone = attr(ATTR_STA_INFO, &info);
+        let quiet = attr(ATTR_STA_INFO, &[]);
+        let no_station = attr(ATTR_IFINDEX, &3u32.to_ne_bytes());
+        assert_eq!(
+            stations_in(&[quiet.clone(), phone, no_station]),
+            Stations { count: 2, rates: Some((866, 400)) }
+        );
+        assert_eq!(stations_in(&[quiet]), Stations { count: 1, rates: None });
+        assert_eq!(stations_in(&[]), Stations::default());
     }
 }

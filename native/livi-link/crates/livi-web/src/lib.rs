@@ -624,8 +624,9 @@ fn wifi_json() -> String {
         }
     }
     let mac = read_trim(&format!("/sys/class/net/{iface}/address"));
-    let clients = livi_wifi::station_count(iface);
-    let (downrate, uprate) = livi_wifi::station_rates(iface).unwrap_or((0, 0));
+    let stations = livi_wifi::stations(iface);
+    let clients = stations.count;
+    let (downrate, uprate) = stations.rates.unwrap_or((0, 0));
     let downbytes = read_trim(&format!("/sys/class/net/{iface}/statistics/rx_bytes"))
         .parse::<u64>()
         .unwrap_or(0);

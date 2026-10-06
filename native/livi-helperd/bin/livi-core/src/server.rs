@@ -14,6 +14,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{Mutex, Notify, broadcast, oneshot, watch};
 
 use crate::config_file::{ConfigFile, apply_patch};
+use crate::dongle::LinkSpeedViewer;
 use crate::hub::{Frame, Hub};
 use crate::projection::{UiCommand, UiSenders};
 use crate::spectrum::Viewer;
@@ -212,6 +213,7 @@ async fn client(core: Arc<Core>, stream: UnixStream) -> io::Result<()> {
     println!("[core] {client} connected");
     let mut patches = welcome(&core, &mut wr).await?;
     let mut viewer: Option<Viewer> = None;
+    let mut link_speed_viewer: Option<LinkSpeedViewer> = None;
 
     loop {
         tokio::select! {
@@ -235,6 +237,12 @@ async fn client(core: Arc<Core>, stream: UnixStream) -> io::Result<()> {
                             viewer.get_or_insert_with(|| core.asks.spectrum.watch());
                         }
                         Ok(ToCore::Spectrum { on: false }) => viewer = None,
+                        Ok(ToCore::LinkSpeed { on: true }) => {
+                            link_speed_viewer.get_or_insert_with(|| {
+                                LinkSpeedViewer::new(&core.asks.link_speed_viewers)
+                            });
+                        }
+                        Ok(ToCore::LinkSpeed { on: false }) => link_speed_viewer = None,
                         Ok(ToCore::Path { path }) => {
                             core.ui_path.send_replace(path);
                         }
@@ -363,7 +371,7 @@ mod tests {
         let radio = Action::SetDongleRadio { radio: livi_core_proto::message::Radio::Bt, on: true };
         ui.send(&ToCore::Action { id: 4, action: radio }).await;
         assert_eq!(ui.recv().await, Some(FromCore::Reply { id: 4, error: None }));
-        assert_eq!(dongle.recv().await, Some((livi_core_proto::message::Radio::Bt, true)));
+        assert_eq!(dongle.radios.recv().await, Some((livi_core_proto::message::Radio::Bt, true)));
         for (id, action, ask) in [
             (5, Action::CheckUpdate, UpdateAsk::Check),
             (6, Action::DownloadUpdate, UpdateAsk::Download),
@@ -409,6 +417,25 @@ mod tests {
         wait_for(|| feed.viewing() == 1).await;
         drop(other);
         wait_for(|| feed.viewing() == 0).await;
+    }
+
+    #[tokio::test]
+    async fn the_dongle_is_asked_for_rates_while_a_client_shows_the_link_speed() {
+        let dir = TempDir::new();
+        let (_core, path, _, dongle, _) = start_with_asks(&dir);
+        let viewers = dongle.link_speed_viewers;
+        let mut settings = Peer::hello(&path).await;
+        let mut other = Peer::hello(&path).await;
+        settings.send(&ToCore::LinkSpeed { on: true }).await;
+        settings.send(&ToCore::LinkSpeed { on: true }).await;
+        wait_for(|| *viewers.borrow() == 1).await;
+
+        settings.send(&ToCore::LinkSpeed { on: false }).await;
+        wait_for(|| *viewers.borrow() == 0).await;
+        other.send(&ToCore::LinkSpeed { on: true }).await;
+        wait_for(|| *viewers.borrow() == 1).await;
+        drop(other);
+        wait_for(|| *viewers.borrow() == 0).await;
     }
 
     #[tokio::test]

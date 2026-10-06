@@ -49,6 +49,11 @@ pub fn status() -> Option<HashMap<String, String>> {
     ask("status")
 }
 
+/// Costs the dongle's Wi-Fi driver a firmware round trip, older dongles answer with nothing.
+pub fn rates() -> Option<HashMap<String, String>> {
+    ask("rates")
+}
+
 /// `within` is per answer, since applying waits for the radio.
 pub fn talk(commands: &[String], within: Duration) -> Result<HashMap<String, String>, String> {
     let stream = livi_net::connect((link::LINK_NAME, livi_net::port::CONTROL), TIMEOUT)

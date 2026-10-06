@@ -446,6 +446,20 @@ describe('store', () => {
       expect(() => without.reportSpectrum(false)).not.toThrow()
       expect(() => without.onSpectrum(() => {})()).not.toThrow()
     })
+
+    test('a window showing the link speed tells core', async () => {
+      const { reportLinkSpeed, fake } = await loadFreshStore()
+      welcome(fake, baseSettings)
+      reportLinkSpeed(true)
+      reportLinkSpeed(false)
+      expect(fake.sent).toEqual([
+        { type: 'linkSpeed', on: true },
+        { type: 'linkSpeed', on: false }
+      ])
+
+      const without = await loadFreshStore({ core: false })
+      expect(() => without.reportLinkSpeed(true)).not.toThrow()
+    })
   })
 
   test('markRestartBaseline stores the current settings and ignores none', async () => {

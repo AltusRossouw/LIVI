@@ -1,7 +1,8 @@
 /** Down is phone to car (the stream), up is car to phone. */
 
 import { SettingsValueRow } from '@settings/components'
-import { useLiviStore } from '@store/store'
+import { reportLinkSpeed, useLiviStore } from '@store/store'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 const DASH = '—'
@@ -15,6 +16,11 @@ function leg(mbps: number, phy: number): string {
 export const WifiLinkInfo = () => {
   const { t } = useTranslation()
   const speed = useLiviStore((s) => s.system?.linkSpeed ?? null)
+
+  useEffect(() => {
+    reportLinkSpeed(true)
+    return () => reportLinkSpeed(false)
+  }, [])
 
   const down = speed ? leg(speed.downMbps, speed.downRate) : DASH
   const up = speed ? leg(speed.upMbps, speed.upRate) : DASH

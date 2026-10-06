@@ -29,6 +29,10 @@ pub enum ToCore {
     Spectrum {
         on: bool,
     },
+    /// The dongle's Wi-Fi driver is asked for rates only while a UI shows them.
+    LinkSpeed {
+        on: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]

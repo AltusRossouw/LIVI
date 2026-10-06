@@ -186,7 +186,7 @@ fn exists(name: &str) -> bool {
 
 /// Counted like the web page counts its clients, so the LED and the page agree.
 fn wifi_client() -> bool {
-    livi_wifi::station_count("wlan0") > 0
+    livi_wifi::stations("wlan0").count > 0
 }
 
 #[derive(Clone, Copy)]

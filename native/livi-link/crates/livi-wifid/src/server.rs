@@ -100,6 +100,7 @@ struct Wanted {
 enum Cmd<'a> {
     Channels,
     Status,
+    Rates,
     Set(&'a str, &'a str),
     Apply,
     Save,
@@ -130,6 +131,7 @@ pub fn serve<S: std::io::Read + Write>(io: &mut S, ap: &Mutex<Ap>) {
                 Err(e) => format!("error {e}\n"),
             },
             Cmd::Status => status(&held(ap)),
+            Cmd::Rates => rates(),
             Cmd::Set(key, value) => match remember(&mut wanted, key, value) {
                 Ok(()) => "ok\n".into(),
                 Err(e) => format!("error {e}\n"),
@@ -197,6 +199,7 @@ fn command(line: &str) -> Cmd<'_> {
         "" => Cmd::Empty,
         "channels" => Cmd::Channels,
         "status" => Cmd::Status,
+        "rates" => Cmd::Rates,
         "apply" => Cmd::Apply,
         "save" => Cmd::Save,
         "down" => Cmd::Down,
@@ -715,13 +718,6 @@ fn status(ap: &Ap) -> String {
             }
         }
     }
-    if let Some(state) = livi_wifi::ap_state(IFACE) {
-        out.push_str(&format!("width {}\n", state.width));
-    }
-    // Seen from the car: down is phone to car, up is car to phone.
-    if let Some((down, up)) = livi_wifi::station_rates(IFACE) {
-        out.push_str(&format!("downrate {down}\nuprate {up}\n"));
-    }
     let counter = |dir: &str| {
         std::fs::read_to_string(format!("/sys/class/net/{IFACE}/statistics/{dir}_bytes"))
             .ok()
@@ -736,6 +732,14 @@ fn status(ap: &Ap) -> String {
     }
     out.push_str("ok\n");
     out
+}
+
+/// Seen from the car: down is phone to car, up is car to phone.
+fn rates() -> String {
+    match livi_wifi::stations(IFACE).rates {
+        Some((down, up)) => format!("downrate {down}\nuprate {up}\nok\n"),
+        None => "ok\n".into(),
+    }
 }
 
 fn start(ap: &mut Ap, config: &std::path::Path) -> Result<(), String> {
@@ -1016,6 +1020,11 @@ mod tests {
     #[test]
     fn down_is_a_command_of_its_own() {
         assert!(matches!(command("down"), Cmd::Down));
+    }
+
+    #[test]
+    fn the_link_rates_are_a_command_of_their_own() {
+        assert!(matches!(command("rates"), Cmd::Rates));
     }
 
     #[test]

@@ -11,6 +11,13 @@ vi.mock('@settings/components', () => ({
   )
 }))
 
+const reportLinkSpeedMock = vi.fn((_on: boolean) => {})
+
+vi.mock('@store/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@store/store')>()),
+  reportLinkSpeed: (on: boolean) => reportLinkSpeedMock(on)
+}))
+
 import { useLiviStore } from '@store/store'
 import { WifiLinkInfo } from '../WifiLinkInfo'
 
@@ -37,9 +44,19 @@ function report(linkSpeed: Speed | null): void {
 
 beforeEach(() => {
   useLiviStore.setState({ system: null })
+  reportLinkSpeedMock.mockClear()
 })
 
 describe('WifiLinkInfo', () => {
+  it('asks core for the link speed only while it is shown', () => {
+    const { unmount } = render(<WifiLinkInfo />)
+    expect(reportLinkSpeedMock.mock.calls).toEqual([[true]])
+
+    unmount()
+
+    expect(reportLinkSpeedMock.mock.calls).toEqual([[true], [false]])
+  })
+
   it('shows a dash on both legs until the first reading arrives', () => {
     render(<WifiLinkInfo />)
 

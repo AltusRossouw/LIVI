@@ -56,6 +56,11 @@ export function reportSpectrum(on: boolean): void {
   session?.spectrum(on)
 }
 
+/** Whether this window shows the link speed, core only asks the dongle for it then. */
+export function reportLinkSpeed(on: boolean): void {
+  session?.linkSpeed(on)
+}
+
 export function onSpectrum(listener: (bands: number[]) => void): () => void {
   return session?.onSpectrum(listener) ?? (() => {})
 }

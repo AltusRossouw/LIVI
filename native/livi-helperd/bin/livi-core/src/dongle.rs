@@ -7,17 +7,36 @@ use livi_core_proto::message::Radio;
 use livi_core_proto::state::{DongleRadios, LinkSpeed};
 use livi_link_host::ap;
 use livi_link_host::link::CHOICE;
-use tokio::sync::mpsc;
+use tokio::sync::watch;
 
 use crate::hub::Hub;
 use crate::hwaddr;
+use crate::projection::DongleAsks;
 
 const POLL: Duration = Duration::from_millis(1500);
+/// The rates cost the dongle's Wi-Fi driver a firmware round trip.
+const RATES_EVERY: Duration = Duration::from_secs(5);
 /// Applying waits for the radio, and a 5 GHz start spends the first seconds scanning.
 const APPLY: Duration = Duration::from_secs(30);
 const DRIFT_RETRY: Duration = Duration::from_secs(30);
 
 type Status = HashMap<String, String>;
+
+/// Held by every UI connection that shows the link speed.
+pub struct LinkSpeedViewer(watch::Sender<usize>);
+
+impl LinkSpeedViewer {
+    pub fn new(viewers: &watch::Sender<usize>) -> Self {
+        viewers.send_modify(|n| *n += 1);
+        Self(viewers.clone())
+    }
+}
+
+impl Drop for LinkSpeedViewer {
+    fn drop(&mut self) {
+        self.0.send_modify(|n| *n = n.saturating_sub(1));
+    }
+}
 
 fn ssid_of(cfg: &Config) -> String {
     if cfg.car_name.is_empty() { "LIVI".into() } else { cfg.car_name.clone() }
@@ -107,6 +126,8 @@ struct Link {
     last_try: Option<Instant>,
     last_drift: Option<Instant>,
     bytes: Option<(f64, f64, Instant)>,
+    rates: Status,
+    rates_at: Option<Instant>,
     misses: u8,
 }
 
@@ -202,9 +223,13 @@ impl Link {
         }
     }
 
+    fn rates_due(&self) -> bool {
+        self.rates_at.is_none_or(|at| at.elapsed() >= RATES_EVERY)
+    }
+
     /// A single missed poll keeps the dongle listed, the route needs a moment after plug in.
-    async fn poll(&mut self, hub: &Hub) -> Option<Status> {
-        let status = if attached() {
+    async fn poll(&mut self, hub: &Hub, speed_shown: bool) -> Option<Status> {
+        let mut status = if attached() {
             tokio::task::spawn_blocking(ap::status).await.ok().flatten()
         } else {
             None
@@ -212,10 +237,26 @@ impl Link {
         self.misses = if status.is_some() { 0 } else { self.misses.saturating_add(1) };
         let answers =
             status.is_some() || (self.misses < 2 && hub.watch().borrow().system.dongle.is_some());
-        let link_speed = status.as_ref().map(|s| self.speed(s));
-        if status.is_none() {
-            self.bytes = None;
-        }
+        let link_speed = match status.as_mut() {
+            Some(s) if speed_shown => {
+                if self.rates_due() {
+                    self.rates = tokio::task::spawn_blocking(ap::rates)
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or_default();
+                    self.rates_at = Some(Instant::now());
+                }
+                // Older dongles carry the rates in the status.
+                s.extend(self.rates.clone());
+                Some(self.speed(s))
+            }
+            _ => {
+                self.bytes = None;
+                self.rates_at = None;
+                None
+            }
+        };
         let mut wifi_interfaces = hwaddr::wifi_interfaces();
         let mut bt_adapters = hwaddr::bt_adapters();
         let mut dongle = None;
@@ -268,7 +309,7 @@ fn adapter_switches(before: &Config, next: &Config) -> Vec<(Radio, bool)> {
     out
 }
 
-pub async fn run(hub: Arc<Hub>, mut asks: mpsc::UnboundedReceiver<(Radio, bool)>) {
+pub async fn run(hub: Arc<Hub>, mut asks: DongleAsks) {
     let mut applied = hub.applied();
     let mut cfg = applied.borrow_and_update().clone();
     let mut link = Link::default();
@@ -277,7 +318,8 @@ pub async fn run(hub: Arc<Hub>, mut asks: mpsc::UnboundedReceiver<(Radio, bool)>
     loop {
         tokio::select! {
             _ = tick.tick() => {
-                let status = link.poll(&hub).await;
+                let speed_shown = *asks.link_speed_viewers.borrow() > 0;
+                let status = link.poll(&hub, speed_shown).await;
                 if link.due(status.as_ref(), &cfg) {
                     link.reconcile(&cfg).await;
                 }
@@ -295,7 +337,7 @@ pub async fn run(hub: Arc<Hub>, mut asks: mpsc::UnboundedReceiver<(Radio, bool)>
                 }
                 cfg = next;
             }
-            Some((radio, on)) = asks.recv() => {
+            Some((radio, on)) = asks.radios.recv() => {
                 // The pick the user just made counts, the applied settings
                 // only follow it once nothing projects or with apply.
                 let now = hub.config();
@@ -432,6 +474,16 @@ mod tests {
         link.bytes = Some((0.0, 0.0, at - Duration::from_secs(1)));
         let next = link.speed(&status(&[("downbytes", "1250000"), ("upbytes", "125000")]));
         assert!((next.down_mbps - 10.0).abs() < 0.2 && (next.up_mbps - 1.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn the_rates_are_asked_for_at_once_and_then_only_every_few_seconds() {
+        let mut link = Link::default();
+        assert!(link.rates_due());
+        link.rates_at = Some(Instant::now());
+        assert!(!link.rates_due());
+        link.rates_at = Some(Instant::now() - RATES_EVERY);
+        assert!(link.rates_due());
     }
 
     #[test]

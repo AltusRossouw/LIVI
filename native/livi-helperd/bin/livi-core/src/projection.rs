@@ -404,13 +404,18 @@ pub struct UiSenders {
     pub commands: mpsc::UnboundedSender<UiCommand>,
     pub input: mpsc::UnboundedSender<Input>,
     pub dongle: mpsc::UnboundedSender<(Radio, bool)>,
+    pub link_speed_viewers: watch::Sender<usize>,
     pub spectrum: Arc<spectrum::Feed>,
     pub goodbye: mpsc::UnboundedSender<oneshot::Sender<()>>,
     pub update: mpsc::UnboundedSender<UpdateAsk>,
     pub activity: watch::Receiver<Activity>,
 }
 
-pub type DongleAsks = mpsc::UnboundedReceiver<(Radio, bool)>;
+pub struct DongleAsks {
+    pub radios: mpsc::UnboundedReceiver<(Radio, bool)>,
+    pub link_speed_viewers: watch::Receiver<usize>,
+}
+
 pub type UpdateAsks = mpsc::UnboundedReceiver<UpdateAsk>;
 
 pub fn ui_channels(wants: PerScreen<Front>) -> (UiSenders, UiAsks, DongleAsks, UpdateAsks) {
@@ -418,6 +423,7 @@ pub fn ui_channels(wants: PerScreen<Front>) -> (UiSenders, UiAsks, DongleAsks, U
     let (commands_tx, commands_rx) = mpsc::unbounded_channel();
     let (input_tx, input_rx) = mpsc::unbounded_channel();
     let (dongle_tx, dongle_rx) = mpsc::unbounded_channel();
+    let (viewers_tx, viewers_rx) = watch::channel(0);
     let (goodbye_tx, goodbye_rx) = mpsc::unbounded_channel();
     let (update_tx, update_rx) = mpsc::unbounded_channel();
     let (activity_tx, activity_rx) = watch::channel(Activity::default());
@@ -428,6 +434,7 @@ pub fn ui_channels(wants: PerScreen<Front>) -> (UiSenders, UiAsks, DongleAsks, U
             commands: commands_tx,
             input: input_tx,
             dongle: dongle_tx,
+            link_speed_viewers: viewers_tx,
             spectrum: feed.clone(),
             goodbye: goodbye_tx,
             update: update_tx,
@@ -441,7 +448,7 @@ pub fn ui_channels(wants: PerScreen<Front>) -> (UiSenders, UiAsks, DongleAsks, U
             goodbye: goodbye_rx,
             activity: activity_tx,
         },
-        dongle_rx,
+        DongleAsks { radios: dongle_rx, link_speed_viewers: viewers_rx },
         update_rx,
     )
 }

@@ -122,6 +122,19 @@ describe('CoreSession', () => {
     expect(frames).toEqual([[0.25, 1]])
   })
 
+  test('showing the link speed is told again after a welcome until it closes', () => {
+    const { session, sent } = setup()
+    session.linkSpeed(true)
+    session.receive(welcome(0, state(0.5)))
+    session.linkSpeed(false)
+    session.receive(welcome(0, state(0.5)))
+    expect(sent).toEqual([
+      { type: 'linkSpeed', on: true },
+      { type: 'linkSpeed', on: true },
+      { type: 'linkSpeed', on: false }
+    ])
+  })
+
   test('input goes out as it is and is not kept', () => {
     const { session, sent } = setup()
     session.input({ kind: 'key', code: 'KeyN', down: true })

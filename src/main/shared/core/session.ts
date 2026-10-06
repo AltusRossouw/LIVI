@@ -19,6 +19,7 @@ export class CoreSession {
   private lastPath: string | null = null
   private readonly shown = new Map<Screen, Front>()
   private drawsSpectrum = false
+  private showsLinkSpeed = false
   private readonly spectrumListeners = new Set<SpectrumListener>()
 
   constructor(private readonly send: Send) {}
@@ -40,6 +41,7 @@ export class CoreSession {
         if (this.lastPath !== null) this.send({ type: 'path', path: this.lastPath })
         for (const [screen, front] of this.shown) this.tellShown(screen, front)
         if (this.drawsSpectrum) this.send({ type: 'spectrum', on: true })
+        if (this.showsLinkSpeed) this.send({ type: 'linkSpeed', on: true })
         return
       case 'spectrum':
         for (const listener of this.spectrumListeners) listener(msg.bands)
@@ -111,6 +113,11 @@ export class CoreSession {
   spectrum(on: boolean): void {
     this.drawsSpectrum = on
     this.send({ type: 'spectrum', on })
+  }
+
+  linkSpeed(on: boolean): void {
+    this.showsLinkSpeed = on
+    this.send({ type: 'linkSpeed', on })
   }
 
   private tellShown(screen: Screen, front: Front): void {

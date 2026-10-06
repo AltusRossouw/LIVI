@@ -124,7 +124,7 @@ elapsedMs: number | null, playing: boolean | null,
  */
 artwork: string | null, };
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 export type PatchOp = { "op": "set", path: Array<string>, value: unknown, } | { "op": "remove", path: Array<string>, };
 
@@ -195,7 +195,7 @@ displayModes: Array<string>,
  */
 displayModeSettable: boolean, audioSinks: Array<AudioDevice>, audioSources: Array<AudioDevice>, };
 
-export type ToCore = { "type": "hello", protocol: number, client: string, } | { "type": "resync" } | { "type": "input", input: Input, } | { "type": "action", id: number, action: Action, } | { "type": "path", path: string, } | { "type": "spectrum", on: boolean, };
+export type ToCore = { "type": "hello", protocol: number, client: string, } | { "type": "resync" } | { "type": "input", input: Input, } | { "type": "action", id: number, action: Action, } | { "type": "path", path: string, } | { "type": "spectrum", on: boolean, } | { "type": "linkSpeed", on: boolean, };
 
 export type Update = { 
 /**

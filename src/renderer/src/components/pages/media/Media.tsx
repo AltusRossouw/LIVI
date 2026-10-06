@@ -1,4 +1,4 @@
-import { useLiviStore } from '@store/store'
+import { coreAction, useLiviStore } from '@store/store'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Controls, ProgressBar } from './components'
 import { FFTSpectrum } from './components/createFFTSpectrum'
@@ -16,6 +16,7 @@ export const Media = () => {
   const [rootRef, { w, h }] = useElementSize<HTMLDivElement>()
   const { snap, livePlayMs, stalled } = useMediaState()
   const sessionKey = useLiviStore((s) => `${s.sessions.active}:${s.sessions.position}`)
+  const carPlayActive = useLiviStore((s) => s.sessions.active === 'carplay')
 
   const { titlePx, artistPx, albumPx, pagePad, colGap, sectionGap, ctrlSize, ctrlGap, progressH } =
     mediaScaleOps({ w, h })
@@ -143,6 +144,11 @@ export const Media = () => {
 
   const elapsedMs = Math.max(0, livePlayMs || 0)
   const totalMs = Math.max(0, durationMs || 0)
+  const onSeek = carPlayActive
+    ? (ms: number) => {
+        coreAction({ kind: 'seek', positionMs: ms }).catch(() => {})
+      }
+    : undefined
   const lastProgressRef = useRef(0)
   const lastTrackSigRef = useRef<string>('')
 
@@ -421,6 +427,7 @@ export const Media = () => {
             progressH={progressHScaled}
             totalMs={totalMs}
             pct={pct}
+            onSeek={onSeek}
           />
         </div>
       </div>

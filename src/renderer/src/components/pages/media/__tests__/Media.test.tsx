@@ -113,6 +113,24 @@ describe('Media component', () => {
     expect(coreActionMock).toHaveBeenCalledWith({ kind: 'media', control: 'next' })
   })
 
+  it('seeks a CarPlay track and leaves an Android Auto one as it is', async () => {
+    coreActionMock.mockImplementationOnce(() => Promise.reject(new Error('no phone')))
+    await act(async () => {
+      useLiviStore.setState({ sessions: { active: 'carplay', position: 1, total: 1 } })
+    })
+    render(<Media />)
+
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('slider'), { key: 'ArrowRight' })
+    })
+    expect(coreActionMock).toHaveBeenCalledWith({ kind: 'seek', positionMs: 1000 })
+
+    await act(async () => {
+      useLiviStore.setState({ sessions: { active: 'androidauto', position: 1, total: 1 } })
+    })
+    expect(screen.queryByRole('slider')).toBeNull()
+  })
+
   it('sends next and prev commands', async () => {
     const { getByLabelText } = render(<Media />)
 

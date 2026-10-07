@@ -16,6 +16,7 @@ use livi_runtime::livi_sock::{
 use livi_runtime::mfi_async::SharedCoprocessor;
 use livi_runtime::reconnect;
 use livi_runtime::state::HelperState;
+use livi_runtime::vehicle::Fuels;
 
 fn env_or<T: std::str::FromStr>(key: &str, default: T) -> T {
     std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
@@ -276,7 +277,8 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let usb_control = livi_aa::usb::Control::default();
     let sco_sink = livi_runtime::sco::ScoSink::default();
 
-    let identity = Identity { name, ssid, bt_mac: [0; 6] };
+    let fuels = Fuels::parse(&std::env::var("LIVI_CP_FUELS").unwrap_or_default());
+    let identity = Identity { name, ssid, bt_mac: [0; 6], fuels };
     let (bluez, bluez_later) = tokio::sync::watch::channel(None);
     let sock_cfg = LiviSockConfig {
         path: livi_sock::SOCK_PATH.into(),

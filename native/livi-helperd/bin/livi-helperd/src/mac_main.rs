@@ -17,6 +17,7 @@ use livi_runtime::livi_sock::{
 };
 use livi_runtime::mfi_async::SharedCoprocessor;
 use livi_runtime::state::HelperState;
+use livi_runtime::vehicle::Fuels;
 
 use crate::link::LinkPresence;
 
@@ -65,7 +66,12 @@ fn cp_config() -> (CpConfig, Identity) {
         on_cable: None,
         start_again: None,
     };
-    let identity = Identity { name: name.clone(), ssid: name, bt_mac: accessory_mac(&pi) };
+    let identity = Identity {
+        name: name.clone(),
+        ssid: name,
+        bt_mac: accessory_mac(&pi),
+        fuels: Fuels::parse(&env_s("LIVI_CP_FUELS", "")),
+    };
     (cp, identity)
 }
 

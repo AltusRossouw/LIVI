@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{fs, io};
 
-use livi_core_proto::config::Config;
+use livi_core_proto::config::{CarType, Config};
 use livi_cp::identity::Identity;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -38,6 +38,19 @@ pub fn starts_differently(before: &Config, after: &Config) -> bool {
     settings_env(before) != settings_env(after)
 }
 
+/// The fuels the phone hears ranges for.
+fn cp_fuels(car: Option<CarType>) -> &'static str {
+    match car {
+        Some(CarType::Gasoline | CarType::E85) => "Gasoline",
+        Some(CarType::Diesel | CarType::DieselWinter | CarType::Biodiesel) => "Diesel",
+        Some(CarType::Electric) => "Electric",
+        Some(CarType::Cng) => "CNG",
+        Some(CarType::HybridGasoline) => "Gasoline,Electric",
+        Some(CarType::HybridDiesel) => "Diesel,Electric",
+        _ => "",
+    }
+}
+
 fn settings_env(cfg: &Config) -> Vec<(String, String)> {
     let flag = |on: bool, off: &str| if on { "1".to_string() } else { off.to_string() };
     let debug = debug(cfg);
@@ -52,6 +65,7 @@ fn settings_env(cfg: &Config) -> Vec<(String, String)> {
         ("LIVI_CP_WIRELESS".to_string(), flag(cfg.wireless_cp_enabled, "")),
         ("DEBUG".to_string(), flag(debug, "")),
         ("LIVI_CP_NAME".to_string(), car_name),
+        ("LIVI_CP_FUELS".to_string(), cp_fuels(cfg.car_type).to_string()),
         ("LIVI_BT_ADAPTER".to_string(), cfg.bt_adapter.clone()),
         ("LIVI_WIFI_IFACE".to_string(), cfg.wifi_interface.clone()),
         ("LIVI_PASSPHRASE".to_string(), cfg.wifi_password.clone()),
@@ -265,6 +279,7 @@ mod tests {
         assert_eq!(get(&env, "LIVI_CP_PK"), Some("ab".repeat(32).as_str()));
         assert_eq!(get(&env, "LIVI_CP_PI"), Some("pi-1"));
         assert_eq!(get(&env, "LIVI_CP_NAME"), Some("LIVI"));
+        assert_eq!(get(&env, "LIVI_CP_FUELS"), Some("Gasoline"));
         assert_eq!(get(&env, "LIVI_CHANNEL"), Some("36"));
         assert_eq!(get(&env, "LIVI_CP_AIRPLAY_PORT"), Some("7000"));
         cfg.debug_logging = true;
@@ -279,8 +294,23 @@ mod tests {
         let mut after = before.clone();
         after.audio_volume = 0.3;
         assert!(!starts_differently(&before, &after));
+        after.car_type = Some(CarType::HybridDiesel);
+        assert!(starts_differently(&before, &after));
+        after.car_type = before.car_type;
         after.wireless_aa_enabled = true;
         assert!(starts_differently(&before, &after));
+    }
+
+    #[test]
+    fn fuels_follow_the_car_type() {
+        assert_eq!(cp_fuels(Some(CarType::E85)), "Gasoline");
+        assert_eq!(cp_fuels(Some(CarType::Biodiesel)), "Diesel");
+        assert_eq!(cp_fuels(Some(CarType::Electric)), "Electric");
+        assert_eq!(cp_fuels(Some(CarType::Cng)), "CNG");
+        assert_eq!(cp_fuels(Some(CarType::HybridGasoline)), "Gasoline,Electric");
+        assert_eq!(cp_fuels(Some(CarType::HybridDiesel)), "Diesel,Electric");
+        assert_eq!(cp_fuels(Some(CarType::Lpg)), "");
+        assert_eq!(cp_fuels(None), "");
     }
 
     #[test]

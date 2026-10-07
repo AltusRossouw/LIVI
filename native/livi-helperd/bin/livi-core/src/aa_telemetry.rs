@@ -6,6 +6,8 @@ use tokio::time::Instant;
 /// The maps re-plan on an energy model, so it goes out at most this often.
 const ENERGY_MODEL_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
 
+pub const LOW_FUEL_PCT: f64 = 10.0;
+
 /// The phone's gear: 0 neutral, 1 to 10 manual, 100 drive, 101 park, 102 reverse.
 pub fn gear(gear: Option<&Value>, reverse: Option<bool>) -> Option<i64> {
     match gear {
@@ -175,7 +177,7 @@ impl AaTelemetry {
         {
             let level = round(pct).clamp(0, 100);
             let range = num(next, "rangeKm").map(|km| round(km * 1000.0).max(0));
-            let low = Some(pct < 10.0);
+            let low = Some(pct < LOW_FUEL_PCT);
             if sent.fuel != Some((level, range, low)) {
                 sent.fuel = Some((level, range, low));
                 out.push(Sensor::Fuel { level, range, low_fuel_warning: low });

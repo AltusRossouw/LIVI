@@ -966,22 +966,6 @@ export const generalSchema: SettingsNode<Config> = {
       }
     },
     {
-      type: 'select',
-      label: 'Steering wheel position',
-      labelKey: 'settings.steeringWheelPosition',
-      icon: 'steering',
-      path: 'hand',
-      displayValue: true,
-      options: [
-        { label: 'LHD', labelKey: 'settings.lhdr', value: 0 },
-        { label: 'RHD', labelKey: 'settings.rhdr', value: 1 }
-      ],
-      page: {
-        title: 'Steering wheel position',
-        labelTitle: 'settings.steeringWheelPosition'
-      }
-    },
-    {
       type: 'number',
       label: 'UI Zoom',
       labelKey: 'settings.uiZoom',

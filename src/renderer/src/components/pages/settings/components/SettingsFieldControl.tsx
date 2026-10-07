@@ -169,6 +169,7 @@ export const SettingsFieldControl = <T,>({
   onDone
 }: Props<T>) => {
   const disabled = useLiviStore((s) => isNodeDisabled(node, s.system))
+  const settings = useLiviStore((s) => s.settings)
   switch (node.type) {
     case 'string':
       return (
@@ -182,14 +183,24 @@ export const SettingsFieldControl = <T,>({
       )
 
     case 'number': {
-      const min = node.min ?? 0
-      const max = node.max ?? Number.MAX_SAFE_INTEGER
-      const step = node.step ?? 1
+      const stored = typeof value === 'number' && Number.isFinite(value) ? value : 0
+      const unit = node.unit?.(settings)
+      const step = unit?.step ?? node.step ?? 1
+      let min = node.min ?? 0
+      let max = node.max ?? Number.MAX_SAFE_INTEGER
+      if (unit) {
+        // Whole steps in the unit, so the spinner does not walk 37, 47, 57.
+        min = Math.ceil((min * unit.factor) / step) * step
+        max = Math.min(
+          Math.floor((max * unit.factor) / step) * step,
+          unit.max ?? Number.POSITIVE_INFINITY
+        )
+      }
 
       return (
         <NumberSpinner
           size="medium"
-          value={typeof value === 'number' && Number.isFinite(value) ? value : 0}
+          value={unit ? Math.min(max, Math.round((stored * unit.factor) / step) * step) : stored}
           min={min}
           max={max}
           step={step}
@@ -197,7 +208,7 @@ export const SettingsFieldControl = <T,>({
             if (typeof v !== 'number' || !Number.isFinite(v)) return
 
             const next = clampInt(v, min, max, step)
-            onChange(next as T)
+            onChange((unit ? Math.round(next / unit.factor) : next) as T)
           }}
         />
       )

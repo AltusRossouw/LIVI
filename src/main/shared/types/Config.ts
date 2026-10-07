@@ -58,6 +58,10 @@ export type LastKnownGps = {
 
 export type AppearanceMode = 'auto' | 'night' | 'day'
 
+export type SpeedUnit = 'kmh' | 'mph'
+
+export type TemperatureUnit = 'celsius' | 'fahrenheit'
+
 /** WPA passphrase bounds. */
 export const WIFI_PASSWORD_MIN = 8
 export const WIFI_PASSWORD_MAX = 63
@@ -140,6 +144,14 @@ export type Config = {
   hand: HandDriveType
   carType?: CarType
   evConnectorTypes?: EvConnectorType[]
+  maxSpeedKph: number
+  /** Speed between two numbered marks on the dash, in the unit shown. */
+  speedScaleStep: number
+  maxRpm: number
+  /** 0 for none. */
+  redlineRpm: number
+  speedUnit: SpeedUnit
+  temperatureUnit: TemperatureUnit
 
   samplingFrequency: 0 | 1
   disableAudioOutput: boolean

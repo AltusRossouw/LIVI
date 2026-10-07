@@ -62,7 +62,7 @@ describe('settings schemas', () => {
     if (settingsSchema.type !== 'route') {
       throw new Error('settingsSchema must be a route node')
     }
-    expect((settingsSchema.children as any[]).length).toBe(6)
+    expect((settingsSchema.children as any[]).length).toBe(7)
     expect(settingsRoutes?.path).toBe('new-settings')
     expect(Array.isArray(settingsRoutes?.children)).toBe(true)
   })

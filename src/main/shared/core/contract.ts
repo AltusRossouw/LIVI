@@ -24,7 +24,15 @@ timezone: string, projectionWidth: number, projectionHeight: number, projectionF
 /**
  * The Wi-Fi AP, Bluetooth and head-unit name, at most 20 characters.
  */
-carName: string, oemName: string, hand: HandDriveType, carType?: CarType, evConnectorTypes?: Array<EvConnectorType>, samplingFrequency: 0 | 1, disableAudioOutput: boolean, huVolume: number, huVolumeLinkSystem: boolean, audioVolume: number, navVolume: number, voiceAssistantVolume: number, callVolume: number, systemSoundsVolume?: number, audioOutputDevice?: string, audioOutputDeviceLabel?: string, audioInputDevice?: string, audioInputDeviceLabel?: string, visualAudioDelayMs: number, autoConn: boolean, autoSwitchOnReverse: boolean, startPage: string, language: string, kiosk: PerScreen<boolean>, uiZoomPercent: number, appearanceMode: AppearanceMode, 
+carName: string, oemName: string, hand: HandDriveType, carType?: CarType, evConnectorTypes?: Array<EvConnectorType>, maxSpeedKph: number, 
+/**
+ * Speed between two numbered marks on the dash, in the unit shown.
+ */
+speedScaleStep: number, maxRpm: number, 
+/**
+ * 0 for none.
+ */
+redlineRpm: number, speedUnit: SpeedUnit, temperatureUnit: TemperatureUnit, samplingFrequency: 0 | 1, disableAudioOutput: boolean, huVolume: number, huVolumeLinkSystem: boolean, audioVolume: number, navVolume: number, voiceAssistantVolume: number, callVolume: number, systemSoundsVolume?: number, audioOutputDevice?: string, audioOutputDeviceLabel?: string, audioInputDevice?: string, audioInputDeviceLabel?: string, visualAudioDelayMs: number, autoConn: boolean, autoSwitchOnReverse: boolean, startPage: string, language: string, kiosk: PerScreen<boolean>, uiZoomPercent: number, appearanceMode: AppearanceMode, 
 /**
  * "WIDTHxHEIGHT", empty leaves the panel at the mode it came up in.
  */
@@ -124,7 +132,7 @@ elapsedMs: number | null, playing: boolean | null,
  */
 artwork: string | null, };
 
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 
 export type PatchOp = { "op": "set", path: Array<string>, value: unknown, } | { "op": "remove", path: Array<string>, };
 
@@ -158,6 +166,8 @@ export type Sessions = { active: Protocol | null,
  * Counted from 1, 0 without an active session.
  */
 position: number, total: number, };
+
+export type SpeedUnit = "kmh" | "mph";
 
 export type State = { front: PerScreen<Front>, sessions: Sessions, nowPlaying: NowPlaying, navigation: Navigation, system: System, 
 /**
@@ -194,6 +204,8 @@ displayModes: Array<string>,
  * Under GNOME the modes are only shown, LIVI cannot put the panel into one.
  */
 displayModeSettable: boolean, audioSinks: Array<AudioDevice>, audioSources: Array<AudioDevice>, };
+
+export type TemperatureUnit = "celsius" | "fahrenheit";
 
 export type ToCore = { "type": "hello", protocol: number, client: string, } | { "type": "resync" } | { "type": "input", input: Input, } | { "type": "action", id: number, action: Action, } | { "type": "path", path: string, } | { "type": "spectrum", on: boolean, } | { "type": "linkSpeed", on: boolean, };
 

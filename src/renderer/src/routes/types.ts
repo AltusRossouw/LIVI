@@ -1,4 +1,5 @@
 import type { System } from '@shared/core/contract'
+import type { Config } from '@shared/types'
 import type React from 'react'
 
 type BivariantCallback<T extends (...args: never[]) => unknown> = {
@@ -40,7 +41,12 @@ export type NumberNode = BaseFieldNode & {
   max?: number
   step?: number
   default?: number
+  /** Stored as is, shown and edited times `factor`. `min` and `max` are stored values. */
+  unit?: (settings: Config | null) => NumberUnit
 }
+
+/** `step` and `max` are in the unit shown, `step` wins over the node's. */
+export type NumberUnit = { factor: number; suffix: string; step?: number; max?: number }
 
 export type StringNode = BaseFieldNode & {
   type: 'string'

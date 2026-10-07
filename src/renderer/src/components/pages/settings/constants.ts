@@ -65,6 +65,7 @@ export const requiresRestartParams: (keyof Config)[] = [
   'wifiPassword',
   'samplingFrequency',
   'hand',
+  'carType',
   'carplayIcon120',
   'carplayIcon180',
   'carplayIcon256'

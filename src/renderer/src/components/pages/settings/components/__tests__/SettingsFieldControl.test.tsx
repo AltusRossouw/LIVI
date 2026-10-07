@@ -72,8 +72,19 @@ vi.mock('../selectOptionsCache', () => ({
 
 vi.mock('../numberSpinner/numberSpinner', () => ({
   __esModule: true,
-  default: ({ onValueCommitted }: { onValueCommitted: (n: number) => void }) => (
+  default: ({
+    onValueCommitted,
+    value,
+    min,
+    max
+  }: {
+    onValueCommitted: (n: number) => void
+    value: number
+    min: number
+    max: number
+  }) => (
     <div>
+      <span data-testid="spinner-range">{`${value}:${min}:${max}`}</span>
       <button data-testid="spinner-ok" onClick={() => onValueCommitted(42.9)} />
       <button data-testid="spinner-bad" onClick={() => onValueCommitted(Number.NaN)} />
     </div>
@@ -295,6 +306,59 @@ describe('SettingsFieldControl', () => {
     )
     fireEvent.click(screen.getByTestId('spinner-ok'))
     expect(onChange).toHaveBeenCalledWith(45)
+  })
+
+  test('number node with a unit takes its step and its cap from the unit', () => {
+    const onChange = vi.fn()
+    const unit = () => ({ factor: 1, suffix: 'x', step: 40, max: 120 })
+    render(
+      <SettingsFieldControl
+        node={{ type: 'number', label: 'Top', path: 'top', min: 60, max: 400, unit } as any}
+        value={200}
+        onChange={onChange}
+      />
+    )
+    expect(screen.getByTestId('spinner-range')).toHaveTextContent('120:80:120')
+    fireEvent.click(screen.getByTestId('spinner-ok'))
+    expect(onChange).toHaveBeenCalledWith(80)
+  })
+
+  test('number node with a unit shows, bounds and stores through the factor', () => {
+    const onChange = vi.fn()
+    const unit = () => ({ factor: 0.5, suffix: 'x' })
+    render(
+      <SettingsFieldControl
+        node={
+          { type: 'number', label: 'Top', path: 'top', min: 61, max: 401, step: 10, unit } as any
+        }
+        value={200}
+        onChange={onChange}
+      />
+    )
+    expect(screen.getByTestId('spinner-range')).toHaveTextContent('100:40:200')
+    fireEvent.click(screen.getByTestId('spinner-ok'))
+    expect(onChange).toHaveBeenCalledWith(80)
+  })
+
+  test('number node with a unit hands it the settings', () => {
+    const onChange = vi.fn()
+    const unit = vi.fn(() => ({ factor: 2, suffix: 'x' }))
+    useLiviStore.setState({ settings: { speedUnit: 'mph' } as never })
+    try {
+      render(
+        <SettingsFieldControl
+          node={{ type: 'number', label: 'Top', path: 'top', unit } as any}
+          value={undefined}
+          onChange={onChange}
+        />
+      )
+      expect(unit).toHaveBeenCalledWith({ speedUnit: 'mph' })
+      expect(screen.getByTestId('spinner-range').textContent?.startsWith('0:0:')).toBe(true)
+      fireEvent.click(screen.getByTestId('spinner-ok'))
+      expect(onChange).toHaveBeenCalledWith(22)
+    } finally {
+      useLiviStore.setState({ settings: null })
+    }
   })
 
   test('checkbox node forwards boolean changes and respects disabled', () => {

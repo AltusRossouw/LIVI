@@ -35,6 +35,7 @@ import type { GnssInfo } from './Gnss'
 //    rangeFuelKm / rangeElectricKm   ·     ·          ✓ (hybrid)
 //    fuelRateLph / consumption*      ✓     ·          TODO
 //    batteryCapacityKwh / Lvl        ·     ✓ (VEM)    ✓ (hybrid warning)
+//    carType / evConnectorTypes      ✓     ✓          ✓
 //    coolantC / oilC / iatC          ✓     ·          TODO
 //    transmissionC                   ✓     ·          TODO
 //    ambientC                        ✓     ✓          ✓
@@ -135,6 +136,10 @@ export type TelemetryPayload = {
   batteryCapacityKwh?: number
   /** Derived from `fuelPct × capacity` if absent. */
   batteryLevelKwh?: number
+  /** A `CarType` name such as `'HybridDiesel'`. Written into the settings when it differs. */
+  carType?: string
+  /** `EvConnectorType` names such as `'Combo2'`. Written into the settings when they differ. */
+  evConnectorTypes?: string[]
 
   /** Manifold absolute pressure. */
   mapKpa?: number

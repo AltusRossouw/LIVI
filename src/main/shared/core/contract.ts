@@ -20,7 +20,7 @@ carPlayMfiPowerGpio: number, gpsEnabled: boolean, gpsDevice: string, gpsBaudRate
 /**
  * From the last GPS fix, applied at startup.
  */
-timezone: string, projectionWidth: number, projectionHeight: number, projectionFps: number, projectionDpi: number, projectionViewAreaTop: number, projectionViewAreaBottom: number, projectionViewAreaLeft: number, projectionViewAreaRight: number, projectionSafeAreaTop: number, projectionSafeAreaBottom: number, projectionSafeAreaLeft: number, projectionSafeAreaRight: number, projectionSafeAreaDrawOutside: boolean, clusterWidth: number, clusterHeight: number, clusterFps: number, clusterDpi: number, clusterViewAreaTop: number, clusterViewAreaBottom: number, clusterViewAreaLeft: number, clusterViewAreaRight: number, clusterSafeAreaTop: number, clusterSafeAreaBottom: number, clusterSafeAreaLeft: number, clusterSafeAreaRight: number, lastConnectedAaBtMac?: string, darkMode: boolean, displayBrightness: number, displayBrightnessAuto: boolean, 
+timezone: string, projectionWidth: number, projectionHeight: number, projectionFps: number, projectionDpi: number, projectionViewAreaTop: number, projectionViewAreaBottom: number, projectionViewAreaLeft: number, projectionViewAreaRight: number, projectionSafeAreaTop: number, projectionSafeAreaBottom: number, projectionSafeAreaLeft: number, projectionSafeAreaRight: number, projectionSafeAreaDrawOutside: boolean, clusterWidth: number, clusterHeight: number, clusterFps: number, clusterDpi: number, clusterViewAreaTop: number, clusterViewAreaBottom: number, clusterViewAreaLeft: number, clusterViewAreaRight: number, clusterSafeAreaTop: number, clusterSafeAreaBottom: number, clusterSafeAreaLeft: number, clusterSafeAreaRight: number, lastConnectedAaBtMac?: string, darkMode: boolean, overlayMessages: boolean, displayBrightness: number, displayBrightnessAuto: boolean, 
 /**
  * The Wi-Fi AP, Bluetooth and head-unit name, at most 20 characters.
  */
@@ -124,7 +124,7 @@ elapsedMs: number | null, playing: boolean | null,
  */
 artwork: string | null, };
 
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 
 export type PatchOp = { "op": "set", path: Array<string>, value: unknown, } | { "op": "remove", path: Array<string>, };
 

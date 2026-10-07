@@ -132,6 +132,7 @@ export type Config = {
   lastConnectedAaBtMac?: string
 
   darkMode: boolean
+  overlayMessages: boolean
   displayBrightness: number
   displayBrightnessAuto: boolean
   carName: string

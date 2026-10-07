@@ -2,6 +2,7 @@ import { ROUTES } from '@shared/types'
 import { coreAction, sendInput, useLiviStore } from '@store/store'
 import { useCallback, useContext, useMemo } from 'react'
 import { useLocation } from 'react-router'
+import { CYCLE_SESSION_EVENT } from '../../constants'
 import { AppContext } from '../../context'
 import { broadcastMediaKey } from '../../utils/broadcastMediaKey'
 import type { BindKey, KeyCommand, useKeyDownProps } from './types'
@@ -92,6 +93,7 @@ export const useKeyDown = ({
 
       if (code === (b?.cycleSession || 'KeyS') && !event.repeat && !isFormField(active)) {
         coreAction({ kind: 'nextDevice' }).catch(() => {})
+        window.dispatchEvent(new Event(CYCLE_SESSION_EVENT))
         event.preventDefault()
         event.stopPropagation()
         return

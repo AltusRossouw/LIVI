@@ -35,6 +35,7 @@ export const DEFAULT_CONFIG: Config = {
   carName: 'LIVI',
   oemName: 'App',
   darkMode: true,
+  overlayMessages: true,
   displayBrightness: 1.0,
   displayBrightnessAuto: true,
   hand: HandDriveType.LHD,

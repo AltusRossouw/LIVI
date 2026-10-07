@@ -146,6 +146,7 @@
     "displayBrightness": "Luminosité de l'écran",
     "displayBrightnessAuto": "Luminosité automatique",
     "darkMode": "Mode Sombre",
+    "overlayMessages": "Messages en superposition",
     "phoneAppearance": "Apparence du Téléphone",
     "phoneAppearanceAuto": "Auto",
     "phoneAppearanceDay": "Jour",

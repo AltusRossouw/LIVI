@@ -126,6 +126,7 @@ pub enum StackCmd {
     Telephony(u8),
     Siri,
     NightMode(bool),
+    LimitedUi(bool),
     Keyframe,
     ClusterActive(bool),
     VideoActive(bool),
@@ -232,6 +233,7 @@ struct Conn<M: Media> {
     event: Option<EventConn>,
     live: bool,
     night_mode: Option<bool>,
+    limited_ui: Option<bool>,
     cluster_want: bool,
     video_active: bool,
     audio_active: bool,
@@ -375,6 +377,7 @@ pub async fn run<M: Media>(
         event: None,
         live: false,
         night_mode: None,
+        limited_ui: None,
         cluster_want: false,
         video_active: false,
         audio_active: false,
@@ -500,6 +503,9 @@ impl<M: Media> Conn<M> {
                 // bring-up on one sent before RECORD.
                 if let Some(night) = self.night_mode {
                     self.send_night_mode(night).await;
+                }
+                if let Some(limited) = self.limited_ui {
+                    self.send_limited_ui(limited).await;
                 }
                 self.emit(StackEvent::Active {
                     ip: net::host_of(&self.peer),
@@ -1175,6 +1181,14 @@ impl<M: Media> Conn<M> {
         .await;
     }
 
+    async fn send_limited_ui(&mut self, limited: bool) {
+        self.send_event_command(&dict([
+            ("type", Value::String("setLimitedUI".into())),
+            ("params", dict([("limitedUI", Value::Bool(limited))])),
+        ]))
+        .await;
+    }
+
     async fn force_keyframe(&mut self, uuid: &str) {
         self.send_event_command(&dict([
             ("type", Value::String("forceKeyFrame".into())),
@@ -1251,6 +1265,10 @@ impl<M: Media> Conn<M> {
             StackCmd::NightMode(night) => {
                 self.night_mode = Some(night);
                 self.send_night_mode(night).await;
+            }
+            StackCmd::LimitedUi(limited) => {
+                self.limited_ui = Some(limited);
+                self.send_limited_ui(limited).await;
             }
             StackCmd::Keyframe => {
                 if self.event.is_none() || !self.main_stream_ready {
@@ -1759,6 +1777,7 @@ pub(crate) mod tests {
         rig.cmds.send(StackCmd::Touches(vec![Touch { x: 0.5, y: 0.5, down: true }])).unwrap();
         rig.cmds.send(StackCmd::Keyframe).unwrap();
         rig.cmds.send(StackCmd::NightMode(true)).unwrap();
+        rig.cmds.send(StackCmd::LimitedUi(true)).unwrap();
         rig.cmds.send(StackCmd::Siri).unwrap();
         rig.cmds.send(StackCmd::Media(hid::media_button::NEXT)).unwrap();
         rig.cmds.send(StackCmd::Telephony(hid::telephony_button::DROP)).unwrap();
@@ -1777,7 +1796,7 @@ pub(crate) mod tests {
         let mut plain = Vec::new();
         let mut chunk = vec![0u8; 16 * 1024];
         let mut commands = Vec::new();
-        while commands.len() < 12 {
+        while commands.len() < 13 {
             let n = tokio::time::timeout(Duration::from_secs(5), event.read(&mut chunk))
                 .await
                 .unwrap()
@@ -1799,6 +1818,7 @@ pub(crate) mod tests {
                 "hidSendReport",
                 "forceKeyFrame",
                 "setNightMode",
+                "setLimitedUI",
                 "requestSiri",
                 "requestSiri",
                 "hidSendReport",

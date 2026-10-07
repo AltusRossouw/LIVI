@@ -37,6 +37,7 @@ import InvertColorsOutlinedIcon from '@mui/icons-material/InvertColorsOutlined'
 import KeyboardOutlinedIcon from '@mui/icons-material/KeyboardOutlined'
 import KeyOutlinedIcon from '@mui/icons-material/KeyOutlined'
 import LanOutlinedIcon from '@mui/icons-material/LanOutlined'
+import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined'
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined'
 import MemoryOutlinedIcon from '@mui/icons-material/MemoryOutlined'
 import MicNoneOutlinedIcon from '@mui/icons-material/MicNoneOutlined'
@@ -167,6 +168,7 @@ const ICONS: Record<string, SvgIconComponent> = {
   clusterVideo: SpeedOutlinedIcon,
 
   darkMode: DarkModeOutlinedIcon,
+  overlayMessages: LayersOutlinedIcon,
   phoneAppearance: BrightnessAutoOutlinedIcon,
   displayBrightness: Brightness6OutlinedIcon,
   displayBrightnessAuto: BrightnessAutoOutlinedIcon,

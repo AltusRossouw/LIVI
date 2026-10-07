@@ -66,6 +66,7 @@ pub struct Config {
     pub last_connected_aa_bt_mac: Option<String>,
 
     pub dark_mode: bool,
+    pub overlay_messages: bool,
     pub display_brightness: f64,
     pub display_brightness_auto: bool,
     /// The Wi-Fi AP, Bluetooth and head-unit name, at most 20 characters.
@@ -375,6 +376,7 @@ pub fn defaults() -> Config {
         cluster_safe_area_right: 300,
         last_connected_aa_bt_mac: empty(),
         dark_mode: true,
+        overlay_messages: true,
         display_brightness: 1.0,
         display_brightness_auto: true,
         car_name: "LIVI".into(),

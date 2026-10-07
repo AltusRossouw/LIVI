@@ -9,7 +9,8 @@ import {
   useNavigate,
   useRoutes
 } from 'react-router'
-import { SessionSwitchOverlay } from './components/common/SessionSwitchOverlay'
+import { PhoneOverlay } from './components/common/PhoneOverlay'
+import { VolumeOverlay } from './components/common/VolumeOverlay'
 import { AppLayout } from './components/layouts/AppLayout'
 import { Cluster, Projection } from './components/pages'
 import { AppContext } from './context'
@@ -294,7 +295,8 @@ function AppInner() {
         <Cluster visible={clusterDashActive} showLoadingPlaceholder={!clusterDashActive} />
       )}
       <Box sx={{ width: '100%', height: '100%' }}>{element}</Box>
-      <SessionSwitchOverlay />
+      <PhoneOverlay />
+      <VolumeOverlay />
     </AppLayout>
   )
 }

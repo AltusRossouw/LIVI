@@ -69,6 +69,7 @@ const liviState: any = {
     bindings: { back: 'KeyB', selectDown: 'Enter' }
   },
   sessions: { active: null, position: 0, total: 0 },
+  devices: [],
   saveSettings: vi.fn()
 }
 const statusState: any = {

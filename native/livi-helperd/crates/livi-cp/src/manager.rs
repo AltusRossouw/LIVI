@@ -135,6 +135,7 @@ pub enum CpCmd {
     NightMode(bool),
     /// None for automatic.
     InitialNightMode(Option<bool>),
+    LimitedUi(bool),
     ClusterActive(bool),
     /// The phones reconnect.
     DropSessions,
@@ -834,6 +835,11 @@ impl<M: Media> Manager<M> {
                     }
                 }
             }
+            CpCmd::LimitedUi(limited) => {
+                for s in self.sessions.values() {
+                    s.send(StackCmd::LimitedUi(limited));
+                }
+            }
             CpCmd::ClusterActive(active) => {
                 self.cluster_stream_active = active;
                 for s in self.sessions.values() {
@@ -1106,6 +1112,7 @@ mod tests {
         rig.handle.stack(id, StackCmd::Keyframe);
         rig.handle.send(CpCmd::NightMode(true));
         rig.handle.send(CpCmd::InitialNightMode(Some(false)));
+        rig.handle.send(CpCmd::LimitedUi(true));
         rig.handle.send(CpCmd::ClusterActive(false));
         phone.sock.shutdown().await.unwrap();
         assert_eq!(

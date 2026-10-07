@@ -1,6 +1,7 @@
 import { ROUTES } from '@shared/types'
 import { renderHook } from '@testing-library/react'
 import { ReactNode } from 'react'
+import { CYCLE_SESSION_EVENT } from '../../../constants'
 import { AppContext, AppContextProps } from '../../../context'
 import { useKeyDownProps } from '../types'
 import { useKeyDown } from '../useKeyDown'
@@ -1108,10 +1109,14 @@ describe('useKeyDown', () => {
       { wrapper }
     )
 
+    const heard = vi.fn()
+    window.addEventListener(CYCLE_SESSION_EVENT, heard)
     const event = makeEvent('KeyS')
     result.current(event)
+    window.removeEventListener(CYCLE_SESSION_EVENT, heard)
 
     expect(mockCoreAction).toHaveBeenCalledWith({ kind: 'nextDevice' })
+    expect(heard).toHaveBeenCalledTimes(1)
     expect(event.preventDefault).toHaveBeenCalled()
     expect(event.stopPropagation).toHaveBeenCalled()
 

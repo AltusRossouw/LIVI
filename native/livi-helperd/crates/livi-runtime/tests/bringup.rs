@@ -15,7 +15,7 @@ use iap2_csm::messages::wifi::SecurityType;
 use livi_runtime::bringup::{BringupEvent, CpConfig, OnCable, run_accessory};
 use livi_runtime::framing::frame_msg_id;
 use livi_runtime::ident::{Identity, Transport};
-use livi_runtime::vehicle::{Vehicle, VehicleFeed};
+use livi_runtime::vehicle::{Fuels, Vehicle, VehicleFeed};
 use livi_runtime::{AsyncAuth, ChannelError, ControlChannel};
 
 struct PairChannel {
@@ -67,6 +67,7 @@ fn identity() -> Identity {
         name: "LIVI".into(),
         ssid: "LIVI".into(),
         bt_mac: [0xAA, 0xBB, 0xCC, 0x11, 0x22, 0x33],
+        fuels: Fuels::parse("Gasoline"),
     }
 }
 
@@ -292,7 +293,10 @@ async fn identification_retries_without_droppable_field() {
 
     phone.send(StartIdentification {}.encode()).await.unwrap();
     let first = phone.expect(0x1D01).await;
-    assert!(IdentificationInformation::decode(&first).unwrap().vehicle_status_component.is_some());
+    let status =
+        IdentificationInformation::decode(&first).unwrap().vehicle_status_component.unwrap();
+    assert!(status.range_gasoline && status.range_warning_gasoline);
+    assert!(!status.range_electric && !status.range_diesel && !status.range_cng);
 
     let mut reject = IdentificationRejected {
         name: false,
@@ -376,6 +380,7 @@ async fn location_and_vehicle_status_reach_the_phone_that_asked() {
         (status.range, status.outside_temperature, status.range_warning),
         (Some(320), Some(12), None)
     );
+    assert_eq!((status.range_gasoline, status.range_electric), (Some(320), None));
 
     phone
         .send(

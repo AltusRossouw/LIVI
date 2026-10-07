@@ -21,8 +21,8 @@ import type { GnssInfo } from './Gnss'
 //    ─────────────────────────────────────────────────────────────────
 //    speedKph                        ✓     ✓          TODO
 //    rpm                             ✓     ✓          TODO
-//    gear                            ✓     ✓          TODO
-//    reverse                         ✓     ✓ (gear)   TODO
+//    gear                            ✓     ✓          ✓
+//    reverse                         ✓     ✓ (gear)   ✓ (gear)
 //    steeringDeg                     ✓     ·          TODO
 //    turn (blinker)                  ✓     ✓          TODO
 //    lights / highBeam / hazards     ✓     ✓          TODO
@@ -30,10 +30,11 @@ import type { GnssInfo } from './Gnss'
 //    nightMode                       ✓     ✓          ✓
 //    path (navigate UI)              ✓     ·          ·
 //    volume (head-unit level)        ✓     ·          ·
-//    fuelPct                         ✓     ✓          TODO
+//    fuelPct                         ✓     ✓          ✓ (range warning)
 //    rangeKm                         ✓     ✓          ✓
+//    rangeFuelKm / rangeElectricKm   ·     ·          ✓ (hybrid)
 //    fuelRateLph / consumption*      ✓     ·          TODO
-//    batteryCapacityKwh / Lvl        ·     ✓ (VEM)    TODO (EV)
+//    batteryCapacityKwh / Lvl        ·     ✓ (VEM)    ✓ (hybrid warning)
 //    coolantC / oilC / iatC          ✓     ·          TODO
 //    transmissionC                   ✓     ·          TODO
 //    ambientC                        ✓     ✓          ✓
@@ -122,6 +123,10 @@ export type TelemetryPayload = {
   /** 0..100. For EVs the state of charge. */
   fuelPct?: number
   rangeKm?: number
+  /** Hybrids only, the range on the tank. */
+  rangeFuelKm?: number
+  /** Hybrids only, the range on the battery. */
+  rangeElectricKm?: number
   fuelRateLph?: number
   consumptionLPer100Km?: number
   consumptionAvgLPer100Km?: number

@@ -3891,7 +3891,7 @@ dependencies = [
 
 [[package]]
 name = "livi-core"
-version = "10.1.0"
+version = "10.2.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -4131,7 +4131,7 @@ dependencies = [
 
 [[package]]
 name = "livi-ui"
-version = "10.1.0"
+version = "10.2.0"
 dependencies = [
  "base64 0.23.1",
  "image",

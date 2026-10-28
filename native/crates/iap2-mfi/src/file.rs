@@ -6,11 +6,11 @@ use std::path::Path;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use p256::ecdsa::signature::hazmat::PrehashSigner;
-use p256::ecdsa::{Signature, SigningKey};
+use p256::ecdsa::signature::hazmat::{PrehashSigner, PrehashVerifier};
+use p256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use p256::pkcs8::DecodePrivateKey as _;
 use rsa::pkcs8::DecodePrivateKey as _;
-use rsa::{Pkcs1v15Sign, RsaPrivateKey};
+use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
 
 use crate::{AuthCoprocessor, CHALLENGE_MAX, CHALLENGE_MIN, MfiError};
 
@@ -96,6 +96,37 @@ impl FileCoprocessor {
         let read =
             |name: &str| std::fs::read(dir.join(name)).map_err(|e| bad(format!("{name}: {e}")));
         Self::from_bytes(&read(CERTIFICATE_FILE)?, &read(IDENTITY_FILE)?)
+    }
+
+    /// Sign a fixed digest and check the result against the public half of the key.
+    ///
+    /// A key that cannot sign, or that signs in a form the verifier rejects, fails here
+    /// instead of in the middle of a CarPlay setup, where the only symptom is the phone
+    /// dropping the session.
+    pub fn self_test(&mut self) -> Result<(), MfiError> {
+        let digest = match &self.identity {
+            Identity::Ec(_) => vec![0x5A; 32],
+            Identity::Rsa(_) => vec![0x5A; SHA1_LEN],
+        };
+        let signature = self.generate_challenge_response(&digest)?;
+        match &self.identity {
+            Identity::Ec(key) => {
+                let signature = Signature::from_slice(&signature)
+                    .map_err(|e| bad(format!("the signature is not raw r||s: {e}")))?;
+                VerifyingKey::from(key)
+                    .verify_prehash(&digest, &signature)
+                    .map_err(|_| bad("the key does not sign for its own public key"))
+            }
+            Identity::Rsa(key) => {
+                let scheme = Pkcs1v15Sign {
+                    hash_len: Some(SHA1_LEN),
+                    prefix: SHA1_PREFIX.into(),
+                };
+                RsaPublicKey::from(key)
+                    .verify(scheme, &digest, &signature)
+                    .map_err(|_| bad("the key does not sign for its own public key"))
+            }
+        }
     }
 }
 
@@ -194,6 +225,14 @@ mod tests {
             .verify(scheme, &digest, &signature)
             .unwrap();
         assert!(chip.generate_challenge_response(&[1u8; 32]).is_err());
+    }
+
+    #[test]
+    fn the_self_test_signs_and_verifies_for_both_key_types() {
+        let mut ec = FileCoprocessor::from_bytes(CERT_DER, EC_PEM.as_bytes()).unwrap();
+        ec.self_test().unwrap();
+        let mut rsa = FileCoprocessor::from_bytes(CERT_DER, RSA_PEM.as_bytes()).unwrap();
+        rsa.self_test().unwrap();
     }
 
     #[test]

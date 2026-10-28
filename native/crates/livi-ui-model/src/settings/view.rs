@@ -190,6 +190,11 @@ pub enum Change {
 }
 
 pub fn label(t: &Strings, l: &Label) -> String {
+    if let Some((script, latin)) = l.unreadable
+        && !t.shows(script)
+    {
+        return latin.to_string();
+    }
     match l.key {
         Some(key) => t.t(key, l.text),
         None => l.text.to_string(),

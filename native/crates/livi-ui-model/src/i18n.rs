@@ -22,6 +22,7 @@ pub struct Strings {
     lang: String,
     words: HashMap<String, String>,
     fallback: HashMap<String, String>,
+    scripts: Option<Vec<[u8; 4]>>,
 }
 
 fn flatten(prefix: &str, value: &Value, out: &mut HashMap<String, String>) {
@@ -69,17 +70,51 @@ fn source(lang: &str) -> &'static str {
     }
 }
 
+pub fn script(lang: &str) -> Option<[u8; 4]> {
+    if matches!(lang, "zh" | "zh-CN" | "zh-Hans" | "zh-SG") {
+        return Some(*b"Hani");
+    }
+    match lang.split(['-', '_']).next().unwrap_or("en") {
+        "ja" => Some(*b"Hira"),
+        "ko" => Some(*b"Hang"),
+        "ar" => Some(*b"Arab"),
+        "he" | "iw" => Some(*b"Hebr"),
+        "th" => Some(*b"Thai"),
+        "hi" => Some(*b"Deva"),
+        _ => None,
+    }
+}
+
 impl Strings {
     pub fn new(lang: &str) -> Self {
         Self {
             lang: lang.to_string(),
             words: table(source(lang)),
             fallback: table(EN),
+            scripts: None,
+        }
+    }
+
+    pub fn readable(lang: &str, scripts: &[[u8; 4]]) -> Self {
+        let shown = script(lang).is_none_or(|s| scripts.contains(&s));
+        Self {
+            lang: lang.to_string(),
+            words: table(if shown { source(lang) } else { EN }),
+            fallback: table(EN),
+            scripts: Some(scripts.to_vec()),
         }
     }
 
     pub fn lang(&self) -> &str {
         &self.lang
+    }
+
+    pub fn scripts(&self) -> Option<&[[u8; 4]]> {
+        self.scripts.as_deref()
+    }
+
+    pub fn shows(&self, script: [u8; 4]) -> bool {
+        self.scripts.as_ref().is_none_or(|s| s.contains(&script))
     }
 
     pub fn get(&self, key: &str) -> Option<&str> {
@@ -139,6 +174,21 @@ mod tests {
                 en.t("settings.audio", "x")
             );
         }
+    }
+
+    #[test]
+    fn a_language_without_its_script_reads_english() {
+        let no_font = Strings::readable("ja", &[*b"Hani"]);
+        assert_eq!(no_font.lang(), "ja");
+        assert!(!no_font.shows(*b"Hira"));
+        assert_eq!(
+            no_font.t("settings.audio", "x"),
+            Strings::new("en").t("settings.audio", "x")
+        );
+        assert!(Strings::readable("ja", &[*b"Hira"]).shows(*b"Hira"));
+        assert!(Strings::new("de").shows(*b"Arab"));
+        assert_eq!(script("zh-TW"), None);
+        assert_eq!(script("he"), Some(*b"Hebr"));
     }
 
     #[test]

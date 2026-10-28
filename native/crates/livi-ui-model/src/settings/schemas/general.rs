@@ -625,13 +625,34 @@ pub fn schema() -> Node {
                     choice(Label::plain("Deutsch"), OptionValue::Text("de")),
                     choice(Label::plain("Українська"), OptionValue::Text("ua")),
                     choice(Label::plain("Français"), OptionValue::Text("fr")),
-                    choice(Label::plain("简体中文"), OptionValue::Text("zh")),
-                    choice(Label::plain("日本語"), OptionValue::Text("ja")),
-                    choice(Label::plain("한국어"), OptionValue::Text("ko")),
-                    choice(Label::plain("العربية"), OptionValue::Text("ar")),
-                    choice(Label::plain("עברית"), OptionValue::Text("he")),
-                    choice(Label::plain("ไทย"), OptionValue::Text("th")),
-                    choice(Label::plain("हिन्दी"), OptionValue::Text("hi")),
+                    choice(
+                        Label::native("简体中文", *b"Hani", "Chinese"),
+                        OptionValue::Text("zh"),
+                    ),
+                    choice(
+                        Label::native("日本語", *b"Hira", "Japanese"),
+                        OptionValue::Text("ja"),
+                    ),
+                    choice(
+                        Label::native("한국어", *b"Hang", "Korean"),
+                        OptionValue::Text("ko"),
+                    ),
+                    choice(
+                        Label::native("العربية", *b"Arab", "Arabic"),
+                        OptionValue::Text("ar"),
+                    ),
+                    choice(
+                        Label::native("עברית", *b"Hebr", "Hebrew"),
+                        OptionValue::Text("he"),
+                    ),
+                    choice(
+                        Label::native("ไทย", *b"Thai", "Thai"),
+                        OptionValue::Text("th"),
+                    ),
+                    choice(
+                        Label::native("हिन्दी", *b"Deva", "Hindi"),
+                        OptionValue::Text("hi"),
+                    ),
                 ],
             )
             .icon("language")

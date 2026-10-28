@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use slint::fontique_011::fontique::{Blob, FallbackKey, FamilyId, FontInfo, Script};
+use slint::fontique_011::fontique::{Blob, Collection, FallbackKey, FamilyId, FontInfo, Script};
 use slint::platform::WindowEvent;
 
 const SCRIPTS: [([u8; 4], char); 8] = [
@@ -22,6 +22,7 @@ const SCRIPTS: [([u8; 4], char); 8] = [
 
 thread_local! {
     static REGISTERED: RefCell<BTreeSet<String>> = RefCell::default();
+    static SHOWN: RefCell<Option<Vec<[u8; 4]>>> = const { RefCell::new(None) };
 }
 
 fn covers(info: &FontInfo, data: &[u8], c: char) -> bool {
@@ -32,7 +33,7 @@ fn covers(info: &FontInfo, data: &[u8], c: char) -> bool {
 }
 
 fn add(
-    collection: &mut slint::fontique_011::fontique::Collection,
+    collection: &mut Collection,
     data: &[u8],
     fonts: &[(FamilyId, Vec<FontInfo>)],
 ) -> Vec<[u8; 4]> {
@@ -53,6 +54,34 @@ fn add(
     scripts.sort();
     scripts.dedup();
     scripts
+}
+
+fn readable(collection: &mut Collection, script: [u8; 4], probe: char) -> bool {
+    let families: Vec<FamilyId> = collection
+        .fallback_families(FallbackKey::new(Script::from_bytes(script), None))
+        .collect();
+    families.into_iter().any(|id| {
+        collection.family(id).is_some_and(|family| {
+            family.fonts().iter().any(|info| {
+                info.load(None)
+                    .is_some_and(|blob| covers(info, blob.data(), probe))
+            })
+        })
+    })
+}
+
+pub fn shown() -> Vec<[u8; 4]> {
+    if let Some(shown) = SHOWN.with_borrow(Clone::clone) {
+        return shown;
+    }
+    let mut collection = slint::fontique_011::shared_collection();
+    let shown: Vec<[u8; 4]> = SCRIPTS
+        .iter()
+        .filter(|(script, probe)| readable(&mut collection, *script, *probe))
+        .map(|(script, _)| *script)
+        .collect();
+    SHOWN.set(Some(shown.clone()));
+    shown
 }
 
 pub fn register(paths: &[String]) -> bool {
@@ -89,6 +118,9 @@ pub fn register(paths: &[String]) -> bool {
             .collect();
         println!("[ui] font {path} registered for {}", names.join(", "));
         added = true;
+    }
+    if added {
+        SHOWN.set(None);
     }
     added
 }

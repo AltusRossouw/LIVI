@@ -90,10 +90,15 @@ pub fn tr(key: &str, text: &str) -> String {
     with(|c| c.strings.t(key, text)).unwrap_or_else(|| text.to_string())
 }
 
+pub fn language() -> String {
+    with(|c| c.strings.lang().to_string()).unwrap_or_default()
+}
+
 pub fn set_language(lang: &str) {
+    let shown = crate::fonts::shown();
     with(|c| {
-        if c.strings.lang() != lang {
-            c.strings = Strings::new(lang);
+        if c.strings.lang() != lang || c.strings.scripts() != Some(shown.as_slice()) {
+            c.strings = Strings::readable(lang, &shown);
         }
     });
 }
@@ -184,7 +189,7 @@ pub fn wire(ui: &AppWindow, client: &Client, lang: &str) {
         *c = Some(Controller {
             model: Settings::new(schema()).with_facts(facts()),
             stack: Vec::new(),
-            strings: Strings::new(lang),
+            strings: Strings::readable(lang, &crate::fonts::shown()),
             baseline: None,
             hsl: None,
             last_slide: None,

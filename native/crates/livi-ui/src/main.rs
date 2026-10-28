@@ -114,15 +114,29 @@ fn apply_look(ui: &AppWindow, look: Look) {
     }
     ui.set_tabs(ModelRc::from(Rc::new(VecModel::from(tabs))));
     ui.set_projection_icon(tab(Tab::Projection).icon);
-    settings_ui::set_language(&look.language);
     secondary::theme(ui);
+    apply_language(ui, &look.language);
+    if ZOOM.get() != look.zoom {
+        ZOOM.set(look.zoom);
+        apply_zoom(ui);
+    }
+}
+
+fn apply_language(ui: &AppWindow, lang: &str) {
+    settings_ui::set_language(lang);
     secondary::set_texts();
     media_ui::set_texts(ui, settings_ui::tr);
     dashboard_ui::set_texts(&ui.global::<DashState>(), settings_ui::tr);
     ui.set_no_camera(settings_ui::tr("camera.noCamera", "No camera found").into());
-    if ZOOM.get() != look.zoom {
-        ZOOM.set(look.zoom);
-        apply_zoom(ui);
+}
+
+fn render_settings(ui: &AppWindow) {
+    if ui.get_page() == Page::Settings {
+        CLIENT.with_borrow(|c| {
+            if let Some(c) = c {
+                settings_ui::render(ui, c);
+            }
+        });
     }
 }
 
@@ -159,15 +173,7 @@ fn apply(ui: &AppWindow, update: Update) {
         }
         Update::Look(look) => apply_look(ui, look),
         Update::Kiosk(on) => fullscreen::follow_main(ui.window(), on),
-        Update::Settings => {
-            if ui.get_page() == Page::Settings {
-                CLIENT.with_borrow(|c| {
-                    if let Some(c) = c {
-                        settings_ui::render(ui, c);
-                    }
-                });
-            }
-        }
+        Update::Settings => render_settings(ui),
         Update::Spectrum(bands) => {
             let model = ui.get_bands();
             for (i, v) in bands.into_iter().enumerate().take(model.row_count()) {
@@ -184,6 +190,11 @@ fn apply(ui: &AppWindow, update: Update) {
         Update::MainMask(mask) => ui.set_main_mask(dashboard_ui::mask_data(mask)),
         Update::Fonts(paths) => {
             if fonts::register(&paths) {
+                let lang = settings_ui::language();
+                if !lang.is_empty() {
+                    apply_language(ui, &lang);
+                    render_settings(ui);
+                }
                 fonts::relayout(ui.window());
                 secondary::relayout();
             }

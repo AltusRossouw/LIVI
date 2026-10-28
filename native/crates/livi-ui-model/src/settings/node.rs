@@ -6,6 +6,7 @@
 pub struct Label {
     pub key: Option<&'static str>,
     pub text: &'static str,
+    pub unreadable: Option<([u8; 4], &'static str)>,
 }
 
 impl Label {
@@ -13,11 +14,24 @@ impl Label {
         Self {
             key: Some(key),
             text,
+            unreadable: None,
         }
     }
 
     pub const fn plain(text: &'static str) -> Self {
-        Self { key: None, text }
+        Self {
+            key: None,
+            text,
+            unreadable: None,
+        }
+    }
+
+    pub const fn native(text: &'static str, script: [u8; 4], latin: &'static str) -> Self {
+        Self {
+            key: None,
+            text,
+            unreadable: Some((script, latin)),
+        }
     }
 }
 

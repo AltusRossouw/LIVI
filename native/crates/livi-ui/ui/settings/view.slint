@@ -36,6 +36,7 @@ export global SettingsState {
     in property <int> text-max;
     in property <color> color-preview;
     in property <string> color-hex;
+    in property <bool> color-hex-invalid;
     in property <bool> color-custom;
     in property <float> color-hue;
     in property <float> color-saturation;
@@ -219,6 +220,7 @@ export component SettingsView inherits Rectangle {
                         base: SettingsState.focus-base;
                         preview: SettingsState.color-preview;
                         hex: SettingsState.color-hex;
+                        hex-invalid: SettingsState.color-hex-invalid;
                         custom: SettingsState.color-custom;
                         hue: SettingsState.color-hue;
                         saturation: SettingsState.color-saturation;

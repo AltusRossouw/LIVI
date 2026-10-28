@@ -87,4 +87,11 @@ mod tests {
         }
         assert_eq!(hex([0, 0xad, 0xad]), "#00adad");
     }
+
+    #[test]
+    fn whole_degree_sliders_cannot_hold_every_hex() {
+        let c = [0xff, 0x7e, 0x00];
+        assert_eq!(to_hsl(c).h, 30.0);
+        assert_eq!(from_hsl(to_hsl(c)), [0xff, 0x80, 0x00]);
+    }
 }

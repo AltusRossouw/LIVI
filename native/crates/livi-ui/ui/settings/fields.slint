@@ -278,6 +278,7 @@ export component ColorBody inherits VerticalLayout {
     in property <int> base;
     in property <color> preview;
     in property <string> hex;
+    in property <bool> hex-invalid;
     in property <bool> custom;
     in property <float> hue;
     in property <float> saturation;
@@ -293,6 +294,8 @@ export component ColorBody inherits VerticalLayout {
     callback slide-done(int, float);
     callback reset();
 
+    property <bool> hex-touched;
+    property <bool> hex-bad: root.hex-invalid && !root.hex-touched;
     property <bool> hex-editing: Focus.editing && Focus.main(root.base);
     changed hex-editing => {
         if (root.hex-editing) {
@@ -319,8 +322,8 @@ export component ColorBody inherits VerticalLayout {
             horizontal-stretch: 1;
             height: 40px;
             border-radius: 8px;
-            border-width: hex-input.has-focus || Focus.main(root.base) ? 2px : 1px;
-            border-color: hex-input.has-focus || Focus.main(root.base) ? Theme.primary : Theme.divider;
+            border-width: root.hex-bad || hex-input.has-focus || Focus.main(root.base) ? 2px : 1px;
+            border-color: root.hex-bad ? #f44336 : hex-input.has-focus || Focus.main(root.base) ? Theme.primary : Theme.divider;
             hex-input := TextInput {
                 x: 12px;
                 width: parent.width - 24px;
@@ -329,7 +332,11 @@ export component ColorBody inherits VerticalLayout {
                 font-size: 16px;
                 vertical-alignment: center;
                 single-line: true;
-                accepted => { root.hex-commit(self.text); }
+                edited => { root.hex-touched = true; }
+                accepted => {
+                    root.hex-touched = false;
+                    root.hex-commit(self.text);
+                }
             }
         }
         Rectangle {

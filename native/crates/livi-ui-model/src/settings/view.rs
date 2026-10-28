@@ -654,10 +654,14 @@ impl Settings {
             }
             Kind::Color => {
                 let hex = text.trim();
-                let ok = hex.len() == 7
-                    && hex.starts_with('#')
-                    && hex[1..].chars().all(|c| c.is_ascii_hexdigit());
-                ok.then(|| Change::Config(patch(node.path, Value::from(hex.to_lowercase()))))
+                let hex = hex.strip_prefix('#').unwrap_or(hex);
+                let ok = hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit());
+                ok.then(|| {
+                    Change::Config(patch(
+                        node.path,
+                        Value::from(format!("#{}", hex.to_lowercase())),
+                    ))
+                })
             }
             _ => None,
         }
@@ -700,6 +704,25 @@ mod tests {
         };
         assert!(patch["uiZoomPercent"].is_u64());
         assert_eq!(patch["uiZoomPercent"], json!(110));
+    }
+
+    #[test]
+    fn a_hex_colour_is_taken_with_or_without_the_hash() {
+        let s = Settings::new(schema());
+        let Some(stack) = s.find(&["appearance", "ui-colors", "highlightColorLight"]) else {
+            panic!("highlight colour is in appearance");
+        };
+        let saved = |text: &str| match s.text(&stack, text) {
+            Some(Change::Config(patch)) => {
+                patch["highlightColorLight"].as_str().map(str::to_string)
+            }
+            _ => None,
+        };
+        assert_eq!(saved("#ff7e00").as_deref(), Some("#ff7e00"));
+        assert_eq!(saved(" FF7E00 ").as_deref(), Some("#ff7e00"));
+        assert_eq!(saved("#ff7e0"), None);
+        assert_eq!(saved("#ff7e00a"), None);
+        assert_eq!(saved("gg7e00"), None);
     }
 
     fn state() -> Value {

@@ -522,13 +522,17 @@ pub fn wire(ui: &AppWindow, client: &Client, lang: &str) {
     s.on_color_hex_commit({
         let (weak, client) = (weak.clone(), client.clone());
         move |text: SharedString| {
+            let Some(ui) = weak.upgrade() else { return };
+            let Some(change) = with(|c| c.model.text(&c.stack, &text)).flatten() else {
+                ui.global::<SettingsState>().set_color_hex_invalid(true);
+                return;
+            };
+            ui.global::<SettingsState>().set_color_hex_invalid(false);
             act(&weak, &client, |c, _| {
                 c.hsl = None;
-                (c.model.text(&c.stack, &text).into_iter().collect(), false)
+                (vec![change], false)
             });
-            if let Some(ui) = weak.upgrade() {
-                crate::keys_ui::text_done(&ui);
-            }
+            crate::keys_ui::text_done(&ui);
         }
     });
     s.on_color_slide({
@@ -549,7 +553,7 @@ pub fn wire(ui: &AppWindow, client: &Client, lang: &str) {
                     _ => hsl.l = f64::from(v).round(),
                 }
                 c.hsl = Some(hsl);
-                show_color(&state, hsl, custom);
+                show_color(&state, hsl, from_hsl(hsl), custom);
             });
         }
     });

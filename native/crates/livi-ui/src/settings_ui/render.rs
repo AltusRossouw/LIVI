@@ -146,8 +146,7 @@ pub(super) fn custom_name(page: CustomPage) -> &'static str {
     }
 }
 
-pub(super) fn show_color(s: &SettingsState, hsl: Hsl, custom: bool) {
-    let c = from_hsl(hsl);
+pub(super) fn show_color(s: &SettingsState, hsl: Hsl, c: [u8; 3], custom: bool) {
     s.set_color_preview(color(c));
     s.set_color_hex(hex(c).into());
     s.set_color_custom(custom);
@@ -273,6 +272,9 @@ pub(super) fn render_screen(c: &mut Controller, s: &SettingsState, state: &Value
             custom,
         } => {
             s.set_title(title.into());
+            if c.hsl.is_none() {
+                s.set_color_hex_invalid(false);
+            }
             let hsl = c
                 .hsl
                 .filter(|h| rgb(&value).is_some_and(|v| from_hsl(*h) == v))
@@ -284,7 +286,7 @@ pub(super) fn render_screen(c: &mut Controller, s: &SettingsState, state: &Value
                     })
                 });
             c.hsl = Some(hsl);
-            show_color(s, hsl, custom);
+            show_color(s, hsl, rgb(&value).unwrap_or_else(|| from_hsl(hsl)), custom);
             s.set_kind(ScreenKind::Color);
         }
         Screen::Slider { title, level, text } => {

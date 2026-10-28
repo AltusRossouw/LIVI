@@ -25,6 +25,27 @@ const CAR_TYPES: [(&str, &str, f64); 13] = [
 const HAND_LHD: f64 = 0.0;
 const HAND_RHD: f64 = 1.0;
 
+fn carplay() -> Node {
+    Node::route(
+        "theme",
+        Label::new("settings.carMakerTheme", "Car Maker Theme"),
+        vec![
+            Node::text(Label::new("settings.carPlayTheme", "Theme"), "carPlayTheme")
+                .icon("uiColors")
+                .display_value()
+                .page(Label::new("settings.carPlayTheme", "Theme")),
+            Node::text(
+                Label::new("settings.carPlayVehicleModel", "Vehicle Model"),
+                "carPlayVehicleModel",
+            )
+            .icon("car")
+            .display_value()
+            .page(Label::new("settings.carPlayVehicleModel", "Vehicle Model")),
+        ],
+    )
+    .icon("wirelessCp")
+}
+
 pub fn schema() -> Node {
     Node::route(
         "car",
@@ -138,11 +159,17 @@ pub fn schema() -> Node {
                 "carPlayVehicleClimate",
             )
             .icon("carPlayVehicleClimate"),
+            Node::checkbox(
+                Label::new("settings.carPlayHlsVideo", "Video in the car"),
+                "carPlayHlsVideo",
+            )
+            .icon("media"),
             Node::custom(
                 Label::new("settings.carData", "Car Data"),
                 "carType",
                 CustomPage::CarReadings,
             ),
+            carplay(),
         ],
     )
     .icon("car")

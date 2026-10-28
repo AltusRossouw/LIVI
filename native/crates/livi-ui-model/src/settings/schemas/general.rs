@@ -560,27 +560,6 @@ fn gps() -> Node {
     .icon("gps")
 }
 
-fn carplay() -> Node {
-    Node::route(
-        "carplay",
-        Label::new("settings.carPlaySection", "CarPlay Ultra"),
-        vec![
-            Node::text(Label::new("settings.carPlayTheme", "Theme"), "carPlayTheme")
-                .icon("uiColors")
-                .display_value()
-                .page(Label::new("settings.carPlayTheme", "Theme")),
-            Node::text(
-                Label::new("settings.carPlayVehicleModel", "Vehicle Model"),
-                "carPlayVehicleModel",
-            )
-            .icon("car")
-            .display_value()
-            .page(Label::new("settings.carPlayVehicleModel", "Vehicle Model")),
-        ],
-    )
-    .icon("wirelessCp")
-}
-
 pub fn schema() -> Node {
     Node::route(
         "general",
@@ -661,12 +640,6 @@ pub fn schema() -> Node {
             mfi(),
             crate::settings::schemas::dab::schema(),
             gps(),
-            Node::checkbox(
-                Label::new("settings.carPlayHlsVideo", "Video in the car"),
-                "carPlayHlsVideo",
-            )
-            .icon("media"),
-            carplay(),
         ],
     )
     .icon("general")

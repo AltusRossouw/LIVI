@@ -3,7 +3,7 @@
 // Additional terms: see NOTICE
 
 pub mod dashboard;
-pub mod i18n;
+pub use livi_i18n as i18n;
 pub mod icons;
 pub mod keys;
 pub mod mask;

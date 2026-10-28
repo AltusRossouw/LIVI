@@ -479,7 +479,7 @@ mod tests {
             time_to_destination: Some(600.0),
             ..Default::default()
         };
-        nav(&mut rows, &guidance, Language::De);
+        nav(&mut rows, &guidance, Language::of("de"));
         assert_eq!(
             rows.unsent(),
             [
@@ -497,7 +497,7 @@ mod tests {
                 "nav time-left 600\n",
             ]
         );
-        nav(&mut rows, &Navigation::default(), Language::De);
+        nav(&mut rows, &Navigation::default(), Language::of("de"));
         assert_eq!(rows.unsent(), ["nav active false\n"]);
         assert!(clock(0.0).is_some_and(|c| c.len() == 5));
     }

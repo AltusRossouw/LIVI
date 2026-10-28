@@ -600,37 +600,43 @@ pub fn schema() -> Node {
                 Label::new("settings.language", "Language"),
                 "language",
                 vec![
-                    choice(Label::plain("English"), OptionValue::Text("en")),
+                    choice(Label::plain("Dansk"), OptionValue::Text("da")),
                     choice(Label::plain("Deutsch"), OptionValue::Text("de")),
-                    choice(Label::plain("Українська"), OptionValue::Text("ua")),
+                    choice(Label::plain("English"), OptionValue::Text("en")),
+                    choice(Label::plain("Español"), OptionValue::Text("es")),
                     choice(Label::plain("Français"), OptionValue::Text("fr")),
+                    choice(Label::plain("Polski"), OptionValue::Text("pl")),
+                    choice(Label::plain("Português"), OptionValue::Text("pt")),
+                    choice(Label::plain("Suomi"), OptionValue::Text("fi")),
+                    choice(Label::plain("Svenska"), OptionValue::Text("sv")),
+                    choice(Label::plain("Українська"), OptionValue::Text("ua")),
                     choice(
-                        Label::native("简体中文", *b"Hani", "Chinese"),
-                        OptionValue::Text("zh"),
-                    ),
-                    choice(
-                        Label::native("日本語", *b"Hira", "Japanese"),
-                        OptionValue::Text("ja"),
-                    ),
-                    choice(
-                        Label::native("한국어", *b"Hang", "Korean"),
-                        OptionValue::Text("ko"),
+                        Label::native("עברית", *b"Hebr", "Hebrew"),
+                        OptionValue::Text("he"),
                     ),
                     choice(
                         Label::native("العربية", *b"Arab", "Arabic"),
                         OptionValue::Text("ar"),
                     ),
                     choice(
-                        Label::native("עברית", *b"Hebr", "Hebrew"),
-                        OptionValue::Text("he"),
+                        Label::native("हिन्दी", *b"Deva", "Hindi"),
+                        OptionValue::Text("hi"),
                     ),
                     choice(
                         Label::native("ไทย", *b"Thai", "Thai"),
                         OptionValue::Text("th"),
                     ),
                     choice(
-                        Label::native("हिन्दी", *b"Deva", "Hindi"),
-                        OptionValue::Text("hi"),
+                        Label::native("日本語", *b"Hira", "Japanese"),
+                        OptionValue::Text("ja"),
+                    ),
+                    choice(
+                        Label::native("简体中文", *b"Hani", "Chinese"),
+                        OptionValue::Text("zh"),
+                    ),
+                    choice(
+                        Label::native("한국어", *b"Hang", "Korean"),
+                        OptionValue::Text("ko"),
                     ),
                 ],
             )

@@ -17,6 +17,12 @@ const AR: &str = include_str!("../locales/ar.json");
 const HE: &str = include_str!("../locales/he.json");
 const TH: &str = include_str!("../locales/th.json");
 const HI: &str = include_str!("../locales/hi.json");
+const ES: &str = include_str!("../locales/es.json");
+const PT: &str = include_str!("../locales/pt.json");
+const PL: &str = include_str!("../locales/pl.json");
+const DA: &str = include_str!("../locales/da.json");
+const SV: &str = include_str!("../locales/sv.json");
+const FI: &str = include_str!("../locales/fi.json");
 
 pub struct Strings {
     lang: String,
@@ -66,6 +72,12 @@ fn source(lang: &str) -> &'static str {
         "he" | "iw" => HE,
         "th" => TH,
         "hi" => HI,
+        "es" => ES,
+        "pt" => PT,
+        "pl" => PL,
+        "da" => DA,
+        "sv" => SV,
+        "fi" => FI,
         _ => EN,
     }
 }
@@ -137,6 +149,17 @@ impl Strings {
     }
 }
 
+pub fn cached(lang: &str) -> &'static Strings {
+    static CACHE: std::sync::Mutex<Vec<&'static Strings>> = std::sync::Mutex::new(Vec::new());
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(strings) = cache.iter().find(|s| s.lang == lang) {
+        return strings;
+    }
+    let strings: &'static Strings = Box::leak(Box::new(Strings::new(lang)));
+    cache.push(strings);
+    strings
+}
+
 impl Default for Strings {
     fn default() -> Self {
         Self::new("en")
@@ -167,7 +190,8 @@ mod tests {
     fn untranslated_languages_fall_back_to_english() {
         let en = Strings::new("en");
         for lang in [
-            "zh", "zh-CN", "zh-Hans", "zh-TW", "zh-Hant", "ja", "ko", "ar", "he", "th", "hi",
+            "zh", "zh-CN", "zh-Hans", "zh-TW", "zh-Hant", "ja", "ko", "ar", "he", "th", "hi", "es",
+            "pt", "pl", "da", "sv", "fi",
         ] {
             assert_eq!(
                 Strings::new(lang).t("settings.audio", "x"),

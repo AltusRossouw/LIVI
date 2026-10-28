@@ -3904,6 +3904,7 @@ dependencies = [
  "livi-cp",
  "livi-dab",
  "livi-host-proto",
+ "livi-i18n",
  "livi-link-host",
  "livi-media",
  "livi-rtlsdr",
@@ -4027,6 +4028,13 @@ dependencies = [
 [[package]]
 name = "livi-host-proto"
 version = "0.1.0"
+
+[[package]]
+name = "livi-i18n"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "livi-link-host"
@@ -4153,6 +4161,7 @@ name = "livi-ui-model"
 version = "0.1.0"
 dependencies = [
  "livi-core-proto",
+ "livi-i18n",
  "serde_json",
 ]
 

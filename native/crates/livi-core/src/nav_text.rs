@@ -2,85 +2,78 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Additional terms: see NOTICE
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Language {
-    En,
-    De,
-    Fr,
-    Ua,
-    Zh,
-    Ja,
-    Ko,
-    Ar,
-    He,
-    Th,
-    Hi,
-}
+use livi_i18n::Strings;
+
+#[derive(Clone, Copy)]
+pub struct Language(&'static Strings);
 
 impl Language {
     pub fn of(setting: &str) -> Self {
-        match setting {
-            "de" => Self::De,
-            "fr" => Self::Fr,
-            "ua" | "uk" | "uk-UA" => Self::Ua,
-            "zh" | "zh-CN" | "zh-Hans" | "zh-SG" => Self::Zh,
-            "ja" | "ja-JP" => Self::Ja,
-            "ko" | "ko-KR" => Self::Ko,
-            "ar" => Self::Ar,
-            "he" | "iw" => Self::He,
-            "th" => Self::Th,
-            "hi" => Self::Hi,
-            _ => Self::En,
-        }
+        Self(livi_i18n::cached(setting))
     }
-
-    fn words(self) -> &'static Words {
-        match self {
-            Self::En
-            | Self::Zh
-            | Self::Ja
-            | Self::Ko
-            | Self::Ar
-            | Self::He
-            | Self::Th
-            | Self::Hi => &EN,
-            Self::De => &DE,
-            Self::Fr => &FR,
-            Self::Ua => &UA,
-        }
-    }
-}
-
-struct Words {
-    unknown: &'static str,
-    no_route: &'static str,
-    roundabout_exit: &'static str,
-    maneuvers: [&'static str; 54],
 }
 
 const ROUNDABOUT_EXITS: std::ops::RangeInclusive<u32> = 28..=46;
 
+const MANEUVERS: [(u32, &str, &str); 35] = [
+    (0, "noTurn", "No turn"),
+    (1, "turnLeft", "Turn left"),
+    (2, "turnRight", "Turn right"),
+    (3, "straight", "Go straight"),
+    (4, "uTurn", "Make a U-turn"),
+    (5, "continue", "Continue on the current road"),
+    (6, "enterRoundabout", "Enter roundabout"),
+    (7, "exitRoundabout", "Exit roundabout"),
+    (8, "exitHighway", "Exit highway"),
+    (9, "mergeHighway", "Merge onto highway"),
+    (10, "endOfNavigation", "End of navigation"),
+    (11, "proceedToRoute", "Proceed to the route"),
+    (12, "arrived", "Arrived"),
+    (13, "keepLeft", "Keep left"),
+    (14, "keepRight", "Keep right"),
+    (15, "enterFerry", "Enter ferry"),
+    (16, "exitFerry", "Exit ferry"),
+    (17, "changeFerry", "Change ferry"),
+    (18, "uTurnToRoute", "Make a U-turn to rejoin the route"),
+    (19, "roundaboutUTurn", "Use the roundabout to make a U-turn"),
+    (20, "endOfRoadLeft", "At the end of the road, turn left"),
+    (21, "endOfRoadRight", "At the end of the road, turn right"),
+    (22, "exitHighwayLeft", "Exit highway on the left"),
+    (23, "exitHighwayRight", "Exit highway on the right"),
+    (24, "arrivedLeft", "Arrived (left)"),
+    (25, "arrivedRight", "Arrived (right)"),
+    (26, "uTurnWhenPossible", "Make a U-turn when possible"),
+    (27, "endOfDirections", "End of directions"),
+    (47, "sharpLeft", "Sharp left"),
+    (48, "sharpRight", "Sharp right"),
+    (49, "slightLeft", "Slight left"),
+    (50, "slightRight", "Slight right"),
+    (51, "changeHighway", "Change highway"),
+    (52, "changeHighwayLeft", "Change highway (left)"),
+    (53, "changeHighwayRight", "Change highway (right)"),
+];
+
 pub fn maneuver(code: u32, language: Language) -> Option<String> {
-    let words = language.words();
     if ROUNDABOUT_EXITS.contains(&code) {
-        return Some(format!(
-            "{} {}",
-            words.roundabout_exit,
-            code - ROUNDABOUT_EXITS.start() + 1
+        let exit = (code - ROUNDABOUT_EXITS.start() + 1).to_string();
+        return Some(language.0.with(
+            "navigation.roundaboutExit",
+            "Roundabout exit {{n}}",
+            &[("n", &exit)],
         ));
     }
-    words
-        .maneuvers
-        .get(code as usize)
-        .map(|text| (*text).to_string())
+    MANEUVERS
+        .iter()
+        .find(|(c, _, _)| *c == code)
+        .map(|(_, key, text)| language.0.t(&format!("navigation.{key}"), text))
 }
 
 pub fn unknown_maneuver(language: Language) -> &'static str {
-    language.words().unknown
+    language.0.get("navigation.unknown").unwrap_or("Unknown")
 }
 
 pub fn no_route(language: Language) -> &'static str {
-    language.words().no_route
+    language.0.get("navigation.noRoute").unwrap_or("No Route")
 }
 
 pub fn distance(meters: f64) -> Option<String> {
@@ -123,254 +116,6 @@ pub fn time_left(seconds: f64) -> Option<String> {
     }
 }
 
-const EN: Words = Words {
-    unknown: "Unknown",
-    no_route: "No Route",
-    roundabout_exit: "Roundabout exit",
-    maneuvers: [
-        "No turn",
-        "Turn left",
-        "Turn right",
-        "Go straight",
-        "Make a U-turn",
-        "Continue on the current road",
-        "Enter roundabout",
-        "Exit roundabout",
-        "Exit highway",
-        "Merge onto highway",
-        "End of navigation",
-        "Proceed to the route",
-        "Arrived",
-        "Keep left",
-        "Keep right",
-        "Enter ferry",
-        "Exit ferry",
-        "Change ferry",
-        "Make a U-turn to rejoin the route",
-        "Use the roundabout to make a U-turn",
-        "At the end of the road, turn left",
-        "At the end of the road, turn right",
-        "Exit highway on the left",
-        "Exit highway on the right",
-        "Arrived (left)",
-        "Arrived (right)",
-        "Make a U-turn when possible",
-        "End of directions",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "Sharp left",
-        "Sharp right",
-        "Slight left",
-        "Slight right",
-        "Change highway",
-        "Change highway (left)",
-        "Change highway (right)",
-    ],
-};
-
-const DE: Words = Words {
-    unknown: "Unbekannt",
-    no_route: "Zielführung aus",
-    roundabout_exit: "Ausfahrt",
-    maneuvers: [
-        "Keine Abbiegung",
-        "Links abbiegen",
-        "Rechts abbiegen",
-        "Geradeaus",
-        "Wenden",
-        "Der Straße folgen",
-        "In den Kreisverkehr einfahren",
-        "Kreisverkehr verlassen",
-        "Autobahn verlassen",
-        "Auf die Autobahn auffahren",
-        "Navigation beendet",
-        "Zur Route fahren",
-        "Angekommen",
-        "Links halten",
-        "Rechts halten",
-        "Auf die Fähre fahren",
-        "Fähre verlassen",
-        "Fähre wechseln",
-        "Wenden und zur Route zurück",
-        "Im Kreisverkehr wenden",
-        "Am Ende der Straße links abbiegen",
-        "Am Ende der Straße rechts abbiegen",
-        "Autobahn links verlassen",
-        "Autobahn rechts verlassen",
-        "Angekommen (links)",
-        "Angekommen (rechts)",
-        "Bei Gelegenheit wenden",
-        "Zielführung beendet",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "Scharf links",
-        "Scharf rechts",
-        "Leicht links",
-        "Leicht rechts",
-        "Autobahnwechsel",
-        "Autobahnwechsel (links)",
-        "Autobahnwechsel (rechts)",
-    ],
-};
-
-const FR: Words = Words {
-    unknown: "Inconnu",
-    no_route: "Aucun itinéraire",
-    roundabout_exit: "Sortie",
-    maneuvers: [
-        "Pas de virage",
-        "Tournez à gauche",
-        "Tournez à droite",
-        "Continuez tout droit",
-        "Faites demi-tour",
-        "Continuez sur la route actuelle",
-        "Entrez dans le rond-point",
-        "Sortez du rond-point",
-        "Quittez l'autoroute",
-        "Rejoignez l'autoroute",
-        "Fin de la navigation",
-        "Rejoignez l'itinéraire",
-        "Arrivé",
-        "Restez à gauche",
-        "Restez à droite",
-        "Embarquez sur le ferry",
-        "Quittez le ferry",
-        "Changez de ferry",
-        "Faites demi-tour pour rejoindre l'itinéraire",
-        "Faites demi-tour au rond-point",
-        "Au bout de la route, tournez à gauche",
-        "Au bout de la route, tournez à droite",
-        "Quittez l'autoroute à gauche",
-        "Quittez l'autoroute à droite",
-        "Arrivé (à gauche)",
-        "Arrivé (à droite)",
-        "Faites demi-tour dès que possible",
-        "Fin du guidage",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "Virage serré à gauche",
-        "Virage serré à droite",
-        "Légèrement à gauche",
-        "Légèrement à droite",
-        "Changement d'autoroute",
-        "Changement d'autoroute (à gauche)",
-        "Changement d'autoroute (à droite)",
-    ],
-};
-
-const UA: Words = Words {
-    unknown: "Невідомо",
-    no_route: "Немає маршруту",
-    roundabout_exit: "З’їзд",
-    maneuvers: [
-        "Без повороту",
-        "Поверніть ліворуч",
-        "Поверніть праворуч",
-        "Рухайтесь прямо",
-        "Розворот",
-        "Продовжуйте цією дорогою",
-        "В'їдьте на кільце",
-        "З'їдьте з кільця",
-        "З'їзд з автомагістралі",
-        "В'їзд на автомагістраль",
-        "Навігацію завершено",
-        "Прямуйте до маршруту",
-        "Прибули",
-        "Тримайтесь ліворуч",
-        "Тримайтесь праворуч",
-        "Заїдьте на пором",
-        "З'їдьте з порома",
-        "Змініть пором",
-        "Розворот, щоб повернутись на маршрут",
-        "Виконайте розворот через кільце",
-        "В кінці дороги поверніть ліворуч",
-        "В кінці дороги поверніть праворуч",
-        "З'їзд з автомагістралі ліворуч",
-        "З'їзд з автомагістралі праворуч",
-        "Прибули (ліворуч)",
-        "Прибули (праворуч)",
-        "Розверніться, коли буде можливо",
-        "Маршрут завершено",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "Різко ліворуч",
-        "Різко праворуч",
-        "Плавно ліворуч",
-        "Плавно праворуч",
-        "Зміна автомагістралі",
-        "Зміна автомагістралі (ліворуч)",
-        "Зміна автомагістралі (праворуч)",
-    ],
-};
-
 #[cfg(test)]
 mod tests {
     use serde_json::Value;
@@ -384,12 +129,8 @@ mod tests {
     #[test]
     fn every_maneuver_reads_as_the_old_dictionary_had_it() {
         let v = vectors();
-        for (key, language) in [
-            ("en", Language::En),
-            ("de", Language::De),
-            ("fr", Language::Fr),
-            ("ua", Language::Ua),
-        ] {
+        for key in ["en", "de", "fr", "ua"] {
+            let language = Language::of(key);
             for (code, text) in v[key]["maneuvers"].as_object().unwrap() {
                 let code: i64 = code.parse().unwrap();
                 let ours = u32::try_from(code)
@@ -425,15 +166,25 @@ mod tests {
 
     #[test]
     fn the_language_setting_picks_the_words() {
-        assert_eq!(Language::of("uk-UA"), Language::Ua);
-        assert_eq!(Language::of("fr"), Language::Fr);
-        assert_eq!(Language::of("xx"), Language::En);
-        assert_eq!(Language::of("zh"), Language::Zh);
-        assert_eq!(Language::of("zh-TW"), Language::En);
-        assert_eq!(Language::of("ja"), Language::Ja);
-        assert_eq!(Language::of("iw"), Language::He);
-        assert_eq!(no_route(Language::De), "Zielführung aus");
-        assert_eq!(maneuver(30, Language::De).as_deref(), Some("Ausfahrt 3"));
-        assert_eq!(maneuver(54, Language::En), None);
+        assert_eq!(
+            no_route(Language::of("uk-UA")),
+            no_route(Language::of("ua"))
+        );
+        assert_eq!(no_route(Language::of("xx")), "No Route");
+        assert_eq!(no_route(Language::of("zh-TW")), "No Route");
+        assert_eq!(no_route(Language::of("de")), "Zielführung aus");
+        assert_eq!(
+            maneuver(30, Language::of("de")).as_deref(),
+            Some("Ausfahrt 3")
+        );
+        assert_eq!(
+            maneuver(30, Language::of("zh")).as_deref(),
+            Some("Roundabout exit 3")
+        );
+        assert_eq!(maneuver(54, Language::of("en")), None);
+        assert_eq!(
+            maneuver(40, Language::of("en")).as_deref(),
+            Some("Roundabout exit 13")
+        );
     }
 }

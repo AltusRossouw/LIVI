@@ -5,4 +5,5 @@ edition.workspace = true
 
 [dependencies]
 livi-core-proto.workspace = true
+livi-i18n.workspace = true
 serde_json.workspace = true

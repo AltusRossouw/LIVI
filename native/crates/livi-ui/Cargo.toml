@@ -33,6 +33,7 @@ slint = { version = "1.18.1", default-features = false, features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 livi-video-view.workspace = true
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSCursor"] }
 
 [build-dependencies]
 slint-build = "1.18.1"

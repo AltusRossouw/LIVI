@@ -4140,6 +4140,7 @@ dependencies = [
  "livi-core-proto",
  "livi-ui-model",
  "livi-video-view",
+ "objc2-app-kit 0.3.2",
  "raw-window-handle",
  "serde_json",
  "slint",

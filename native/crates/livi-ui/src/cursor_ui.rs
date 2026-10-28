@@ -6,6 +6,7 @@ use std::cell::Cell;
 use std::time::Duration;
 
 use slint::ComponentHandle;
+#[cfg(not(target_os = "macos"))]
 use slint::winit_030::WinitWindowAccessor;
 use slint::winit_030::winit::dpi::PhysicalPosition;
 
@@ -19,11 +20,20 @@ thread_local! {
     static IDLE: slint::Timer = slint::Timer::default();
 }
 
+#[cfg(not(target_os = "macos"))]
 fn visible(ui: &AppWindow, on: bool) {
     let applied = ui.window().with_winit_window(|w| w.set_cursor_visible(on));
     if applied.is_some() {
         SHOWN.set(on);
     }
+}
+
+#[cfg(target_os = "macos")]
+fn visible(_ui: &AppWindow, on: bool) {
+    if !on {
+        objc2_app_kit::NSCursor::setHiddenUntilMouseMoves(true);
+    }
+    SHOWN.set(on);
 }
 
 pub fn start(ui: &AppWindow) {

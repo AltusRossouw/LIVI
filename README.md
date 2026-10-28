@@ -48,12 +48,13 @@ Wireless CarPlay requires a Bluetooth and a Wi-Fi interface. Both can come from 
 
 ## MFi Authentication
 
-CarPlay requires the accessory to authenticate against the phone. The usual way is an Apple **MFi authentication coprocessor**, a hardware chip that cannot be emulated and that LIVI neither ships nor bypasses. Two routes:
+CarPlay requires the accessory to authenticate against the phone. The usual way is an Apple **MFi authentication coprocessor**, a hardware chip that cannot be emulated and that LIVI neither ships nor bypasses. Three routes:
 
 - **On the board**: a coprocessor wired to the I²C bus
 - **Over the network**: a [LIVI Link](LIVI-LINK.md)
+- **From imported files**: a certificate and key of your own, used when they are in the MFi folder
 
-Both routes work on Linux. A Mac has no I²C bus to put a coprocessor on, so there the LIVI Link is the only one.
+The first two work on Linux. A Mac has no I²C bus to put a coprocessor on, so there the LIVI Link or the imported files are the routes.
 
 LIVI does not support Apple's Basic Accessory Authentication on MacOS, but may in the future.
 
@@ -64,7 +65,18 @@ For a chip on the board, configuration (`config.json`):
 | `carPlayMfiI2cBus`    | `2`     | I²C bus number the coprocessor is on |
 | `carPlayMfiPowerGpio` | `21`    | GPIO that powers the coprocessor     |
 
-Without one of these, native CarPlay is unavailable. All Android Auto paths work regardless.
+The imported files are `certificate.p7b` and `identity.pk8` in `~/.config/LIVI/mfi` on Linux and in `~/Library/Application Support/LIVI/mfi` on a Mac. They are read when they are there, before the chip is probed. An identity that does not open, or that cannot sign for its own key, is reported and skipped.
+
+`livi-mfid` serves MFi on port 5000, the endpoint a [LIVI Link](LIVI-LINK.md) provides for the head unit, and offers both sources the same way:
+
+```sh
+livi-mfid                 # the imported files when there are any, else the chip on i2c-1
+livi-mfid 2               # the chip on i2c-2
+livi-mfid --files         # the imported files, by default from ~/.config/LIVI/mfi
+livi-mfid --files /etc/mfi
+```
+
+Without a chip and without imported files, native CarPlay is unavailable. All Android Auto paths work regardless.
 
 ## Wireless
 

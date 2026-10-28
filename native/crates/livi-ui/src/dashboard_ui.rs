@@ -18,6 +18,11 @@ use slint::{Color, ComponentHandle, Image, ModelRc, SharedString, VecModel};
 use crate::media::{Pixels, decode};
 use crate::{AppWindow, CapData, DashState, GaugeData, LabelData, MaskData, TrailData};
 
+pub fn set_texts(d: &DashState, tr: impl Fn(&str, &str) -> String) {
+    d.set_gear_label(tr("dashboard.gear", "GEAR").into());
+    d.set_placeholder(tr("dashboard.noDashboard", "No dashboard on this screen").into());
+}
+
 impl DashView {
     pub fn map(&self) -> bool {
         self.readings.enabled && self.map

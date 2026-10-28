@@ -52,6 +52,7 @@ fn open(main: &AppWindow, client: &Client, spec: &Secondary) -> Option<Secondary
     w.set_window_title(title(spec.screen).into());
     w.set_has_dashboard(spec.dashboard);
     copy_theme(main, &w);
+    set_window_texts(&w);
     w.global::<DashState>()
         .set_clock(crate::clock::now_text().into());
     let window = w.window();
@@ -144,6 +145,23 @@ pub fn dash(client: &Client, screen: Screen, view: DashView) {
 
 pub fn theme(main: &AppWindow) {
     OPEN.with_borrow(|open| open.iter().for_each(|o| copy_theme(main, &o.window)));
+}
+
+fn set_window_texts(w: &SecondaryWindow) {
+    let tr = crate::settings_ui::tr;
+    crate::dashboard_ui::set_texts(&w.global::<DashState>(), tr);
+    w.set_empty_label(tr("secondary.noContent", "No content on this screen").into());
+}
+
+pub fn set_texts() {
+    OPEN.with_borrow(|open| open.iter().for_each(|o| set_window_texts(&o.window)));
+}
+
+pub fn relayout() {
+    OPEN.with_borrow(|open| {
+        open.iter()
+            .for_each(|o| crate::fonts::relayout(o.window.window()))
+    });
 }
 
 pub fn tick_clock(text: &str) {

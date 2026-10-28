@@ -29,6 +29,7 @@ slint = { version = "1.18.1", default-features = false, features = [
   "renderer-software",
   "raw-window-handle-06",
   "unstable-winit-030",
+  "unstable-fontique-011",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

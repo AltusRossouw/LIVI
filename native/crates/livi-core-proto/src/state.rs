@@ -176,6 +176,7 @@ pub struct System {
     pub audio_sinks: Vec<AudioDevice>,
     pub audio_sources: Vec<AudioDevice>,
     pub start_page: String,
+    pub fonts: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

@@ -9,6 +9,7 @@ mod cursor_ui;
 mod dashboard_ui;
 mod files_ui;
 mod follow;
+mod fonts;
 mod fullscreen;
 mod icon_ui;
 mod icons;
@@ -115,7 +116,10 @@ fn apply_look(ui: &AppWindow, look: Look) {
     ui.set_projection_icon(tab(Tab::Projection).icon);
     settings_ui::set_language(&look.language);
     secondary::theme(ui);
+    secondary::set_texts();
     media_ui::set_texts(ui, settings_ui::tr);
+    dashboard_ui::set_texts(&ui.global::<DashState>(), settings_ui::tr);
+    ui.set_no_camera(settings_ui::tr("camera.noCamera", "No camera found").into());
     if ZOOM.get() != look.zoom {
         ZOOM.set(look.zoom);
         apply_zoom(ui);
@@ -178,6 +182,12 @@ fn apply(ui: &AppWindow, update: Update) {
         Update::PhoneName(name) => overlay_ui::phone(ui, &name),
         Update::Camera(found) => ui.set_camera_found(found),
         Update::MainMask(mask) => ui.set_main_mask(dashboard_ui::mask_data(mask)),
+        Update::Fonts(paths) => {
+            if fonts::register(&paths) {
+                fonts::relayout(ui.window());
+                secondary::relayout();
+            }
+        }
     }
 }
 

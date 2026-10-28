@@ -8,6 +8,13 @@ pub enum Language {
     De,
     Fr,
     Ua,
+    Zh,
+    Ja,
+    Ko,
+    Ar,
+    He,
+    Th,
+    Hi,
 }
 
 impl Language {
@@ -16,13 +23,27 @@ impl Language {
             "de" => Self::De,
             "fr" => Self::Fr,
             "ua" | "uk" | "uk-UA" => Self::Ua,
+            "zh" | "zh-CN" | "zh-Hans" | "zh-SG" => Self::Zh,
+            "ja" | "ja-JP" => Self::Ja,
+            "ko" | "ko-KR" => Self::Ko,
+            "ar" => Self::Ar,
+            "he" | "iw" => Self::He,
+            "th" => Self::Th,
+            "hi" => Self::Hi,
             _ => Self::En,
         }
     }
 
     fn words(self) -> &'static Words {
         match self {
-            Self::En => &EN,
+            Self::En
+            | Self::Zh
+            | Self::Ja
+            | Self::Ko
+            | Self::Ar
+            | Self::He
+            | Self::Th
+            | Self::Hi => &EN,
             Self::De => &DE,
             Self::Fr => &FR,
             Self::Ua => &UA,
@@ -407,6 +428,10 @@ mod tests {
         assert_eq!(Language::of("uk-UA"), Language::Ua);
         assert_eq!(Language::of("fr"), Language::Fr);
         assert_eq!(Language::of("xx"), Language::En);
+        assert_eq!(Language::of("zh"), Language::Zh);
+        assert_eq!(Language::of("zh-TW"), Language::En);
+        assert_eq!(Language::of("ja"), Language::Ja);
+        assert_eq!(Language::of("iw"), Language::He);
         assert_eq!(no_route(Language::De), "Zielführung aus");
         assert_eq!(maneuver(30, Language::De).as_deref(), Some("Ausfahrt 3"));
         assert_eq!(maneuver(54, Language::En), None);

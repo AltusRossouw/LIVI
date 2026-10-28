@@ -621,22 +621,17 @@ pub fn schema() -> Node {
                 Label::new("settings.language", "Language"),
                 "language",
                 vec![
-                    choice(
-                        Label::new("settings.english", "English"),
-                        OptionValue::Text("en"),
-                    ),
-                    choice(
-                        Label::new("settings.german", "German"),
-                        OptionValue::Text("de"),
-                    ),
-                    choice(
-                        Label::new("settings.ukrainian", "Ukrainian"),
-                        OptionValue::Text("ua"),
-                    ),
-                    choice(
-                        Label::new("settings.french", "French"),
-                        OptionValue::Text("fr"),
-                    ),
+                    choice(Label::plain("English"), OptionValue::Text("en")),
+                    choice(Label::plain("Deutsch"), OptionValue::Text("de")),
+                    choice(Label::plain("Українська"), OptionValue::Text("ua")),
+                    choice(Label::plain("Français"), OptionValue::Text("fr")),
+                    choice(Label::plain("简体中文"), OptionValue::Text("zh")),
+                    choice(Label::plain("日本語"), OptionValue::Text("ja")),
+                    choice(Label::plain("한국어"), OptionValue::Text("ko")),
+                    choice(Label::plain("العربية"), OptionValue::Text("ar")),
+                    choice(Label::plain("עברית"), OptionValue::Text("he")),
+                    choice(Label::plain("ไทย"), OptionValue::Text("th")),
+                    choice(Label::plain("हिन्दी"), OptionValue::Text("hi")),
                 ],
             )
             .icon("language")

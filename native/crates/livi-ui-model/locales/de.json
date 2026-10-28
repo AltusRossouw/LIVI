@@ -125,10 +125,6 @@
     "fullscreen": "Vollbild",
     "uiZoom": "UI Zoom",
     "language": "Sprache",
-    "english": "Englisch",
-    "german": "Deutsch",
-    "ukrainian": "Ukrainisch",
-    "french": "Französisch",
     "audio": "Audio",
     "media": "Medien",
     "huVolume": "Head-Unit",
@@ -328,7 +324,13 @@
     "restartsAutomaticallyWhenDone": "Startet nach Abschluss automatisch neu",
     "abort": "Abbrechen",
     "installNow": "Jetzt installieren",
-    "close": "Schließen"
+    "close": "Schließen",
+    "downloading": "Wird heruntergeladen",
+    "readyToInstall": "Bereit zur Installation",
+    "installing": "Wird installiert",
+    "relaunching": "Wird neu gestartet",
+    "error": "Fehler",
+    "starting": "Wird gestartet…"
   },
   "media": {
     "source": "Quelle",
@@ -338,6 +340,17 @@
     "favorite": "Favorit",
     "noStations": "Noch keine Sender, Suche unter Einstellungen > Allgemein > DAB+",
     "hideStation": "Sender ausblenden",
-    "showStation": "Sender einblenden"
+    "showStation": "Sender einblenden",
+    "noArtwork": "Kein Cover"
+  },
+  "camera": {
+    "noCamera": "Keine Kamera gefunden"
+  },
+  "dashboard": {
+    "gear": "GANG",
+    "noDashboard": "Kein Dashboard auf diesem Bildschirm"
+  },
+  "secondary": {
+    "noContent": "Kein Inhalt auf diesem Bildschirm"
   }
 }

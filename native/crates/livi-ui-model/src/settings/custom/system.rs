@@ -252,16 +252,20 @@ pub fn update_dialog(state: &Value, t: &Strings, f: &Facts) -> Option<Dialog> {
     }
     let pct = (phase == UpdatePhase::Download && p.update.total > 0.0)
         .then(|| (p.update.received / p.update.total * 100.0).round());
-    let phase_text = match phase {
-        UpdatePhase::Download => "Downloading",
-        UpdatePhase::Ready => "Ready to install",
-        UpdatePhase::Installing => "Installing",
-        UpdatePhase::Relaunching => "Relaunching",
-        UpdatePhase::Error => "Error",
-        UpdatePhase::Idle => "Starting…",
+    let (key, text) = match phase {
+        UpdatePhase::Download => ("downloading", "Downloading"),
+        UpdatePhase::Ready => ("readyToInstall", "Ready to install"),
+        UpdatePhase::Installing => ("installing", "Installing"),
+        UpdatePhase::Relaunching => ("relaunching", "Relaunching"),
+        UpdatePhase::Error => ("error", "Error"),
+        UpdatePhase::Idle => ("starting", "Starting…"),
     };
     let mut rows = vec![
-        info(phase_text.to_string(), None, String::new()),
+        info(
+            t.t(&format!("softwareUpdate.{key}"), text),
+            None,
+            String::new(),
+        ),
         Row {
             kind: RowKind::Progress,
             level: pct.map_or(0.0, |v| v as f32 / 100.0),

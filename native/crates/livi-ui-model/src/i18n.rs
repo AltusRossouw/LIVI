@@ -10,6 +10,13 @@ const EN: &str = include_str!("../locales/en.json");
 const DE: &str = include_str!("../locales/de.json");
 const FR: &str = include_str!("../locales/fr.json");
 const UA: &str = include_str!("../locales/ua.json");
+const ZH: &str = include_str!("../locales/zh.json");
+const JA: &str = include_str!("../locales/ja.json");
+const KO: &str = include_str!("../locales/ko.json");
+const AR: &str = include_str!("../locales/ar.json");
+const HE: &str = include_str!("../locales/he.json");
+const TH: &str = include_str!("../locales/th.json");
+const HI: &str = include_str!("../locales/hi.json");
 
 pub struct Strings {
     lang: String,
@@ -45,10 +52,19 @@ fn table(json: &str) -> HashMap<String, String> {
 }
 
 fn source(lang: &str) -> &'static str {
+    if matches!(lang, "zh" | "zh-CN" | "zh-Hans" | "zh-SG") {
+        return ZH;
+    }
     match lang.split(['-', '_']).next().unwrap_or("en") {
         "de" => DE,
         "fr" => FR,
         "ua" | "uk" => UA,
+        "ja" => JA,
+        "ko" => KO,
+        "ar" => AR,
+        "he" | "iw" => HE,
+        "th" => TH,
+        "hi" => HI,
         _ => EN,
     }
 }
@@ -110,6 +126,19 @@ mod tests {
             Strings::new("uk-UA").t("settings.audio", "x"),
             Strings::new("ua").t("settings.audio", "x")
         );
+    }
+
+    #[test]
+    fn untranslated_languages_fall_back_to_english() {
+        let en = Strings::new("en");
+        for lang in [
+            "zh", "zh-CN", "zh-Hans", "zh-TW", "zh-Hant", "ja", "ko", "ar", "he", "th", "hi",
+        ] {
+            assert_eq!(
+                Strings::new(lang).t("settings.audio", "x"),
+                en.t("settings.audio", "x")
+            );
+        }
     }
 
     #[test]

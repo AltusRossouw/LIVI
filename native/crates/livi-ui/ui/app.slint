@@ -29,6 +29,7 @@ export component AppWindow inherits Window {
     in property <int> stream-height: 720;
     in property <MaskData> main-mask;
     in property <bool> camera-found;
+    in property <string> no-camera: "No camera found";
     in property <string> status;
 
     in property <string> track-title;
@@ -155,7 +156,7 @@ export component AppWindow inherits Window {
             if root.page == Page.camera && !root.camera-found: Rectangle {
                 background: Theme.background;
                 Text {
-                    text: "No camera found";
+                    text: root.no-camera;
                     color: Theme.text-secondary;
                     font-size: 20px;
                 }

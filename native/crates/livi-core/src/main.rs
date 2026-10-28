@@ -30,6 +30,7 @@ mod cp_telemetry;
 mod dab;
 mod devices;
 mod dongle;
+mod fonts;
 mod gnss;
 mod gvfs_guard;
 mod hands_free;
@@ -219,6 +220,7 @@ async fn run() -> Result<Exit, String> {
     tokio::spawn(car_bridge::run(core.clone(), inside.clone()));
     tokio::spawn(system_volume::follow(core.clone()));
     tokio::spawn(update::run(core.clone(), update_asks));
+    tokio::spawn(fonts::follow(core.clone(), user_data.join("fonts")));
     state_files::start(&core, core.activity(), &user_data);
     let res = Resources::from_env();
     tokio::spawn(audio_devices::follow(

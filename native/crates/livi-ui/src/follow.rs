@@ -33,6 +33,7 @@ pub enum Update {
     PhoneName(String),
     Camera(bool),
     MainMask(Option<Mask>),
+    Fonts(Vec<String>),
 }
 
 #[derive(Default)]
@@ -49,6 +50,7 @@ pub struct Follow {
     phones: overlay::Phone,
     started: bool,
     main_mask: Option<Option<Mask>>,
+    fonts: Option<Vec<String>>,
 }
 
 impl Follow {
@@ -134,6 +136,18 @@ impl Follow {
                     w.screen,
                     Box::new(reader.read(state, w.screen, dark)),
                 ));
+            }
+        }
+        if hit("system") {
+            let fonts: Vec<String> = state["system"]["fonts"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|f| f.as_str().map(str::to_string))
+                .collect();
+            if self.fonts.as_ref() != Some(&fonts) {
+                self.fonts = Some(fonts.clone());
+                out.push(Update::Fonts(fonts));
             }
         }
         if hit("cameras") {

@@ -96,12 +96,6 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_sha }}
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /*
-            !/assets/gstreamer/*/
-            /assets/gstreamer/*/version.txt
-            /assets/gstreamer/${{ matrix.os == 'macos' && 'macos-arm64' || format('linux-{0}', matrix.arch) }}/
 
       - name: Read version from native/Cargo.toml
         id: pkg
@@ -310,7 +304,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add the LIVI Link firmware
-        run: bash scripts/livi-link/stage-firmware.sh nightly-assets/livi-link
+        run: |
+          sh scripts/assets.sh fetch livi-link
+          bash scripts/livi-link/stage-firmware.sh nightly-assets/livi-link
 
       - name: Replace the nightly prerelease
         env:

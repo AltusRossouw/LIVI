@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::util::{Arch, copy_exe, copy_tree, exec, read, root, version};
+use crate::util::{Arch, copy_exe, copy_tree, exec, fetch_gstreamer, read, root, version};
 
 const BUNDLE_ID: &str = "dev.f-io.livi";
 const GST: &str = "gstreamer/macos-arm64";
@@ -108,6 +108,7 @@ pub fn run(arch: Arch) -> Result<(), String> {
     copy_exe(&built("livi-helperd"), &res.join("driver/livi-helperd"))?;
     copy_exe(&built("livi-gst-host"), &res.join("gst-host/livi-gst-host"))?;
 
+    fetch_gstreamer("macos-arm64")?;
     let gst_src = root.join("assets").join(GST);
     let skip = |p: &Path| {
         p.extension().is_some_and(|e| e == "a")

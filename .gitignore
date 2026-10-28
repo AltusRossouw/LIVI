@@ -54,7 +54,14 @@ Thumbs.db
 *.log
 *.log*
 
-# LIVI Link dongle stack — build output, committed by the CI job only
+# GStreamer bundles, fetched from the assets release
+/assets/gstreamer/*/*
+!/assets/gstreamer/LICENSES/*
+!/assets/gstreamer/*/version.txt
+!/assets/gstreamer/*/packages.txt
+!/assets/gstreamer/*/sha256.txt
+
+# LIVI Link dongle stack — firmware fetched from the assets release
 assets/livi-link/*/*.gz
 assets/livi-link/*/*.lfwb
 assets/livi-link/*/MANIFEST.md5

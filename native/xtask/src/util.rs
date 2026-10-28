@@ -128,6 +128,14 @@ pub fn exec(cmd: &mut Command) -> Result<(), String> {
     }
 }
 
+pub fn fetch_gstreamer(platform: &str) -> Result<(), String> {
+    exec(
+        Command::new("sh")
+            .arg(root().join("scripts/assets.sh"))
+            .args(["fetch", "gstreamer", platform]),
+    )
+}
+
 pub fn read(cmd: &mut Command) -> Result<String, String> {
     let what = format!("{cmd:?}");
     let out = cmd.output().map_err(|e| format!("{what}: {e}"))?;

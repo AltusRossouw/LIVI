@@ -315,45 +315,6 @@ jobs:
           merge-multiple: true
           path: .artifacts
 
-      - name: Extract artifact [macos-arm64]
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive=.artifacts/gstreamer-macos-arm64.tar.gz
-          if [[ ! -f "$archive" ]]; then
-            echo "no macos-arm64 archive, keeping the committed one"
-            exit 0
-          fi
-          rm -rf assets/gstreamer/macos-arm64
-          mkdir -p assets/gstreamer
-          tar -C assets/gstreamer -xzf "$archive"
-
-      - name: Extract artifact [linux-x64]
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive=.artifacts/gstreamer-linux-x64.tar.gz
-          if [[ ! -f "$archive" ]]; then
-            echo "no linux-x64 archive, keeping the committed one"
-            exit 0
-          fi
-          rm -rf assets/gstreamer/linux-x64
-          mkdir -p assets/gstreamer
-          tar -C assets/gstreamer -xzf "$archive"
-
-      - name: Extract artifact [linux-arm64]
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive=.artifacts/gstreamer-linux-arm64.tar.gz
-          if [[ ! -f "$archive" ]]; then
-            echo "no linux-arm64 archive, keeping the committed one"
-            exit 0
-          fi
-          rm -rf assets/gstreamer/linux-arm64
-          mkdir -p assets/gstreamer
-          tar -C assets/gstreamer -xzf "$archive"
-
       - name: Check that something was built
         shell: bash
         run: |
@@ -362,6 +323,18 @@ jobs:
             echo "no platform produced an asset"
             exit 1
           fi
+
+      - name: Publish bundles
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for plat in macos-arm64 linux-x64 linux-arm64; do
+            archive=".artifacts/gstreamer-${plat}.tar.gz"
+            [[ -f "$archive" ]] || continue
+            sh scripts/assets.sh publish gstreamer "$plat" "$archive"
+          done
 
       - name: Read Linux version for badge
         id: meta
@@ -393,7 +366,7 @@ jobs:
           for plat in linux-x64 linux-arm64 macos-arm64; do
             dir="assets/gstreamer/${plat}"
             [[ -d "$dir" ]] || continue
-            git add -f -A "$dir"
+            git add -A "$dir"
             if git diff --cached --quiet -- "$dir"; then
               continue
             fi

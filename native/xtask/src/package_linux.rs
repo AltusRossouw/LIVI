@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
-use crate::util::{Arch, copy_exe, copy_tree, exec, root, version};
+use crate::util::{Arch, copy_exe, copy_tree, exec, fetch_gstreamer, root, version};
 
 const START: &str = r#"#!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
@@ -103,6 +103,7 @@ pub fn run(arch: Arch) -> Result<(), String> {
         copy_tree(&displays, &res.join("displays"), &|_| false)?;
     }
 
+    fetch_gstreamer(&format!("linux-{}", arch.name()))?;
     let gst_dir = format!("gstreamer/linux-{}", arch.name());
     let gst_src = root.join("assets").join(&gst_dir);
     let skip = |p: &Path| {

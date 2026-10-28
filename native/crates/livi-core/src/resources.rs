@@ -98,7 +98,7 @@ impl Resources {
             compositor: root.join("out/bin/livi-compositor"),
             gstreamer: platform_dir()
                 .map(|d| root.join("assets/gstreamer").join(d))
-                .filter(|p| p.is_dir()),
+                .filter(|p| p.join("lib").is_dir()),
             templates: root.join("assets/linux"),
             ui: Some(UiCmd::Exec {
                 bin: root.join("out/bin/LIVI"),

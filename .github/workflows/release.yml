@@ -117,7 +117,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add the LIVI Link firmware
-        run: bash scripts/livi-link/stage-firmware.sh release-assets
+        run: |
+          sh scripts/assets.sh fetch livi-link
+          bash scripts/livi-link/stage-firmware.sh release-assets
 
       - name: Create GitHub release
         env:
